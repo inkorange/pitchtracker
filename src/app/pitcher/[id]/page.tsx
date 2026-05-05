@@ -220,25 +220,32 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
               No arsenal data cached for {season}.
             </div>
           ) : (
-            <ul className="space-y-1">
+            <ul className="space-y-1.5">
               {aggregates!.map((a) => (
                 <li
                   key={a.pitch_type}
-                  className="flex items-center gap-2 text-xs tabular-nums"
+                  className="space-y-0.5"
                 >
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: getPitchColor(a.pitch_type) }}
-                  />
-                  <span className="text-white/85 flex-1 truncate">
-                    {getPitchLabel(a.pitch_type)}
-                  </span>
-                  <span className="text-white/55">
-                    {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
-                  </span>
-                  <span className="text-white/45 w-10 text-right">
-                    {a.usage_pct != null ? `${Number(a.usage_pct).toFixed(0)}%` : "—"}
-                  </span>
+                  <div className="flex items-center gap-2 text-xs tabular-nums">
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: getPitchColor(a.pitch_type) }}
+                    />
+                    <span className="text-white/85 flex-1 truncate">
+                      {getPitchLabel(a.pitch_type)}
+                    </span>
+                    <span className="text-white/55">
+                      {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
+                    </span>
+                    <span className="text-white/45 w-10 text-right">
+                      {a.usage_pct != null ? `${Number(a.usage_pct).toFixed(0)}%` : "—"}
+                    </span>
+                  </div>
+                  {a.avg_break_onset_ft != null && (
+                    <div className="pl-4 text-[10px] tabular-nums text-white/40">
+                      break onset · {Number(a.avg_break_onset_ft).toFixed(1)} ft
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

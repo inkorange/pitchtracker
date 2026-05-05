@@ -162,6 +162,7 @@ export type Database = {
           avg_vertical_break: number | null;
           avg_horizontal_break: number | null;
           avg_induced_vertical_break: number | null;
+          avg_break_onset_ft: number | null;
           whiff_rate: number | null;
           called_strike_rate: number | null;
           run_value_per_100: number | null;
