@@ -9,10 +9,11 @@ import type { CameraPreset } from "@/lib/viz/camera-presets";
 
 interface SceneProps {
   preset: CameraPreset;
+  presetTick?: number;
   children: ReactNode;
 }
 
-export function Scene({ preset, children }: SceneProps) {
+export function Scene({ preset, presetTick, children }: SceneProps) {
   return (
     <Canvas
       gl={{ antialias: true, powerPreference: "high-performance" }}
@@ -23,7 +24,7 @@ export function Scene({ preset, children }: SceneProps) {
       <Suspense fallback={null}>
         <Lighting />
         <Stage />
-        <CameraRig preset={preset} />
+        <CameraRig preset={preset} presetTick={presetTick} />
         {children}
       </Suspense>
     </Canvas>

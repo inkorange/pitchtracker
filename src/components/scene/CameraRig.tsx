@@ -10,9 +10,13 @@ type OrbitControlsImpl = ComponentRef<typeof OrbitControls>;
 
 interface CameraRigProps {
   preset: CameraPreset;
+  // Increments each time a preset button is clicked, even if the preset
+  // value itself didn't change. Lets the user re-click the active preset
+  // to snap back after orbiting away.
+  presetTick?: number;
 }
 
-export function CameraRig({ preset }: CameraRigProps) {
+export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
   const { camera } = useThree();
   const orbitRef = useRef<OrbitControlsImpl>(null);
   const targetPos = useRef(new Vector3());
@@ -35,7 +39,7 @@ export function CameraRig({ preset }: CameraRigProps) {
     } else {
       animatingRef.current = true;
     }
-  }, [preset, camera]);
+  }, [preset, presetTick, camera]);
 
   // If the user starts orbiting, cancel any in-flight preset tween so the
   // tween doesn't fight the user's drag.
@@ -81,10 +85,9 @@ export function CameraRig({ preset }: CameraRigProps) {
       // Dampen the wheel/pinch zoom so a single scroll doesn't fly the
       // camera across the scene (default zoomSpeed is 1.0).
       zoomSpeed={0.4}
-      // Allow the camera to tilt slightly past horizontal (~10° below the
-      // horizon) so low-angle views of the pitch path are usable, but not
-      // far enough to look up at the scene from below the ground plane.
-      maxPolarAngle={Math.PI / 2 + 0.18}
+      // Camera can reach exactly horizontal but never below it — the
+      // ground plane should never be above the camera's eye line.
+      maxPolarAngle={Math.PI / 2}
       makeDefault
     />
   );

@@ -83,13 +83,17 @@ export function Stage() {
 }
 
 // =====================================================================
-// Outfield grass: 180° sector covering the whole field. The dirt fan
-// sits on top of it inside the 95-ft-from-rubber boundary.
+// Outfield grass: a large square plane centered slightly forward of
+// home so it covers the field plus generous margins to the sides and
+// behind the plate. No more black void around the field.
 // =====================================================================
 function OutfieldGrass() {
   return (
-    <mesh position={[0, Y_GRASS_BASE, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <circleGeometry args={[330, 96, 0, Math.PI]} />
+    <mesh
+      position={[0, Y_GRASS_BASE, -100]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <planeGeometry args={[800, 800]} />
       <meshStandardMaterial color={GRASS} roughness={0.95} metalness={0} />
     </mesh>
   );

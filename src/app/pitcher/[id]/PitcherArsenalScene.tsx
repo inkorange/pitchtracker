@@ -37,6 +37,13 @@ interface PitcherArsenalSceneProps {
 
 export function PitcherArsenalScene({ pitches }: PitcherArsenalSceneProps) {
   const [preset, setPreset] = useState<CameraPreset>("side");
+  const [presetTick, setPresetTick] = useState(0);
+  const handlePresetChange = (next: CameraPreset) => {
+    setPreset(next);
+    // Bump even when next === preset so the rig retriggers and the user
+    // can re-click an active preset to snap back after orbiting away.
+    setPresetTick((t) => t + 1);
+  };
 
   const ribbons = useMemo(() => {
     return pitches
@@ -90,12 +97,12 @@ export function PitcherArsenalScene({ pitches }: PitcherArsenalSceneProps) {
 
   return (
     <>
-      <Scene preset={preset}>
+      <Scene preset={preset} presetTick={presetTick}>
         {ribbons.map((r) => (
           <Ribbon key={r.id} path={r.path} pitchType={r.pitchType} radius={0.06} />
         ))}
       </Scene>
-      <CameraPad current={preset} onChange={setPreset} />
+      <CameraPad current={preset} onChange={handlePresetChange} />
     </>
   );
 }
