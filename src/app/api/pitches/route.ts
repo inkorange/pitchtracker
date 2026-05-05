@@ -36,11 +36,18 @@ export async function GET(request: Request) {
   if (pitches.length === 0 || isStale(pitches[0]?.fetched_at)) {
     const fresh = await fetchGamePitches(gamePk);
     if (fresh.length > 0) {
+      // Get the known pitcher IDs once so we can null out FK-violating rows
+      // for opposing-team pitchers we don't have metadata for yet.
+      const { data: knownPitchers } = await supabase
+        .from("pitch_pitchers")
+        .select("mlb_id");
+      const knownPitcherIds = new Set((knownPitchers ?? []).map((p) => p.mlb_id));
+
       const rows: TablesInsert<"pitch_game_pitches">[] = fresh.map((p) => ({
         game_pk: p.game_pk,
         at_bat_number: p.at_bat_number,
         pitch_number: p.pitch_number,
-        pitcher_id: p.pitcher,
+        pitcher_id: knownPitcherIds.has(p.pitcher) ? p.pitcher : null,
         batter_id: p.batter,
         pitch_type: p.pitch_type ?? null,
         pitch_name: p.pitch_name ?? null,

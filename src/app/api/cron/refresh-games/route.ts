@@ -21,7 +21,23 @@ export async function GET(request: Request) {
   const games = await fetchSchedule(from, to);
   const supabase = createAdminClient();
 
-  const rows = games.map((g) => ({
+  // Restrict to games where both teams are MLB (in pitch_teams). The
+  // schedule API also returns spring training / WBC / exhibition games
+  // against non-MLB teams that would violate the FK.
+  const { data: teamRows } = await supabase.from("pitch_teams").select("mlb_id");
+  const validTeamIds = new Set((teamRows ?? []).map((t) => t.mlb_id));
+
+  // The schedule API can return the same gamePk more than once in a window
+  // (e.g. resumed games, schedule corrections). Dedupe by game_pk before
+  // upserting so we don't violate ON CONFLICT.
+  const byPk = new Map<number, (typeof games)[number]>();
+  for (const g of games) {
+    if (!validTeamIds.has(g.teams.home.team.id) || !validTeamIds.has(g.teams.away.team.id)) {
+      continue;
+    }
+    byPk.set(g.gamePk, g);
+  }
+  const rows = Array.from(byPk.values()).map((g) => ({
     game_pk: g.gamePk,
     game_date: g.gameDate.slice(0, 10),
     season: Number(g.gameDate.slice(0, 4)),

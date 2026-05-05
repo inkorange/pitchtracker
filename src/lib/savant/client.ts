@@ -4,6 +4,7 @@
 //      hybrid pitch fetcher path) or a wider filter set (Phase 5 mining).
 //   2. Player services — pre-computed pitcher arsenal aggregates.
 
+import Papa from "papaparse";
 import type { StatcastRow } from "@/lib/pitch/Pitch";
 
 const SEARCH_BASE = "https://baseballsavant.mlb.com/statcast_search/csv";
@@ -72,25 +73,16 @@ function parseNum(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-// Parse Savant's CSV. The CSV uses standard quoting; our row content
-// doesn't include embedded commas-in-quotes for the fields we care about,
-// so a simple split is sufficient. If we hit an edge case we'll swap in
-// papaparse — keeping it dependency-free for now.
+// Parse Savant's CSV via papaparse. The Savant CSV has a BOM, quoted
+// fields, and embedded commas inside quoted strings (e.g. "Laureano, Ramón"),
+// so a naive split breaks. papaparse handles all of those plus type coercion.
 function parseCsv(csv: string): Record<string, string>[] {
-  const lines = csv.split(/\r?\n/).filter((l) => l.length > 0);
-  if (lines.length < 2) return [];
-  const header = lines[0].split(",");
-  const out: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = lines[i].split(",");
-    if (cells.length !== header.length) continue;
-    const row: Record<string, string> = {};
-    for (let j = 0; j < header.length; j++) {
-      row[header[j]] = cells[j];
-    }
-    out.push(row);
-  }
-  return out;
+  const result = Papa.parse<Record<string, string>>(csv, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.replace(/^﻿/, "").trim(),
+  });
+  return result.data;
 }
 
 function castRow(raw: Record<string, string>): SavantPitchRow {
