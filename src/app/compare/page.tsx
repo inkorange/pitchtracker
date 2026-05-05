@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -27,6 +28,28 @@ interface PageProps {
 }
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const sp = await searchParams;
+  const og = new URLSearchParams();
+  if (sp.a) og.set("a", sp.a);
+  if (sp.b) og.set("b", sp.b);
+  if (sp.aSeason) og.set("aSeason", sp.aSeason);
+  if (sp.bSeason) og.set("bSeason", sp.bSeason);
+  const ogUrl = `/api/og/compare?${og.toString()}`;
+  return {
+    title: "Compare pitchers · pitchtracker",
+    openGraph: {
+      title: "Compare pitchers in 3D",
+      description: "Two pitchers' arsenals overlaid in shared 3D space.",
+      images: [{ url: ogUrl, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [ogUrl],
+    },
+  };
+}
 
 export default async function ComparePage({ searchParams }: PageProps) {
   const sp = await searchParams;

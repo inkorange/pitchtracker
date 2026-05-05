@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
+import { BallTracer } from "@/components/ribbon/BallTracer";
 import { CameraPad } from "@/components/controls/CameraPad";
+import { TransportBar } from "@/components/controls/TransportBar";
 import { averagePitchesByType, type CachedPitchSubset } from "@/lib/pitch/averages";
 import { computeTunnelStats } from "@/lib/pitch/tunneling";
 import type { Pitch } from "@/lib/pitch/Pitch";
@@ -26,7 +28,6 @@ interface RibbonData {
 
 interface MatchedTunnel {
   pitchType: string;
-  // Statcast-space marker position (the tunnel point).
   markerPos: [number, number, number];
   tunnelY: number;
 }
@@ -43,7 +44,9 @@ export function ComparisonScene({
     setPresetTick((t) => t + 1);
   };
 
-  const { aRibbons, bRibbons, tunnels } = useMemo(() => {
+  const [progress, setProgress] = useState(0);
+
+  const { aRibbons, bRibbons, tunnels, flightDuration } = useMemo(() => {
     const aByType = averagePitchesByType(aPitches);
     const bByType = averagePitchesByType(bPitches);
 
@@ -75,7 +78,6 @@ export function ComparisonScene({
       }
     }
 
-    // Compute tunnel point per pitch type both pitchers have.
     const tunnels: MatchedTunnel[] = [];
     for (const [type, aPitch] of aByType) {
       const bPitch = bByType.get(type);
@@ -86,12 +88,25 @@ export function ComparisonScene({
         const markerPos = tunnelMarkerPosition(aPitch, bPitch, stats.tunnelY, releaseOffset);
         tunnels.push({ pitchType: type, markerPos, tunnelY: stats.tunnelY });
       } catch {
-        // skip pitches with degenerate math
+        // skip
       }
     }
 
-    return { aRibbons: aRaw, bRibbons, tunnels };
+    // Use the longest flight time among matched pitches as the playback
+    // duration — slowest pitch sets the pace so all balls reach the
+    // plate around the same time.
+    let flightDuration = 0.4;
+    for (const p of aByType.values()) {
+      flightDuration = Math.max(flightDuration, safeDuration(p));
+    }
+    for (const p of bByType.values()) {
+      flightDuration = Math.max(flightDuration, safeDuration(p));
+    }
+
+    return { aRibbons: aRaw, bRibbons, tunnels, flightDuration };
   }, [aPitches, bPitches, normalizeRelease]);
+
+  const showTracers = aRibbons.length + bRibbons.length > 0;
 
   return (
     <>
@@ -121,8 +136,19 @@ export function ComparisonScene({
             pitchType={t.pitchType}
           />
         ))}
+        {showTracers &&
+          aRibbons.map((r) => (
+            <BallTracer key={`a-tracer-${r.pitchType}`} path={r.path} progress={progress} />
+          ))}
+        {showTracers &&
+          bRibbons.map((r) => (
+            <BallTracer key={`b-tracer-${r.pitchType}`} path={r.path} progress={progress} />
+          ))}
       </Scene>
       <CameraPad current={preset} onChange={handlePresetChange} />
+      {showTracers && (
+        <TransportBar flightDuration={flightDuration} onProgressChange={setProgress} />
+      )}
     </>
   );
 }
@@ -160,11 +186,18 @@ function tunnelMarkerPosition(
 ): [number, number, number] {
   const pa = a.positionAtY(tunnelY);
   const pb = b.positionAtY(tunnelY);
-  // Average A's position with B's release-shifted position to land the
-  // marker right where the two paths converge in the rendered scene.
   return [
     (pa[0] + pb[0] + bOffset[0]) / 2,
     (pa[1] + pb[1] + bOffset[1]) / 2,
     (pa[2] + pb[2] + bOffset[2]) / 2,
   ];
+}
+
+function safeDuration(p: Pitch): number {
+  try {
+    const d = p.flightDuration();
+    return Number.isFinite(d) && d > 0 ? d : 0;
+  } catch {
+    return 0;
+  }
 }
