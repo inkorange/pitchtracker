@@ -7,6 +7,7 @@ import { getPitchLabel, getPitchColor } from "@/lib/viz/colors";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
+import { SeasonPicker } from "@/components/filters/SeasonPicker";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -210,7 +211,6 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           pitcherId={pitcher.mlb_id}
           season={season}
           available={availableSeasons.length ? availableSeasons : [season]}
-          searchParams={sp}
         />
 
         <div>
@@ -270,41 +270,3 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   );
 }
 
-function SeasonPicker({
-  pitcherId,
-  season,
-  available,
-  searchParams,
-}: {
-  pitcherId: number;
-  season: number;
-  available: number[];
-  searchParams: { pitch?: string; hand?: string; game?: string };
-}) {
-  const preserved = new URLSearchParams();
-  if (searchParams.pitch) preserved.set("pitch", searchParams.pitch);
-  if (searchParams.hand) preserved.set("hand", searchParams.hand);
-  // Don't preserve `game` across seasons — the game wouldn't apply.
-  const suffix = preserved.toString();
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-white/45">Season</span>
-      <div className="flex gap-1">
-        {available.map((s) => (
-          <Link
-            key={s}
-            href={`/pitcher/${pitcherId}?season=${s}${suffix ? `&${suffix}` : ""}`}
-            className={`px-2 py-0.5 text-[11px] tabular-nums rounded ${
-              s === season
-                ? "bg-white/12 text-white"
-                : "text-white/55 hover:text-white hover:bg-white/[0.04]"
-            }`}
-          >
-            {s}
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}

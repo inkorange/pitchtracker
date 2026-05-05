@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useTransition } from "react";
 import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
 
 interface ArsenalEntry {
@@ -25,6 +25,7 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const update = useCallback(
     (next: Record<string, string | null>) => {
@@ -34,7 +35,9 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
         else sp.set(k, v);
       }
       const qs = sp.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      startTransition(() => {
+        router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      });
     },
     [params, pathname, router],
   );
@@ -55,7 +58,13 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 transition-opacity ${isPending ? "opacity-60" : ""}`}>
+      {isPending && (
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-white/55">
+          <span className="inline-block w-2 h-2 rounded-full bg-white/40 animate-pulse" />
+          Updating…
+        </div>
+      )}
       {arsenal.length > 0 && (
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
