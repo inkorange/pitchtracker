@@ -1,10 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { getPitchColorForSide, getPitchLabel, type CompareSide } from "@/lib/viz/colors";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { ComparisonScene } from "./ComparisonScene";
+import { CompareSideFilters } from "./CompareSideFilters";
+import { CompareLinkActions } from "./CompareLinkActions";
+import { TunnelingPanel } from "./TunnelingPanel";
 
 interface PageProps {
   searchParams: Promise<{
@@ -12,10 +16,17 @@ interface PageProps {
     b?: string;
     aSeason?: string;
     bSeason?: string;
-    pitch?: string;
-    hand?: string;
+    aPitch?: string;
+    bPitch?: string;
+    aHand?: string;
+    bHand?: string;
+    aGame?: string;
+    bGame?: string;
+    trueRelease?: string;
   }>;
 }
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 export default async function ComparePage({ searchParams }: PageProps) {
   const sp = await searchParams;
@@ -30,8 +41,6 @@ export default async function ComparePage({ searchParams }: PageProps) {
 
   const supabase = await createClient();
   const currentYear = new Date().getFullYear();
-  const aSeason = sp.aSeason ? Number(sp.aSeason) : currentYear;
-  const bSeason = sp.bSeason ? Number(sp.bSeason) : currentYear;
 
   const [{ data: aPitcher }, { data: bPitcher }] = await Promise.all([
     supabase.from("pitch_pitchers").select("*").eq("mlb_id", aId).maybeSingle(),
@@ -42,14 +51,32 @@ export default async function ComparePage({ searchParams }: PageProps) {
     return <EmptyState aId={haveA ? aId : null} bId={haveB ? bId : null} />;
   }
 
-  const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
-  const hand = sp.hand === "L" || sp.hand === "R" ? sp.hand : null;
+  const aSeason = Number(sp.aSeason) || currentYear;
+  const bSeason = Number(sp.bSeason) || currentYear;
 
-  const [aPitches, bPitches, aAggregates, bAggregates] = await Promise.all([
-    fetchPitches(supabase, aId, aSeason, pitchTypes, hand),
-    fetchPitches(supabase, bId, bSeason, pitchTypes, hand),
-    fetchAggregates(supabase, aId, aSeason),
-    fetchAggregates(supabase, bId, bSeason),
+  // Lazy backfill: pull from Savant on first visit per side × season.
+  await Promise.all([
+    ensurePitcherSeasonCache(aId, aSeason),
+    ensurePitcherSeasonCache(bId, bSeason),
+  ]);
+
+  const [aCtx, bCtx] = await Promise.all([
+    loadSideContext(supabase, {
+      pitcherId: aId,
+      season: aSeason,
+      pitchTypes: (sp.aPitch ?? "").split(",").filter(Boolean),
+      hand: parseHand(sp.aHand),
+      gamePk: parseGame(sp.aGame),
+      currentYear,
+    }),
+    loadSideContext(supabase, {
+      pitcherId: bId,
+      season: bSeason,
+      pitchTypes: (sp.bPitch ?? "").split(",").filter(Boolean),
+      hand: parseHand(sp.bHand),
+      gamePk: parseGame(sp.bGame),
+      currentYear,
+    }),
   ]);
 
   const [aTeam, bTeam] = await Promise.all([
@@ -57,47 +84,207 @@ export default async function ComparePage({ searchParams }: PageProps) {
     bPitcher.current_team_id ? fetchTeam(supabase, bPitcher.current_team_id) : null,
   ]);
 
+  const trueRelease = sp.trueRelease === "1";
+
   return (
     <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
-      <ComparisonScene aPitches={aPitches} bPitches={bPitches} />
+      <ComparisonScene
+        aPitches={aCtx.pitches}
+        bPitches={bCtx.pitches}
+        normalizeRelease={!trueRelease}
+      />
 
       <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
-        <Link
-          href="/"
-          className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors pointer-events-auto"
-        >
-          ← pitchtracker
-        </Link>
+        <div className="flex gap-3 items-center pointer-events-auto">
+          <Link
+            href="/"
+            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
+          >
+            ← pitchtracker
+          </Link>
+          <CompareLinkActions />
+        </div>
         <div className="text-[10px] uppercase tracking-[0.16em] text-white/45 pointer-events-none">
           Compare
         </div>
       </header>
 
-      <section className="absolute top-20 left-6 w-[380px] rounded-lg bg-white/[0.06] backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-6 w-[400px] rounded-lg bg-white/[0.06] backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
         <PitcherCard
           side="a"
           pitcher={aPitcher}
           team={aTeam}
-          season={aSeason}
-          aggregates={aAggregates}
+          season={aCtx.season}
+          aggregates={aCtx.aggregates}
+          availableSeasons={aCtx.availableSeasons}
+          games={aCtx.gameOptions}
         />
         <div className="border-t border-white/[0.08]" />
         <PitcherCard
           side="b"
           pitcher={bPitcher}
           team={bTeam}
-          season={bSeason}
-          aggregates={bAggregates}
+          season={bCtx.season}
+          aggregates={bCtx.aggregates}
+          availableSeasons={bCtx.availableSeasons}
+          games={bCtx.gameOptions}
         />
 
-        <div className="text-[11px] tabular-nums text-white/45 pt-2 border-t border-white/[0.05]">
-          {aPitches.length + bPitches.length} pitches rendered ·{" "}
-          {aPitches.length} from {aPitcher.last_name ?? "A"}, {bPitches.length} from{" "}
-          {bPitcher.last_name ?? "B"}
+        <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
+
+        <div className="text-[11px] tabular-nums text-white/45 pt-2 border-t border-white/[0.05] flex items-center justify-between">
+          <span>
+            {aCtx.pitches.length + bCtx.pitches.length} pitches rendered
+          </span>
+          <Link
+            href={`/compare?${buildToggleQS(sp, "trueRelease", trueRelease ? null : "1")}`}
+            className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white transition-colors"
+          >
+            {trueRelease ? "Sync release" : "True release"}
+          </Link>
         </div>
       </section>
     </main>
   );
+}
+
+interface SideContext {
+  season: number;
+  availableSeasons: number[];
+  aggregates: AggRow[];
+  pitches: PitchRow[];
+  gameOptions: GameOption[];
+}
+
+async function loadSideContext(
+  supabase: SupabaseClient,
+  args: {
+    pitcherId: number;
+    season: number;
+    pitchTypes: string[];
+    hand: "L" | "R" | null;
+    gamePk: number | null;
+    currentYear: number;
+  },
+): Promise<SideContext> {
+  const { pitcherId, season, pitchTypes, hand, gamePk, currentYear } = args;
+
+  const { data: aggSeasonRows } = await supabase
+    .from("pitch_pitcher_aggregates")
+    .select("season")
+    .eq("pitcher_id", pitcherId);
+  const { data: pitcherGameRows } = await supabase
+    .from("pitch_game_pitches")
+    .select("game_pk")
+    .eq("pitcher_id", pitcherId);
+  const distinctPitcherGamePks = Array.from(
+    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
+  );
+  const { data: pitcherGameSeasons } =
+    distinctPitcherGamePks.length > 0
+      ? await supabase
+          .from("pitch_games")
+          .select("game_pk, game_date, season, home_team_id, away_team_id")
+          .in("game_pk", distinctPitcherGamePks)
+      : { data: [] };
+  const seasonsWithData = new Set<number>();
+  for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
+  for (const r of pitcherGameSeasons ?? []) seasonsWithData.add(r.season);
+  seasonsWithData.add(currentYear);
+  const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
+
+  const { data: seasonGames } = await supabase
+    .from("pitch_games")
+    .select("game_pk")
+    .eq("season", season);
+  const seasonGamePks = new Set((seasonGames ?? []).map((g) => g.game_pk));
+
+  let pitchQuery = supabase
+    .from("pitch_game_pitches")
+    .select(
+      "game_pk, pitch_type, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, stand",
+    )
+    .eq("pitcher_id", pitcherId)
+    .limit(1500);
+  if (seasonGamePks.size > 0) {
+    pitchQuery = pitchQuery.in("game_pk", Array.from(seasonGamePks));
+  } else {
+    pitchQuery = pitchQuery.eq("game_pk", -1); // empty
+  }
+  if (pitchTypes.length > 0) pitchQuery = pitchQuery.in("pitch_type", pitchTypes);
+  if (hand) pitchQuery = pitchQuery.eq("stand", hand);
+  if (gamePk) pitchQuery = pitchQuery.eq("game_pk", gamePk);
+
+  const { data: pitches } = await pitchQuery;
+
+  const { data: aggregates } = await supabase
+    .from("pitch_pitcher_aggregates")
+    .select("pitch_type, pitch_count, usage_pct, avg_velocity")
+    .eq("pitcher_id", pitcherId)
+    .eq("season", season)
+    .eq("batter_hand", "*")
+    .order("usage_pct", { ascending: false, nullsFirst: false });
+
+  // Game dropdown options (cached games for this pitcher in this season).
+  const cachedGamePksForSeason = distinctPitcherGamePks.filter((pk) => seasonGamePks.has(pk));
+  const seasonGameMeta = (pitcherGameSeasons ?? []).filter((g) =>
+    cachedGamePksForSeason.includes(g.game_pk),
+  );
+  const teamIds = new Set<number>();
+  for (const g of seasonGameMeta) {
+    if (g.home_team_id) teamIds.add(g.home_team_id);
+    if (g.away_team_id) teamIds.add(g.away_team_id);
+  }
+  const { data: teamRows } =
+    teamIds.size > 0
+      ? await supabase
+          .from("pitch_teams")
+          .select("mlb_id, abbreviation")
+          .in("mlb_id", Array.from(teamIds))
+      : { data: [] };
+  const teamAbbr = new Map<number, string>(
+    (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
+  );
+  const gameOptions: GameOption[] = seasonGameMeta
+    .map((g) => ({
+      game_pk: g.game_pk,
+      game_date: g.game_date,
+      away: g.away_team_id ? (teamAbbr.get(g.away_team_id) ?? "?") : "?",
+      home: g.home_team_id ? (teamAbbr.get(g.home_team_id) ?? "?") : "?",
+    }))
+    .sort((a, b) => b.game_date.localeCompare(a.game_date));
+
+  return {
+    season,
+    availableSeasons,
+    aggregates: (aggregates ?? []) as AggRow[],
+    pitches: (pitches ?? []) as PitchRow[],
+    gameOptions,
+  };
+}
+
+function parseHand(v: string | undefined): "L" | "R" | null {
+  return v === "L" || v === "R" ? v : null;
+}
+
+function parseGame(v: string | undefined): number | null {
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildToggleQS(
+  sp: Record<string, string | undefined>,
+  key: string,
+  value: string | null,
+): string {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (k === key) continue;
+    if (v != null) params.set(k, v);
+  }
+  if (value !== null) params.set(key, value);
+  return params.toString();
 }
 
 interface PitcherRow {
@@ -106,6 +293,7 @@ interface PitcherRow {
   throws: string | null;
   current_team_id: number | null;
   debut_year: number | null;
+  last_name: string | null;
 }
 
 interface TeamRow {
@@ -121,52 +309,32 @@ interface AggRow {
   avg_velocity: number | null;
 }
 
-async function fetchPitches(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  pitcherId: number,
-  season: number,
-  pitchTypes: string[],
-  hand: "L" | "R" | null,
-) {
-  // Get game_pks from this season first.
-  const { data: seasonGames } = await supabase
-    .from("pitch_games")
-    .select("game_pk")
-    .eq("season", season);
-  const seasonGamePks = (seasonGames ?? []).map((g) => g.game_pk);
-  if (seasonGamePks.length === 0) return [];
-
-  let q = supabase
-    .from("pitch_game_pitches")
-    .select(
-      "pitch_type, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, stand",
-    )
-    .eq("pitcher_id", pitcherId)
-    .in("game_pk", seasonGamePks)
-    .limit(1500);
-  if (pitchTypes.length > 0) q = q.in("pitch_type", pitchTypes);
-  if (hand) q = q.eq("stand", hand);
-  const { data } = await q;
-  return data ?? [];
+interface PitchRow {
+  pitch_type: string | null;
+  release_pos_x: number | null;
+  release_pos_y: number | null;
+  release_pos_z: number | null;
+  vx0: number | null;
+  vy0: number | null;
+  vz0: number | null;
+  ax: number | null;
+  ay: number | null;
+  az: number | null;
+  plate_x: number | null;
+  plate_z: number | null;
+  release_speed: number | null;
+  stand: string | null;
 }
 
-async function fetchAggregates(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  pitcherId: number,
-  season: number,
-): Promise<AggRow[]> {
-  const { data } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select("pitch_type, pitch_count, usage_pct, avg_velocity")
-    .eq("pitcher_id", pitcherId)
-    .eq("season", season)
-    .eq("batter_hand", "*")
-    .order("usage_pct", { ascending: false, nullsFirst: false });
-  return (data ?? []) as AggRow[];
+interface GameOption {
+  game_pk: number;
+  game_date: string;
+  away: string;
+  home: string;
 }
 
 async function fetchTeam(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   teamId: number,
 ): Promise<TeamRow | null> {
   const { data } = await supabase
@@ -183,12 +351,16 @@ function PitcherCard({
   team,
   season,
   aggregates,
+  availableSeasons,
+  games,
 }: {
   side: CompareSide;
   pitcher: PitcherRow;
   team: TeamRow | null;
   season: number;
   aggregates: AggRow[];
+  availableSeasons: number[];
+  games: GameOption[];
 }) {
   const sideLabel = side === "a" ? "Pitcher A" : "Pitcher B";
   return (
@@ -253,13 +425,20 @@ function PitcherCard({
           ))}
         </ul>
       )}
+      <CompareSideFilters
+        side={side}
+        availableSeasons={availableSeasons}
+        arsenal={aggregates.map((a) => ({
+          pitch_type: a.pitch_type,
+          pitch_count: a.pitch_count,
+        }))}
+        games={games}
+      />
     </div>
   );
 }
 
 async function EmptyState({ aId, bId }: { aId: number | null; bId: number | null }) {
-  // Look up either selected pitcher's name so the empty-state UI can show
-  // who's already in the slot.
   const supabase = await createClient();
   const ids = [aId, bId].filter((x): x is number => x != null);
   const { data: rows } = ids.length
@@ -287,19 +466,8 @@ async function EmptyState({ aId, bId }: { aId: number | null; bId: number | null
           </p>
         </div>
 
-        <CompareSlot
-          slot="a"
-          selectedId={aId}
-          selectedName={aId ? byId.get(aId) : undefined}
-          otherId={bId}
-        />
-
-        <CompareSlot
-          slot="b"
-          selectedId={bId}
-          selectedName={bId ? byId.get(bId) : undefined}
-          otherId={aId}
-        />
+        <CompareSlot slot="a" selectedId={aId} selectedName={aId ? byId.get(aId) : undefined} otherId={bId} />
+        <CompareSlot slot="b" selectedId={bId} selectedName={bId ? byId.get(bId) : undefined} otherId={aId} />
       </div>
     </main>
   );
@@ -338,9 +506,7 @@ function CompareSlot({
 
   return (
     <div className="space-y-3">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-        {slotLabel}
-      </div>
+      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">{slotLabel}</div>
       {selectedId ? (
         <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-md bg-white/[0.06] border border-white/10">
           <div className="flex items-center gap-3 min-w-0">

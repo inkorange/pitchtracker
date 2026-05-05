@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { getPitchLabel, getPitchColor } from "@/lib/viz/colors";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
@@ -60,6 +61,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
 
   const season = sp.season ? Number(sp.season) : currentYear;
+
+  // First-visit lazy backfill: if no pitches are cached for this pitcher
+  // × season yet, pull from Savant on demand. No-op once cached.
+  await ensurePitcherSeasonCache(pitcherId, season);
 
   const { data: aggregates } = await supabase
     .from("pitch_pitcher_aggregates")

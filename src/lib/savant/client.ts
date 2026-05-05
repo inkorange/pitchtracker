@@ -103,6 +103,23 @@ export async function fetchGamePitches(gamePk: number): Promise<SavantPitchRow[]
     game_pk: String(gamePk),
   });
   const url = `${SEARCH_BASE}?${params}`;
+  return fetchSavantCsv(url, `game ${gamePk}`);
+}
+
+// Fetch all of a pitcher's pitches for a given season. Used by the
+// on-demand backfill when a pitcher × season has no cached data yet.
+export async function fetchPitcherSeasonPitches(
+  pitcherId: number,
+  season: number,
+): Promise<SavantPitchRow[]> {
+  // pitchers_lookup[] needs the literal brackets, which URLSearchParams
+  // would percent-encode as %5B%5D — Savant accepts both, but we build
+  // the URL manually here to keep it readable.
+  const url = `${SEARCH_BASE}?all=true&type=details&hfSea=${season}%7C&player_type=pitcher&pitchers_lookup%5B%5D=${pitcherId}`;
+  return fetchSavantCsv(url, `pitcher ${pitcherId} season ${season}`);
+}
+
+async function fetchSavantCsv(url: string, label: string): Promise<SavantPitchRow[]> {
   const res = await fetch(url, {
     headers: {
       Accept: "text/csv",
@@ -111,7 +128,7 @@ export async function fetchGamePitches(gamePk: number): Promise<SavantPitchRow[]
     cache: "no-store",
   });
   if (!res.ok) {
-    throw new Error(`Savant CSV ${res.status} for game ${gamePk}`);
+    throw new Error(`Savant CSV ${res.status} for ${label}`);
   }
   const csv = await res.text();
   return parseCsv(csv).map(castRow);
