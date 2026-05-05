@@ -1,9 +1,12 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { OrbitControls } from "@react-three/drei";
+import { useEffect, useRef, type ComponentRef } from "react";
 import { Vector3 } from "three";
 import { CAMERA_PRESETS, type CameraPreset } from "@/lib/viz/camera-presets";
+
+type OrbitControlsImpl = ComponentRef<typeof OrbitControls>;
 
 interface CameraRigProps {
   preset: CameraPreset;
@@ -11,29 +14,68 @@ interface CameraRigProps {
 
 export function CameraRig({ preset }: CameraRigProps) {
   const { camera } = useThree();
+  const orbitRef = useRef<OrbitControlsImpl>(null);
   const targetPos = useRef(new Vector3());
   const targetLook = useRef(new Vector3());
-  const currentLook = useRef(new Vector3());
-  const initialized = useRef(false);
+  const animatingRef = useRef(false);
+  const firstRenderRef = useRef(true);
 
   useEffect(() => {
     const p = CAMERA_PRESETS[preset];
     targetPos.current.set(p.position[0], p.position[1], p.position[2]);
     targetLook.current.set(p.target[0], p.target[1], p.target[2]);
-    if (!initialized.current) {
+    if (firstRenderRef.current) {
       camera.position.set(p.position[0], p.position[1], p.position[2]);
-      currentLook.current.set(p.target[0], p.target[1], p.target[2]);
-      initialized.current = true;
+      if (orbitRef.current) {
+        orbitRef.current.target.set(p.target[0], p.target[1], p.target[2]);
+        orbitRef.current.update();
+      }
+      firstRenderRef.current = false;
+      animatingRef.current = false;
+    } else {
+      animatingRef.current = true;
     }
   }, [preset, camera]);
 
+  // If the user starts orbiting, cancel any in-flight preset tween so the
+  // tween doesn't fight the user's drag.
+  useEffect(() => {
+    const controls = orbitRef.current;
+    if (!controls) return;
+    const cancel = () => {
+      animatingRef.current = false;
+    };
+    controls.addEventListener("start", cancel);
+    return () => {
+      controls.removeEventListener("start", cancel);
+    };
+  }, []);
+
   useFrame((_, delta) => {
-    // Damped spring-like easing toward the target preset.
+    if (!animatingRef.current) return;
     const k = Math.min(1, delta * 2.5);
     camera.position.lerp(targetPos.current, k);
-    currentLook.current.lerp(targetLook.current, k);
-    camera.lookAt(currentLook.current);
+    if (orbitRef.current) {
+      orbitRef.current.target.lerp(targetLook.current, k);
+      orbitRef.current.update();
+    }
+    if (
+      camera.position.distanceTo(targetPos.current) < 0.05 &&
+      orbitRef.current &&
+      orbitRef.current.target.distanceTo(targetLook.current) < 0.05
+    ) {
+      animatingRef.current = false;
+    }
   });
 
-  return null;
+  return (
+    <OrbitControls
+      ref={orbitRef}
+      enableDamping
+      dampingFactor={0.08}
+      minDistance={5}
+      maxDistance={140}
+      makeDefault
+    />
+  );
 }

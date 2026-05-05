@@ -38,7 +38,7 @@ export default function SinglePitchDev() {
   const flightDuration = useMemo(() => pitch.flightDuration(), [pitch]);
 
   return (
-    <main className="w-screen h-screen relative bg-[#0a0e14] overflow-hidden">
+    <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
       <Scene preset={preset}>
         <Ribbon path={path} pitchType={SKUBAL_FASTBALL.pitch_type} />
         <BallTracer path={path} progress={progress} />
