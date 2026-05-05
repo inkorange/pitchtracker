@@ -75,6 +75,10 @@ export function CameraRig({ preset }: CameraRigProps) {
       dampingFactor={0.08}
       minDistance={5}
       maxDistance={140}
+      // Constrain orbit to top and sides — never below the horizon. Keeps the
+      // ground plane and stadium silhouette from clipping other objects when
+      // the camera tries to look up from underneath.
+      maxPolarAngle={Math.PI / 2 - 0.05}
       makeDefault
     />
   );
