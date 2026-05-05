@@ -10,9 +10,13 @@ type OrbitControlsImpl = ComponentRef<typeof OrbitControls>;
 
 interface CameraRigProps {
   preset: CameraPreset;
+  // Increments each time a preset button is clicked, even if the preset
+  // value itself didn't change. Lets the user re-click the active preset
+  // to snap back after orbiting away.
+  presetTick?: number;
 }
 
-export function CameraRig({ preset }: CameraRigProps) {
+export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
   const { camera } = useThree();
   const orbitRef = useRef<OrbitControlsImpl>(null);
   const targetPos = useRef(new Vector3());
@@ -35,7 +39,7 @@ export function CameraRig({ preset }: CameraRigProps) {
     } else {
       animatingRef.current = true;
     }
-  }, [preset, camera]);
+  }, [preset, presetTick, camera]);
 
   // If the user starts orbiting, cancel any in-flight preset tween so the
   // tween doesn't fight the user's drag.
@@ -74,11 +78,16 @@ export function CameraRig({ preset }: CameraRigProps) {
       enableDamping
       dampingFactor={0.08}
       minDistance={5}
-      maxDistance={140}
-      // Constrain orbit to top and sides — never below the horizon. Keeps the
-      // ground plane and stadium silhouette from clipping other objects when
-      // the camera tries to look up from underneath.
-      maxPolarAngle={Math.PI / 2 - 0.05}
+      // Max zoom-out matches the top preset's camera distance (100 ft).
+      // Users can zoom in from any preset, but never further out than the
+      // top preset's framing.
+      maxDistance={100}
+      // Dampen the wheel/pinch zoom so a single scroll doesn't fly the
+      // camera across the scene (default zoomSpeed is 1.0).
+      zoomSpeed={0.4}
+      // Camera can reach exactly horizontal but never below it — the
+      // ground plane should never be above the camera's eye line.
+      maxPolarAngle={Math.PI / 2}
       makeDefault
     />
   );

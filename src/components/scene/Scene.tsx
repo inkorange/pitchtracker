@@ -2,7 +2,6 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, type ReactNode } from "react";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { Stage } from "./Stage";
 import { Lighting } from "./Lighting";
 import { CameraRig } from "./CameraRig";
@@ -10,10 +9,11 @@ import type { CameraPreset } from "@/lib/viz/camera-presets";
 
 interface SceneProps {
   preset: CameraPreset;
+  presetTick?: number;
   children: ReactNode;
 }
 
-export function Scene({ preset, children }: SceneProps) {
+export function Scene({ preset, presetTick, children }: SceneProps) {
   return (
     <Canvas
       gl={{ antialias: true, powerPreference: "high-performance" }}
@@ -24,11 +24,8 @@ export function Scene({ preset, children }: SceneProps) {
       <Suspense fallback={null}>
         <Lighting />
         <Stage />
-        <CameraRig preset={preset} />
+        <CameraRig preset={preset} presetTick={presetTick} />
         {children}
-        <EffectComposer>
-          <Bloom intensity={0.85} luminanceThreshold={0.2} luminanceSmoothing={0.4} mipmapBlur />
-        </EffectComposer>
       </Suspense>
     </Canvas>
   );

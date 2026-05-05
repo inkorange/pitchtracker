@@ -91,6 +91,26 @@ describe("Pitch trajectory reconstruction", () => {
     expect(dt).toBeLessThan(0.5);
   });
 
+  it("break-onset distance is between the plate and the release point", () => {
+    const pitch = new Pitch(SKUBAL_FASTBALL);
+    const onset = pitch.breakOnsetDistance(0.5);
+    // Half-break time is 1/sqrt(2) ≈ 70.7% of total flight from release.
+    // Because of drag the ball decelerates, so at 70.7% of time it has
+    // already covered well over 70.7% of its distance — meaning the y
+    // position is closer to the plate than the path midpoint (~27 ft).
+    expect(onset).toBeGreaterThan(0);
+    expect(onset).toBeLessThan(SKUBAL_FASTBALL.release_pos_y);
+    expect(onset).toBeLessThan(27);
+  });
+
+  it("break-onset threshold ordering: 0.25 occurs farther out than 0.75", () => {
+    const pitch = new Pitch(SKUBAL_FASTBALL);
+    const early = pitch.breakOnsetDistance(0.25);
+    const late = pitch.breakOnsetDistance(0.75);
+    // Lower threshold = earlier in flight = farther from plate (larger y).
+    expect(early).toBeGreaterThan(late);
+  });
+
   it("velocity decays from release to plate (atmospheric drag)", () => {
     const pitch = new Pitch(SKUBAL_FASTBALL);
     const vRelease = pitch.velocityAt(SKUBAL_FASTBALL.release_pos_y);

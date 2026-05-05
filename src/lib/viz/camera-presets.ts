@@ -16,22 +16,25 @@ export interface CameraPosition {
 const PATH_MID: [number, number, number] = [0, 4.2, -28];
 
 export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
-  // Hitter's eye: behind the plate looking toward the mound.
-  // Camera ~12 ft behind plate, slightly above hitter eye height; aim down
-  // the path so foreshortening reads naturally.
+  // Hitter's eye: behind the plate looking toward the mound. Camera pulled
+  // back to 16 ft and aimed at chest-area in the distance so the plate and
+  // the full strike zone both fit in the lower portion of the frame.
   front: {
-    position: [0, 5.5, 12],
-    target: [0, 4.5, -55],
+    position: [0, 4, 16],
+    target: [0, 2.5, -55],
   },
   // Pitcher's view: behind the mound looking at the plate.
   back: {
     position: [0, 6.5, -68],
     target: [0, 3, 0],
   },
-  // Bird's eye: high enough that the full 55-ft path fits with margin.
+  // Bird's eye, tight: just the plate, batter's box, and mound in full
+  // view. Camera at y=100 over the midpoint between home and mound
+  // (z=-30) so the visible area spans roughly z=-71 to z=+11 — enough
+  // for home plate area, mound, and a slice past it.
   top: {
-    position: [0, 80, -28],
-    target: [0, 0, -28],
+    position: [0, 100, -30],
+    target: [0, 0, -30],
   },
   // Third-base side profile: pulled back so the entire pitch path is visible
   // horizontally on a 16:9 frame with comfortable margin (~10 ft each side).

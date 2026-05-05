@@ -89,6 +89,21 @@ export class Pitch {
     return this._solveTimeAtY(plateY) - this._solveTimeAtY(this.row.release_pos_y);
   }
 
+  // Break-onset distance: y-position (feet from the plate) at which `threshold`
+  // fraction of the pitch's total break has occurred. Smaller value = later /
+  // sharper break. Default threshold is 0.5 — the convention a pitching coach
+  // suggested on the project.
+  //
+  // Math: break magnitude grows as 0.5·|a_break|·T² where T is time since
+  // release. At threshold τ, T_τ = T_total · sqrt(τ). The y position at that
+  // time is the break-onset distance.
+  breakOnsetDistance(threshold = 0.5, plateY = 0): number {
+    const tRelease = this._solveTimeAtY(this.row.release_pos_y);
+    const tPlate = this._solveTimeAtY(plateY);
+    const tAt = tRelease + (tPlate - tRelease) * Math.sqrt(threshold);
+    return this.positionAtTime(tAt)[1];
+  }
+
   private _solveTimeAtY(targetY: number): number {
     const { vy0, ay } = this.row;
     // Solve: 0.5 * ay * t^2 + vy0 * t + (REFERENCE_Y - targetY) = 0

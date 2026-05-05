@@ -3,10 +3,20 @@
 export function Lighting() {
   return (
     <>
-      <ambientLight intensity={0.15} />
-      <directionalLight position={[10, 20, 5]} intensity={0.6} color="#ffffff" />
-      <directionalLight position={[-10, 8, -10]} intensity={0.3} color="#88aaff" />
-      <pointLight position={[0, 8, -30]} intensity={50} color="#ffffff" distance={60} decay={1.5} />
+      {/* Ambient: slightly lower than before so the directional lights
+          contribute real shading, but not so low that the dirt + grass
+          go muddy. */}
+      <ambientLight intensity={0.4} />
+      {/* Hemisphere: warm sky tone above, cool dirt tone below. Gives
+          everything a subtle outdoor feel without baking in a single
+          dominant color. */}
+      <hemisphereLight args={["#b8cfe0", "#5a4426", 0.45]} />
+      {/* Key light: warm, from up-and-to-the-right. Gives the plate,
+          bases, and mound real shading and a soft side highlight. */}
+      <directionalLight position={[16, 28, 8]} intensity={0.95} color="#fff2db" />
+      {/* Fill: cooler, from the opposite side, so shadowed faces don't
+          go pure black. */}
+      <directionalLight position={[-14, 10, -12]} intensity={0.3} color="#9ab1c9" />
     </>
   );
 }

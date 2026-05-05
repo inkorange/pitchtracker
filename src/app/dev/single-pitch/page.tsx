@@ -31,6 +31,11 @@ const SKUBAL_FASTBALL: StatcastRow = {
 
 export default function SinglePitchDev() {
   const [preset, setPreset] = useState<CameraPreset>("side");
+  const [presetTick, setPresetTick] = useState(0);
+  const handlePresetChange = (next: CameraPreset) => {
+    setPreset(next);
+    setPresetTick((t) => t + 1);
+  };
   const [progress, setProgress] = useState(0);
 
   const pitch = useMemo(() => new Pitch(SKUBAL_FASTBALL), []);
@@ -39,7 +44,7 @@ export default function SinglePitchDev() {
 
   return (
     <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
-      <Scene preset={preset}>
+      <Scene preset={preset} presetTick={presetTick}>
         <Ribbon path={path} pitchType={SKUBAL_FASTBALL.pitch_type} />
         <BallTracer path={path} progress={progress} />
       </Scene>
@@ -53,7 +58,7 @@ export default function SinglePitchDev() {
         </div>
       </div>
       <TransportBar flightDuration={flightDuration} onProgressChange={setProgress} />
-      <CameraPad current={preset} onChange={setPreset} />
+      <CameraPad current={preset} onChange={handlePresetChange} />
     </main>
   );
 }
