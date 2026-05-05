@@ -3,13 +3,16 @@
 import { useMemo } from "react";
 import { CatmullRomCurve3, TubeGeometry, Vector3 } from "three";
 import { statcastToThree } from "@/lib/viz/coords";
-import { getPitchColor } from "@/lib/viz/colors";
+import { type CompareSide, getPitchColor, getPitchColorForSide } from "@/lib/viz/colors";
 
 interface RibbonProps {
   path: Array<[number, number, number]>;
   pitchType: string;
   radius?: number;
   drawProgress?: number;
+  // When set, picks the pitcher A vs B palette variant; otherwise uses
+  // the default semantic color.
+  side?: CompareSide;
 }
 
 export function Ribbon({
@@ -17,6 +20,7 @@ export function Ribbon({
   pitchType,
   radius = 0.09,
   drawProgress = 1,
+  side,
 }: RibbonProps) {
   const geometry = useMemo(() => {
     const points = path.map((p) => new Vector3(...statcastToThree(p)));
@@ -25,7 +29,7 @@ export function Ribbon({
     return new TubeGeometry(curve, visibleSamples, radius, 8, false);
   }, [path, radius, drawProgress]);
 
-  const color = getPitchColor(pitchType);
+  const color = side ? getPitchColorForSide(pitchType, side) : getPitchColor(pitchType);
 
   return (
     <mesh geometry={geometry}>

@@ -48,3 +48,76 @@ export function getPitchColor(pitchType: string): string {
 export function getPitchLabel(pitchType: string): string {
   return PITCH_LABELS[pitchType.toUpperCase()] ?? pitchType;
 }
+
+// =====================================================================
+// Two-pitcher comparison palette: pitcher A uses the semantic colors
+// above; pitcher B uses the same colors with a 70° hue rotation, so the
+// two arsenals read as warm-vs-cool while keeping within-pitcher
+// pitch-type semantic distinction (a "fastball" is still the brightest
+// reddish/orange end of B's palette, etc.).
+// =====================================================================
+
+const COMPARE_HUE_SHIFT_B = 70;
+
+export type CompareSide = "a" | "b";
+
+export function getPitchColorForSide(pitchType: string, side: CompareSide): string {
+  const base = getPitchColor(pitchType);
+  if (side === "a") return base;
+  return rotateHue(base, COMPARE_HUE_SHIFT_B);
+}
+
+function rotateHue(hex: string, degrees: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const { h, s, l } = rgbToHsl(r, g, b);
+  const h2 = (((h * 360 + degrees) % 360) + 360) % 360 / 360;
+  const { r: r2, g: g2, b: b2 } = hslToRgb(h2, s, l);
+  return rgbToHex(r2, g2, b2);
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  return {
+    r: parseInt(hex.slice(1, 3), 16) / 255,
+    g: parseInt(hex.slice(3, 5), 16) / 255,
+    b: parseInt(hex.slice(5, 7), 16) / 255,
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const to = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n * 255))).toString(16).padStart(2, "0");
+  return `#${to(r)}${to(g)}${to(b)}`;
+}
+
+function rgbToHsl(r: number, g: number, b: number) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return { h: h / 6, s, l };
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+  if (s === 0) return { r: l, g: l, b: l };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const hue2rgb = (t: number) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  return {
+    r: hue2rgb(h + 1 / 3),
+    g: hue2rgb(h),
+    b: hue2rgb(h - 1 / 3),
+  };
+}

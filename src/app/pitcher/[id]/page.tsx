@@ -167,6 +167,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           >
             ← pitchtracker
           </Link>
+          <Link
+            href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
+            className="px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.14em] bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white/85 transition-colors"
+          >
+            Compare with…
+          </Link>
         </div>
         <div className="w-80 pointer-events-auto">
           <PitcherSearch placeholder="Search another pitcher…" />
