@@ -78,6 +78,9 @@ export function CameraRig({ preset }: CameraRigProps) {
       // Users can zoom in from any preset, but never further out than the
       // top preset's framing.
       maxDistance={100}
+      // Dampen the wheel/pinch zoom so a single scroll doesn't fly the
+      // camera across the scene (default zoomSpeed is 1.0).
+      zoomSpeed={0.4}
       // Constrain orbit to top and sides — never below the horizon. Keeps the
       // ground plane and stadium silhouette from clipping other objects when
       // the camera tries to look up from underneath.

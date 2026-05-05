@@ -63,6 +63,8 @@ export function Stage() {
       <OutfieldGrass />
       <InfieldDirtFan />
       <InfieldGrassDiamond />
+      <FoulLineBasepath side="first" />
+      <FoulLineBasepath side="third" />
       <BaseCutout position={FIRST_BASE} />
       <BaseCutout position={SECOND_BASE} />
       <BaseCutout position={THIRD_BASE} />
@@ -118,18 +120,24 @@ function InfieldDirtFan() {
 }
 
 // =====================================================================
-// Infield grass diamond: corners AT the base positions (so the dirt
-// cutouts above each base round off the corners visibly). Home corner
-// pulled to (0, 26) for the home-plate-area buffer. Mound is a hole.
+// Infield grass diamond: corners AT the base positions (rounded by the
+// dirt cutouts layered above). The home edge follows the home plate
+// area circle from where each foul line exits it, so there's no
+// triangular dirt wedge in front of the plate — just narrow basepath
+// strips on the foul lines (rendered separately, layered above this).
 // =====================================================================
 function InfieldGrassDiamond() {
   const shape = useMemo(() => {
+    const exitFirst = HOME_AREA_R / Math.SQRT2; // 9.19
     const s = new Shape();
-    s.moveTo(0, 26); // home corner pulled forward for the home plate area
+    // Start where the 1B foul line exits the home plate circle.
+    s.moveTo(exitFirst, exitFirst);
     s.lineTo(BASE_DIAG, BASE_DIAG); // 1B
     s.lineTo(0, TWO_BASE); // 2B
     s.lineTo(-BASE_DIAG, BASE_DIAG); // 3B
-    s.closePath();
+    s.lineTo(-exitFirst, exitFirst); // exit of 3B foul line from home plate circle
+    // CW arc back along the home plate circle through (0, 13).
+    s.absarc(0, 0, HOME_AREA_R, (3 * Math.PI) / 4, Math.PI / 4, true);
 
     // Mound hole (CW for hole winding).
     const mound = new Path();
@@ -143,6 +151,44 @@ function InfieldGrassDiamond() {
     <mesh position={[0, Y_INFIELD_GRASS, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <shapeGeometry args={[shape]} />
       <meshStandardMaterial color={GRASS} roughness={0.95} metalness={0} />
+    </mesh>
+  );
+}
+
+// =====================================================================
+// Foul-line basepath dirt: 6-ft-wide strip centered on the foul line
+// from the home-plate-area exit to the corresponding base cutout. Sits
+// above the grass diamond, so the foul line reads as a real dirt strip
+// (similar to 1B/3B basepaths in the reference photo).
+// =====================================================================
+function FoulLineBasepath({ side }: { side: "first" | "third" }) {
+  const shape = useMemo(() => {
+    const sign = side === "first" ? 1 : -1;
+    const exit = HOME_AREA_R / Math.SQRT2;
+    const baseEdge = (BASE_DIST - BASE_CUT_R) / Math.SQRT2;
+    const fromXY: [number, number] = [sign * exit, exit];
+    const toXY: [number, number] = [sign * baseEdge, baseEdge];
+    const dx = toXY[0] - fromXY[0];
+    const dy = toXY[1] - fromXY[1];
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const ux = dx / len;
+    const uy = dy / len;
+    // Perpendicular CCW
+    const half = 3; // 6 ft wide / 2
+    const px = -uy * half;
+    const py = ux * half;
+    const s = new Shape();
+    s.moveTo(fromXY[0] - px, fromXY[1] - py);
+    s.lineTo(toXY[0] - px, toXY[1] - py);
+    s.lineTo(toXY[0] + px, toXY[1] + py);
+    s.lineTo(fromXY[0] + px, fromXY[1] + py);
+    s.closePath();
+    return s;
+  }, [side]);
+  return (
+    <mesh position={[0, Y_DIRT_FEATURE - 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <shapeGeometry args={[shape]} />
+      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }
