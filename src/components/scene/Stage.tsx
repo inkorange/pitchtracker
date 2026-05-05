@@ -164,10 +164,15 @@ function InfieldGrassDiamond() {
 function FoulLineBasepath({ side }: { side: "first" | "third" }) {
   const shape = useMemo(() => {
     const sign = side === "first" ? 1 : -1;
-    const exit = HOME_AREA_R / Math.SQRT2;
-    const baseEdge = (BASE_DIST - BASE_CUT_R) / Math.SQRT2;
-    const fromXY: [number, number] = [sign * exit, exit];
-    const toXY: [number, number] = [sign * baseEdge, baseEdge];
+    // Extend each end 3 ft into its adjacent circle so the strip's
+    // rectangular corners (which sit slightly outside the circles when
+    // the centerline ends exactly on the circle edge) are safely covered.
+    // Both ends are dirt, so the overlap is invisible.
+    const overlap = 3;
+    const homeEnd = (HOME_AREA_R - overlap) / Math.SQRT2;
+    const baseEnd = (BASE_DIST - BASE_CUT_R + overlap) / Math.SQRT2;
+    const fromXY: [number, number] = [sign * homeEnd, homeEnd];
+    const toXY: [number, number] = [sign * baseEnd, baseEnd];
     const dx = toXY[0] - fromXY[0];
     const dy = toXY[1] - fromXY[1];
     const len = Math.sqrt(dx * dx + dy * dy);
@@ -234,13 +239,11 @@ function MoundDirt() {
 
 function Base({ position }: { position: [number, number, number] }) {
   const size = 1.25;
+  const height = 0.25; // ~3 inches, real MLB bases are canvas/foam blocks
   return (
-    <mesh
-      position={[position[0], Y_BASE, position[2]]}
-      rotation={[-Math.PI / 2, 0, 0]}
-    >
-      <planeGeometry args={[size, size]} />
-      <meshStandardMaterial color="#f3f4f6" roughness={0.7} metalness={0.05} />
+    <mesh position={[position[0], Y_BASE + height / 2, position[2]]}>
+      <boxGeometry args={[size, height, size]} />
+      <meshStandardMaterial color="#f3f4f6" roughness={0.6} metalness={0.05} />
     </mesh>
   );
 }
@@ -300,10 +303,17 @@ function HomePlate() {
     return s;
   }, []);
 
+  // ~0.5" of extrusion gives the plate visible thickness without making
+  // it look like a brick.
+  const extrudeSettings = useMemo(
+    () => ({ depth: 0.0417, bevelEnabled: false }),
+    [],
+  );
+
   return (
     <mesh position={[0, Y_PLATE, 0.5]} rotation={[-Math.PI / 2, 0, 0]}>
-      <shapeGeometry args={[plateShape]} />
-      <meshStandardMaterial color="#f3f4f6" roughness={0.65} metalness={0.05} />
+      <extrudeGeometry args={[plateShape, extrudeSettings]} />
+      <meshStandardMaterial color="#f3f4f6" roughness={0.55} metalness={0.05} />
     </mesh>
   );
 }
