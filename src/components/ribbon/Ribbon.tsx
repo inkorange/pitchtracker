@@ -13,6 +13,7 @@ interface RibbonProps {
   // When set, picks the pitcher A vs B palette variant; otherwise uses
   // the default semantic color.
   side?: CompareSide;
+  opacity?: number;
 }
 
 export function Ribbon({
@@ -21,6 +22,7 @@ export function Ribbon({
   radius = 0.09,
   drawProgress = 1,
   side,
+  opacity = 1,
 }: RibbonProps) {
   const geometry = useMemo(() => {
     const points = path.map((p) => new Vector3(...statcastToThree(p)));
@@ -30,10 +32,18 @@ export function Ribbon({
   }, [path, radius, drawProgress]);
 
   const color = side ? getPitchColorForSide(pitchType, side) : getPitchColor(pitchType);
+  const transparent = opacity < 1;
 
   return (
     <mesh geometry={geometry}>
-      <meshStandardMaterial color={color} roughness={0.55} metalness={0.05} />
+      <meshStandardMaterial
+        color={color}
+        roughness={0.55}
+        metalness={0.05}
+        transparent={transparent}
+        opacity={opacity}
+        depthWrite={!transparent}
+      />
     </mesh>
   );
 }

@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       .eq("pitcher_id", aId)
       .eq("season", aSeason)
       .eq("batter_hand", "*")
+      .gt("pitch_count", 0)
       .order("usage_pct", { ascending: false, nullsFirst: false })
       .limit(5),
     supabase
@@ -56,6 +57,7 @@ export async function GET(request: Request) {
       .eq("pitcher_id", bId)
       .eq("season", bSeason)
       .eq("batter_hand", "*")
+      .gt("pitch_count", 0)
       .order("usage_pct", { ascending: false, nullsFirst: false })
       .limit(5),
   ]);
@@ -153,6 +155,8 @@ function PitcherSide({
         gap: 18,
       }}
     >
+      {/* next/image doesn't run inside Next.js OG ImageResponse; native <img> is required. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={headshot}
         width={170}

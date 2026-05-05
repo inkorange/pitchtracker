@@ -4,12 +4,19 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
-import { getPitchColorForSide, getPitchLabel, type CompareSide } from "@/lib/viz/colors";
-import { PitcherSearch } from "@/components/search/PitcherSearch";
+import {
+  categorizeDescription,
+  getPitchColorForSide,
+  getPitchLabel,
+  type CompareSide,
+  type OutcomeCategory,
+} from "@/lib/viz/colors";
 import { ComparisonScene } from "./ComparisonScene";
 import { CompareSideFilters } from "./CompareSideFilters";
 import { CompareLinkActions } from "./CompareLinkActions";
+import { CompareSlotSearch } from "./CompareSlotSearch";
 import { TunnelingPanel } from "./TunnelingPanel";
+import { CompareHoverProvider, HoverableSide } from "./CompareHoverContext";
 
 interface PageProps {
   searchParams: Promise<{
@@ -23,7 +30,9 @@ interface PageProps {
     bHand?: string;
     aGame?: string;
     bGame?: string;
-    trueRelease?: string;
+    aOutcome?: string;
+    bOutcome?: string;
+    syncRelease?: string;
   }>;
 }
 
@@ -90,6 +99,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
       pitchTypes: (sp.aPitch ?? "").split(",").filter(Boolean),
       hand: parseHand(sp.aHand),
       gamePk: parseGame(sp.aGame),
+      outcomes: parseOutcomes(sp.aOutcome),
       currentYear,
     }),
     loadSideContext(supabase, {
@@ -98,6 +108,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
       pitchTypes: (sp.bPitch ?? "").split(",").filter(Boolean),
       hand: parseHand(sp.bHand),
       gamePk: parseGame(sp.bGame),
+      outcomes: parseOutcomes(sp.bOutcome),
       currentYear,
     }),
   ]);
@@ -107,67 +118,77 @@ export default async function ComparePage({ searchParams }: PageProps) {
     bPitcher.current_team_id ? fetchTeam(supabase, bPitcher.current_team_id) : null,
   ]);
 
-  const trueRelease = sp.trueRelease === "1";
+  // Default to true release (no normalization). Opposite-handed pitchers
+  // look wrong when you collapse their arm slots into the same point;
+  // the user opts into "Sync release" only when comparing same-handed
+  // mechanics where shape difference is the focus.
+  const syncRelease = sp.syncRelease === "1";
 
   return (
-    <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
-      <ComparisonScene
-        aPitches={aCtx.pitches}
-        bPitches={bCtx.pitches}
-        normalizeRelease={!trueRelease}
-      />
-
-      <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
-        <div className="flex gap-3 items-center pointer-events-auto">
-          <Link
-            href="/"
-            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-          >
-            ← pitchtracker
-          </Link>
-          <CompareLinkActions />
-        </div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-white/45 pointer-events-none">
-          Compare
-        </div>
-      </header>
-
-      <section className="absolute top-20 left-6 w-[400px] rounded-lg bg-white/[0.06] backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
-        <PitcherCard
-          side="a"
-          pitcher={aPitcher}
-          team={aTeam}
-          season={aCtx.season}
-          aggregates={aCtx.aggregates}
-          availableSeasons={aCtx.availableSeasons}
-          games={aCtx.gameOptions}
-        />
-        <div className="border-t border-white/[0.08]" />
-        <PitcherCard
-          side="b"
-          pitcher={bPitcher}
-          team={bTeam}
-          season={bCtx.season}
-          aggregates={bCtx.aggregates}
-          availableSeasons={bCtx.availableSeasons}
-          games={bCtx.gameOptions}
+    <CompareHoverProvider>
+      <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
+        <ComparisonScene
+          aPitches={aCtx.pitches}
+          bPitches={bCtx.pitches}
+          normalizeRelease={syncRelease}
         />
 
-        <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
+        <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
+          <div className="flex gap-3 items-center pointer-events-auto">
+            <Link
+              href="/"
+              className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
+            >
+              ← pitchtracker
+            </Link>
+            <CompareLinkActions />
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.16em] text-white/45 pointer-events-none">
+            Compare
+          </div>
+        </header>
 
-        <div className="text-[11px] tabular-nums text-white/45 pt-2 border-t border-white/[0.05] flex items-center justify-between">
-          <span>
-            {aCtx.pitches.length + bCtx.pitches.length} pitches rendered
-          </span>
-          <Link
-            href={`/compare?${buildToggleQS(sp, "trueRelease", trueRelease ? null : "1")}`}
-            className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white transition-colors"
-          >
-            {trueRelease ? "Sync release" : "True release"}
-          </Link>
-        </div>
-      </section>
-    </main>
+        <section className="absolute top-20 left-6 w-[400px] rounded-lg bg-white/[0.06] backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+          <HoverableSide side="a">
+            <PitcherCard
+              side="a"
+              pitcher={aPitcher}
+              team={aTeam}
+              season={aCtx.season}
+              aggregates={aCtx.aggregates}
+              availableSeasons={aCtx.availableSeasons}
+              games={aCtx.gameOptions}
+            />
+          </HoverableSide>
+          <div className="border-t border-white/[0.08]" />
+          <HoverableSide side="b">
+            <PitcherCard
+              side="b"
+              pitcher={bPitcher}
+              team={bTeam}
+              season={bCtx.season}
+              aggregates={bCtx.aggregates}
+              availableSeasons={bCtx.availableSeasons}
+              games={bCtx.gameOptions}
+            />
+          </HoverableSide>
+
+          <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
+
+          <div className="text-[11px] tabular-nums text-white/45 pt-2 border-t border-white/[0.05] flex items-center justify-between">
+            <span>
+              {aCtx.pitches.length + bCtx.pitches.length} pitches rendered
+            </span>
+            <Link
+              href={`/compare?${buildToggleQS(sp, "syncRelease", syncRelease ? null : "1")}`}
+              className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white transition-colors"
+            >
+              {syncRelease ? "True release" : "Sync release"}
+            </Link>
+          </div>
+        </section>
+      </main>
+    </CompareHoverProvider>
   );
 }
 
@@ -187,10 +208,11 @@ async function loadSideContext(
     pitchTypes: string[];
     hand: "L" | "R" | null;
     gamePk: number | null;
+    outcomes: OutcomeCategory[];
     currentYear: number;
   },
 ): Promise<SideContext> {
-  const { pitcherId, season, pitchTypes, hand, gamePk, currentYear } = args;
+  const { pitcherId, season, pitchTypes, hand, gamePk, outcomes, currentYear } = args;
 
   const { data: aggSeasonRows } = await supabase
     .from("pitch_pitcher_aggregates")
@@ -225,7 +247,7 @@ async function loadSideContext(
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, pitch_type, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, stand",
+      "game_pk, pitch_type, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, stand, description",
     )
     .eq("pitcher_id", pitcherId)
     .limit(1500);
@@ -240,12 +262,22 @@ async function loadSideContext(
 
   const { data: pitches } = await pitchQuery;
 
+  // Outcome filtering happens in JS rather than SQL — Statcast description
+  // strings map onto our 5-bucket categorization with too many edge cases
+  // (e.g. "swinging_strike_blocked") to translate cleanly into a SQL filter.
+  const outcomeSet = new Set(outcomes);
+  const filteredPitches =
+    outcomeSet.size > 0
+      ? (pitches ?? []).filter((p) => outcomeSet.has(categorizeDescription(p.description)))
+      : (pitches ?? []);
+
   const { data: aggregates } = await supabase
     .from("pitch_pitcher_aggregates")
     .select("pitch_type, pitch_count, usage_pct, avg_velocity")
     .eq("pitcher_id", pitcherId)
     .eq("season", season)
     .eq("batter_hand", "*")
+    .gt("pitch_count", 0) // skip empty/stale pitch types
     .order("usage_pct", { ascending: false, nullsFirst: false });
 
   // Game dropdown options (cached games for this pitcher in this season).
@@ -281,7 +313,7 @@ async function loadSideContext(
     season,
     availableSeasons,
     aggregates: (aggregates ?? []) as AggRow[],
-    pitches: (pitches ?? []) as PitchRow[],
+    pitches: filteredPitches as PitchRow[],
     gameOptions,
   };
 }
@@ -294,6 +326,16 @@ function parseGame(v: string | undefined): number | null {
   if (!v) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+const OUTCOME_KEYS: OutcomeCategory[] = ["whiff", "called", "ball", "foul", "inplay", "other"];
+
+function parseOutcomes(v: string | undefined): OutcomeCategory[] {
+  if (!v) return [];
+  const parts = v.split(",").map((s) => s.trim()).filter(Boolean);
+  return parts.filter((p): p is OutcomeCategory =>
+    (OUTCOME_KEYS as string[]).includes(p),
+  );
 }
 
 function buildToggleQS(
@@ -347,6 +389,7 @@ interface PitchRow {
   plate_z: number | null;
   release_speed: number | null;
   stand: string | null;
+  description: string | null;
 }
 
 interface GameOption {
@@ -441,8 +484,10 @@ function PitcherCard({
               <span className="text-white/55">
                 {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
               </span>
-              <span className="text-white/45 w-9 text-right">
-                {a.usage_pct != null ? `${Number(a.usage_pct).toFixed(0)}%` : "—"}
+              <span className="text-white/45 w-16 text-right">
+                {a.usage_pct != null
+                  ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
+                  : "—"}
               </span>
             </li>
           ))}
@@ -508,17 +553,6 @@ function CompareSlot({
   otherId: number | null;
 }) {
   const slotLabel = slot === "a" ? "Pitcher A" : "Pitcher B";
-  const buildHref = (id: number) => {
-    const sp = new URLSearchParams();
-    if (slot === "a") {
-      sp.set("a", String(id));
-      if (otherId) sp.set("b", String(otherId));
-    } else {
-      if (otherId) sp.set("a", String(otherId));
-      sp.set("b", String(id));
-    }
-    return `/compare?${sp.toString()}`;
-  };
   const changeHref = (() => {
     const sp = new URLSearchParams();
     if (slot === "a" && otherId) sp.set("b", String(otherId));
@@ -555,7 +589,7 @@ function CompareSlot({
           </Link>
         </div>
       ) : (
-        <PitcherSearch placeholder="Search a pitcher…" resultHref={buildHref} />
+        <CompareSlotSearch slot={slot} otherId={otherId} />
       )}
     </div>
   );

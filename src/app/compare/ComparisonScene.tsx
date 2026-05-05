@@ -11,10 +11,17 @@ import { computeTunnelStats } from "@/lib/pitch/tunneling";
 import type { Pitch } from "@/lib/pitch/Pitch";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
 import { TunnelMarker } from "./TunnelMarker";
+import { OutcomeMarkers } from "./OutcomeMarkers";
+import { useOpacityForSide } from "./CompareHoverContext";
+import type { CompareSide } from "@/lib/viz/colors";
+
+interface PitchWithOutcome extends CachedPitchSubset {
+  description?: string | null;
+}
 
 interface ComparisonSceneProps {
-  aPitches: CachedPitchSubset[];
-  bPitches: CachedPitchSubset[];
+  aPitches: PitchWithOutcome[];
+  bPitches: PitchWithOutcome[];
   // When true (default), translate both pitchers' paths so they share a
   // common release origin. Lets the user compare pitch SHAPE rather than
   // arm-slot differences. Set false for "true release" mode.
@@ -111,24 +118,20 @@ export function ComparisonScene({
   return (
     <>
       <Scene preset={preset} presetTick={presetTick}>
-        {aRibbons.map((r) => (
-          <Ribbon
-            key={`a-${r.pitchType}`}
-            path={r.path}
-            pitchType={r.pitchType}
-            radius={0.1}
-            side="a"
-          />
-        ))}
-        {bRibbons.map((r) => (
-          <Ribbon
-            key={`b-${r.pitchType}`}
-            path={r.path}
-            pitchType={r.pitchType}
-            radius={0.1}
-            side="b"
-          />
-        ))}
+        <SideLayer
+          side="a"
+          ribbons={aRibbons}
+          pitches={aPitches}
+          progress={progress}
+          showTracers={showTracers}
+        />
+        <SideLayer
+          side="b"
+          ribbons={bRibbons}
+          pitches={bPitches}
+          progress={progress}
+          showTracers={showTracers}
+        />
         {tunnels.map((t) => (
           <TunnelMarker
             key={`t-${t.pitchType}`}
@@ -136,19 +139,46 @@ export function ComparisonScene({
             pitchType={t.pitchType}
           />
         ))}
-        {showTracers &&
-          aRibbons.map((r) => (
-            <BallTracer key={`a-tracer-${r.pitchType}`} path={r.path} progress={progress} />
-          ))}
-        {showTracers &&
-          bRibbons.map((r) => (
-            <BallTracer key={`b-tracer-${r.pitchType}`} path={r.path} progress={progress} />
-          ))}
       </Scene>
       <CameraPad current={preset} onChange={handlePresetChange} />
       {showTracers && (
         <TransportBar flightDuration={flightDuration} onProgressChange={setProgress} />
       )}
+    </>
+  );
+}
+
+interface SideLayerProps {
+  side: CompareSide;
+  ribbons: RibbonData[];
+  pitches: PitchWithOutcome[];
+  progress: number;
+  showTracers: boolean;
+}
+
+function SideLayer({ side, ribbons, pitches, progress, showTracers }: SideLayerProps) {
+  const opacity = useOpacityForSide(side);
+  return (
+    <>
+      {ribbons.map((r) => (
+        <Ribbon
+          key={`${side}-${r.pitchType}`}
+          path={r.path}
+          pitchType={r.pitchType}
+          radius={0.1}
+          side={side}
+          opacity={opacity}
+        />
+      ))}
+      <OutcomeMarkers pitches={pitches} opacity={opacity} />
+      {showTracers &&
+        ribbons.map((r) => (
+          <BallTracer
+            key={`${side}-tracer-${r.pitchType}`}
+            path={r.path}
+            progress={progress}
+          />
+        ))}
     </>
   );
 }

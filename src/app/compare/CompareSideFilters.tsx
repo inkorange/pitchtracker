@@ -3,7 +3,14 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
 import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
-import { getPitchColorForSide, getPitchLabel, type CompareSide } from "@/lib/viz/colors";
+import {
+  getPitchColorForSide,
+  getPitchLabel,
+  OUTCOME_COLORS,
+  OUTCOME_LABELS,
+  type CompareSide,
+  type OutcomeCategory,
+} from "@/lib/viz/colors";
 
 interface ArsenalEntry {
   pitch_type: string;
@@ -39,6 +46,7 @@ export function CompareSideFilters({
   const pitchKey = `${side}Pitch`;
   const handKey = `${side}Hand`;
   const gameKey = `${side}Game`;
+  const outcomeKey = `${side}Outcome`;
 
   const update = useCallback(
     (next: Record<string, string | null>) => {
@@ -59,6 +67,14 @@ export function CompareSideFilters({
   const activePitchTypes = (params.get(pitchKey) ?? "").split(",").filter(Boolean);
   const activeHand = params.get(handKey) ?? "";
   const activeGame = params.get(gameKey) ?? "";
+  const activeOutcomes = (params.get(outcomeKey) ?? "").split(",").filter(Boolean);
+
+  const toggleOutcome = (cat: OutcomeCategory) => {
+    const cur = new Set(activeOutcomes);
+    if (cur.has(cat)) cur.delete(cat);
+    else cur.add(cat);
+    update({ [outcomeKey]: cur.size > 0 ? Array.from(cur).join(",") : null });
+  };
 
   const togglePitch = (type: string) => {
     const cur = new Set(activePitchTypes);
@@ -156,6 +172,36 @@ export function CompareSideFilters({
               {opt.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
+          Outcome
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(["whiff", "called", "ball", "foul", "inplay"] as const).map((cat) => {
+            const active = activeOutcomes.length === 0 || activeOutcomes.includes(cat);
+            const dim = activeOutcomes.length > 0 && !active;
+            return (
+              <button
+                key={cat}
+                onClick={() => toggleOutcome(cat)}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors ${
+                  dim
+                    ? "bg-white/[0.02] text-white/35 border border-white/5"
+                    : "bg-white/[0.06] text-white/85 border border-white/10 hover:bg-white/[0.1]"
+                }`}
+                aria-pressed={!dim}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: OUTCOME_COLORS[cat], opacity: dim ? 0.3 : 1 }}
+                />
+                {OUTCOME_LABELS[cat]}
+              </button>
+            );
+          })}
         </div>
       </div>
 

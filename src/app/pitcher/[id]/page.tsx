@@ -72,6 +72,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     .eq("pitcher_id", pitcherId)
     .eq("season", season)
     .eq("batter_hand", "*")
+    .gt("pitch_count", 0) // skip empty/stale pitch types
     .order("usage_pct", { ascending: false, nullsFirst: false });
 
   // Get the set of game_pks for this pitcher in the active season — used for
@@ -248,8 +249,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                     <span className="text-white/55">
                       {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
                     </span>
-                    <span className="text-white/45 w-10 text-right">
-                      {a.usage_pct != null ? `${Number(a.usage_pct).toFixed(0)}%` : "—"}
+                    <span className="text-white/45 w-16 text-right">
+                      {a.usage_pct != null
+                        ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
+                        : "—"}
                     </span>
                   </div>
                   {a.avg_break_onset_ft != null && (

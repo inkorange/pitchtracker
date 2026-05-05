@@ -103,6 +103,64 @@ function rgbToHsl(r: number, g: number, b: number) {
   return { h: h / 6, s, l };
 }
 
+// =====================================================================
+// Outcome colors: per-pitch result palette used for plate-dot markers
+// and outcome filter chips. Categories collapse Statcast's many
+// `description` values into the five categories pitchers + hitters
+// actually talk about.
+// =====================================================================
+
+export type OutcomeCategory = "whiff" | "called" | "ball" | "foul" | "inplay" | "other";
+
+export const OUTCOME_COLORS: Record<OutcomeCategory, string> = {
+  whiff: "#ef4444", // bright red — swing and miss
+  called: "#f59e0b", // amber — caught looking
+  ball: "#3b82f6", // blue — outside the zone
+  foul: "#a3a3a3", // neutral gray
+  inplay: "#22c55e", // green — bat met ball
+  other: "#7a8694", // unknown
+};
+
+export const OUTCOME_LABELS: Record<OutcomeCategory, string> = {
+  whiff: "Swinging strike",
+  called: "Called strike",
+  ball: "Ball",
+  foul: "Foul",
+  inplay: "In play",
+  other: "Other",
+};
+
+export function categorizeDescription(description: string | null | undefined): OutcomeCategory {
+  if (!description) return "other";
+  switch (description) {
+    case "swinging_strike":
+    case "swinging_strike_blocked":
+    case "missed_bunt":
+    case "foul_tip":
+      return "whiff";
+    case "called_strike":
+      return "called";
+    case "ball":
+    case "blocked_ball":
+    case "intent_ball":
+    case "pitchout":
+    case "hit_by_pitch":
+      return "ball";
+    case "foul":
+    case "foul_bunt":
+      return "foul";
+    case "hit_into_play":
+    case "hit_into_play_no_out":
+      return "inplay";
+    default:
+      return "other";
+  }
+}
+
+export function getOutcomeColor(description: string | null | undefined): string {
+  return OUTCOME_COLORS[categorizeDescription(description)];
+}
+
 function hslToRgb(h: number, s: number, l: number) {
   if (s === 0) return { r: l, g: l, b: l };
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
