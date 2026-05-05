@@ -9,6 +9,7 @@ export function Stage() {
     <group>
       <StrikeZone />
       <HomePlate />
+      <Mound />
       <GroundFade />
       <StadiumSilhouette />
     </group>
@@ -61,21 +62,45 @@ function HomePlate() {
   );
 }
 
+function Mound() {
+  // MLB rules: 18 ft diameter (9 ft radius), 10" tall (0.83 ft) with a flat
+  // plateau at top where the rubber sits. The front edge of the mound is
+  // 60'6" - 9' = 51.5 ft from the plate; mound center at y = 60.5 ft (Statcast),
+  // which is z = -60.5 in Three.js coords. We use a low frustum (radiusTop <
+  // radiusBottom) for the slope, slightly exaggerated in height for visibility.
+  const height = 1.0;
+  return (
+    <group position={[0, 0, -60.5]}>
+      <mesh position={[0, height / 2, 0]}>
+        <cylinderGeometry args={[2.2, 9, height, 48]} />
+        <meshStandardMaterial color="#3a2a20" roughness={0.95} metalness={0} />
+      </mesh>
+      {/* Pitcher's rubber: 24"x6" white slab on the plateau */}
+      <mesh position={[0, height + 0.04, 0.4]}>
+        <boxGeometry args={[2, 0.08, 0.5]} />
+        <meshStandardMaterial color="#dadde2" roughness={0.7} metalness={0.05} />
+      </mesh>
+    </group>
+  );
+}
+
 function GroundFade() {
   // Subtle dark gradient implying a ground plane without committing to grass or dirt.
   return (
-    <mesh position={[0, 0, -30]} rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[140, 90]} />
+    <mesh position={[0, 0, -60]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[300, 220]} />
       <meshBasicMaterial color="#0a0e14" transparent opacity={0.85} />
     </mesh>
   );
 }
 
 function StadiumSilhouette() {
+  // Far enough back that it reads as a horizon backdrop, not a wall behind
+  // the mound. Camera far-clip in Scene.tsx is set to 1500 to accommodate.
   return (
-    <mesh position={[0, 14, -95]}>
-      <planeGeometry args={[220, 60]} />
-      <meshBasicMaterial color="#141b26" />
+    <mesh position={[0, 25, -320]}>
+      <planeGeometry args={[600, 140]} />
+      <meshBasicMaterial color="#101620" />
     </mesh>
   );
 }

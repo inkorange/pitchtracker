@@ -19,7 +19,7 @@ export function Scene({ preset, children }: SceneProps) {
       gl={{ antialias: true, powerPreference: "high-performance" }}
       dpr={[1, 2]}
       style={{ background: "#0a0e14" }}
-      camera={{ fov: 45, near: 0.1, far: 500 }}
+      camera={{ fov: 45, near: 0.1, far: 1500 }}
     >
       <Suspense fallback={null}>
         <Lighting />
