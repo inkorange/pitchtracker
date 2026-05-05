@@ -33,13 +33,32 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     .maybeSingle();
   if (!pitcher) notFound();
 
-  const { data: seasonRows } = await supabase
+  const currentYear = new Date().getFullYear();
+
+  // All seasons we have data for this pitcher — aggregates OR cached pitches —
+  // plus the current year (always selectable).
+  const { data: aggSeasonRows } = await supabase
     .from("pitch_pitcher_aggregates")
     .select("season")
-    .eq("pitcher_id", pitcherId)
-    .order("season", { ascending: false });
-  const availableSeasons = Array.from(new Set((seasonRows ?? []).map((r) => r.season)));
-  const season = sp.season ? Number(sp.season) : (availableSeasons[0] ?? new Date().getFullYear());
+    .eq("pitcher_id", pitcherId);
+  const { data: pitcherGameRows } = await supabase
+    .from("pitch_game_pitches")
+    .select("game_pk")
+    .eq("pitcher_id", pitcherId);
+  const pitcherGamePks = Array.from(
+    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
+  );
+  const { data: pitcherGameSeasons } =
+    pitcherGamePks.length > 0
+      ? await supabase.from("pitch_games").select("season").in("game_pk", pitcherGamePks)
+      : { data: [] };
+  const seasonsWithData = new Set<number>();
+  for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
+  for (const r of pitcherGameSeasons ?? []) seasonsWithData.add(r.season);
+  seasonsWithData.add(currentYear);
+  const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
+
+  const season = sp.season ? Number(sp.season) : currentYear;
 
   const { data: aggregates } = await supabase
     .from("pitch_pitcher_aggregates")
@@ -49,7 +68,16 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     .eq("batter_hand", "*")
     .order("usage_pct", { ascending: false, nullsFirst: false });
 
-  // Build the filtered cached-pitch query.
+  // Get the set of game_pks for this pitcher in the active season — used for
+  // both the cached-pitch query and the game dropdown so neither leaks games
+  // from other years.
+  const { data: seasonGamesRows } = await supabase
+    .from("pitch_games")
+    .select("game_pk")
+    .eq("season", season);
+  const seasonGamePks = new Set((seasonGamesRows ?? []).map((g) => g.game_pk));
+
+  // Cached pitches for this pitcher × season.
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
@@ -57,6 +85,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     )
     .eq("pitcher_id", pitcherId)
     .limit(1500);
+  if (seasonGamePks.size > 0) {
+    pitchQuery = pitchQuery.in("game_pk", Array.from(seasonGamePks));
+  } else {
+    // No games for this season → no pitches.
+    pitchQuery = pitchQuery.eq("game_pk", -1);
+  }
 
   const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
   if (pitchTypes.length > 0) {
@@ -74,15 +108,15 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     (p) => p.vx0 != null && p.vy0 != null && p.vz0 != null,
   );
 
-  // Distinct cached games for the game dropdown — two queries instead of a
-  // dual-FK join, which PostgREST handles awkwardly.
+  // Distinct cached games for the game dropdown — restricted to the active
+  // season so we don't list 2025 games when the user is viewing 2026.
   const { data: distinctGameRows } = await supabase
     .from("pitch_game_pitches")
     .select("game_pk")
     .eq("pitcher_id", pitcherId);
   const distinctGamePks = Array.from(
     new Set((distinctGameRows ?? []).map((r) => r.game_pk)),
-  );
+  ).filter((pk) => seasonGamePks.has(pk));
   const { data: gameMetaRows } =
     distinctGamePks.length > 0
       ? await supabase
