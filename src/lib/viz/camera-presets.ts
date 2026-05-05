@@ -28,12 +28,13 @@ export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
     position: [0, 6.5, -68],
     target: [0, 3, 0],
   },
-  // Bird's eye: the dirt extends ~155 ft from home in the outfield direction
-  // (95 ft arc from the rubber). Camera is high enough to fit the full dirt
-  // area plus a slice of outfield grass.
+  // Bird's eye, tight: just the plate, batter's box, and mound in full
+  // view. Camera at y=100 over the midpoint between home and mound
+  // (z=-30) so the visible area spans roughly z=-71 to z=+11 — enough
+  // for home plate area, mound, and a slice past it.
   top: {
-    position: [0, 230, -85],
-    target: [0, 0, -85],
+    position: [0, 100, -30],
+    target: [0, 0, -30],
   },
   // Third-base side profile: pulled back so the entire pitch path is visible
   // horizontally on a 16:9 frame with comfortable margin (~10 ft each side).

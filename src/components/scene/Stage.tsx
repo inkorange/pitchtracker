@@ -105,7 +105,10 @@ function InfieldGrassDiamond() {
     const twoBaseRad = TWO_BASE - BASE_INSET; // 114.3 ft from home
 
     const s = new Shape();
-    s.moveTo(0, HOME_AREA_R + 0.5); // just outside the home plate area circle
+    // Home corner pulled to 26 ft (matches the home-plate-area diameter)
+    // so the home-side dirt buffer reads as a clean strip, not a
+    // sharp diamond point butting up against the home plate circle.
+    s.moveTo(0, 26);
     s.lineTo(oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);
     s.lineTo(0, twoBaseRad);
     s.lineTo(-oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);

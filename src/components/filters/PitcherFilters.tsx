@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
 import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
+import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
 
 interface ArsenalEntry {
   pitch_type: string;
@@ -58,13 +59,8 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
   };
 
   return (
-    <div className={`space-y-3 transition-opacity ${isPending ? "opacity-60" : ""}`}>
-      {isPending && (
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-white/55">
-          <span className="inline-block w-2 h-2 rounded-full bg-white/40 animate-pulse" />
-          Updating…
-        </div>
-      )}
+    <div className="space-y-3">
+      <TransitionOverlay isPending={isPending} />
       {arsenal.length > 0 && (
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">

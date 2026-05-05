@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
+import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
 
 interface SeasonPickerProps {
   pitcherId: number;
@@ -25,8 +26,9 @@ export function SeasonPicker({ pitcherId, season, available }: SeasonPickerProps
 
   return (
     <div className="flex items-center gap-1.5">
+      <TransitionOverlay isPending={isPending} />
       <span className="text-[10px] uppercase tracking-[0.14em] text-white/45">Season</span>
-      <div className={`flex gap-1 transition-opacity ${isPending ? "opacity-60" : ""}`}>
+      <div className="flex gap-1">
         {available.map((s) => (
           <button
             key={s}
@@ -43,7 +45,6 @@ export function SeasonPicker({ pitcherId, season, available }: SeasonPickerProps
           </button>
         ))}
       </div>
-      {isPending && <span className="inline-block w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse" />}
     </div>
   );
 }
