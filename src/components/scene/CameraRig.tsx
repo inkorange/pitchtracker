@@ -74,7 +74,10 @@ export function CameraRig({ preset }: CameraRigProps) {
       enableDamping
       dampingFactor={0.08}
       minDistance={5}
-      maxDistance={140}
+      // Max zoom-out matches the top preset's camera distance (100 ft).
+      // Users can zoom in from any preset, but never further out than the
+      // top preset's framing.
+      maxDistance={100}
       // Constrain orbit to top and sides — never below the horizon. Keeps the
       // ground plane and stadium silhouette from clipping other objects when
       // the camera tries to look up from underneath.

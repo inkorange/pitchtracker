@@ -7,26 +7,28 @@ import { Path, Shape } from "three";
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
 //
-// Field model (matches the reference photo):
-// - One big grass plane covers the whole field as the base layer.
-// - A curved dirt fan extends 120 ft from home in fair territory — the
-//   "infield skin", with foul lines as straight edges and a 90° arc
-//   connecting them through the outfield direction.
-// - Inside the dirt fan, an infield grass diamond carves out the center,
-//   with corners pulled 13 ft inside each base. The dirt that remains
-//   visible between the diamond and the fan boundary IS the basepath
-//   network (foul-line strips + 1B-2B + 2B-3B + base cutouts), all
-//   natural consequences of this geometry.
-// - The mound and home-plate area sit as additional dirt features.
+// Field model (matches the reference photo + official MLB diagram):
+//
+// Layers stacked low → high in y:
+//  1. Outfield grass (180° sector covering the whole field)
+//  2. Infield dirt fan — bounded by foul lines from home and the 95-ft
+//     arc from the FRONT OF THE RUBBER (official spec). That arc passes
+//     ~127 ft from home along each foul line and ~155 ft from home
+//     through the outfield, well past 2B at 127.28 ft.
+//  3. Infield grass diamond with corners at the actual base positions
+//     (1B, 2B, 3B) and a home corner pulled to 26 ft. Mound is a hole.
+//  4. Dirt features above the grass diamond — 13 ft circles at each
+//     base (creating the rounded-concave corner look on the grass),
+//     home plate area, and the mound dirt patch.
 
 const PLATE_TO_MOUND = 60.5;
 const BASE_DIST = 90;
 const BASE_DIAG = BASE_DIST / Math.SQRT2; // 63.64 ft
 const TWO_BASE = BASE_DIST * Math.SQRT2; // 127.28 ft
-const DIRT_FAN_R = 120; // distance from home to the outfield-grass arc
+const GRASS_LINE_R = 95; // 95 ft radius from front of the rubber
 const HOME_AREA_R = 13; // 26 ft diameter
 const MOUND_R = 9; // 18 ft diameter
-const BASE_INSET = 13; // 13 ft inside each base, so dirt buffer = 13 ft
+const BASE_CUT_R = 13; // 13 ft arcs around each base
 
 const FIRST_BASE: [number, number, number] = [BASE_DIAG, 0, -BASE_DIAG];
 const SECOND_BASE: [number, number, number] = [0, 0, -TWO_BASE];
@@ -36,15 +38,24 @@ const GRASS = "#2f5e35";
 const DIRT = "#a87c52";
 const LINE = "#f1f3f5";
 
-// Y stack — layered with enough separation that depth buffering is
-// reliable from any reasonable camera distance.
 const Y_GRASS_BASE = 0.0;
 const Y_DIRT_FAN = 0.05;
 const Y_INFIELD_GRASS = 0.1;
-const Y_DIRT_FEATURE = 0.15; // home plate area, mound dirt, etc.
+const Y_DIRT_FEATURE = 0.15;
 const Y_BASE = 0.2;
 const Y_PLATE = 0.21;
 const Y_LINE = 0.22;
+
+// Compute where the 95-ft-from-rubber arc intersects each foul line.
+const FOUL_HIT = (() => {
+  const b = PLATE_TO_MOUND * Math.SQRT2;
+  const c = PLATE_TO_MOUND * PLATE_TO_MOUND - GRASS_LINE_R * GRASS_LINE_R;
+  const t = (b + Math.sqrt(b * b - 4 * c)) / 2;
+  const xy = t / Math.SQRT2;
+  // Angle of the 1B-line intersection point measured from the rubber center.
+  const ang = Math.atan2(xy - PLATE_TO_MOUND, xy);
+  return { xy, ang };
+})();
 
 export function Stage() {
   return (
@@ -52,6 +63,9 @@ export function Stage() {
       <OutfieldGrass />
       <InfieldDirtFan />
       <InfieldGrassDiamond />
+      <BaseCutout position={FIRST_BASE} />
+      <BaseCutout position={SECOND_BASE} />
+      <BaseCutout position={THIRD_BASE} />
       <HomePlateArea />
       <MoundDirt />
       <FoulLines />
@@ -67,8 +81,8 @@ export function Stage() {
 }
 
 // =====================================================================
-// Base layer: 180° green sector covering the whole field. Outer arc
-// gives the rounded outfield-grass edge.
+// Outfield grass: 180° sector covering the whole field. The dirt fan
+// sits on top of it inside the 95-ft-from-rubber boundary.
 // =====================================================================
 function OutfieldGrass() {
   return (
@@ -80,38 +94,41 @@ function OutfieldGrass() {
 }
 
 // =====================================================================
-// Infield dirt: 120-ft fan from home, 90° fair-ball arc. Sits on top
-// of the outfield grass.
+// Infield dirt fan: bounded by foul lines from home and the 95-ft arc
+// from the front of the rubber. Includes the area past 2B where the
+// dirt curves through the outfield.
 // =====================================================================
 function InfieldDirtFan() {
+  const shape = useMemo(() => {
+    const s = new Shape();
+    s.moveTo(0, 0); // home
+    s.lineTo(FOUL_HIT.xy, FOUL_HIT.xy); // along 1B foul line to the arc
+    // CCW arc through the outfield apex (passes through (0, 60.5 + 95)).
+    s.absarc(0, PLATE_TO_MOUND, GRASS_LINE_R, FOUL_HIT.ang, Math.PI - FOUL_HIT.ang, false);
+    s.lineTo(-FOUL_HIT.xy, FOUL_HIT.xy);
+    s.lineTo(0, 0);
+    return s;
+  }, []);
   return (
     <mesh position={[0, Y_DIRT_FAN, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <circleGeometry args={[DIRT_FAN_R, 96, Math.PI / 4, Math.PI / 2]} />
+      <shapeGeometry args={[shape]} />
       <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }
 
 // =====================================================================
-// Infield grass diamond: corners 13 ft inside each base; home corner
-// at the home-plate-area boundary; mound hole.
-// The dirt that shows BETWEEN this diamond and the dirt-fan boundary is
-// the basepath network — foul-line strips, 1B-2B, 2B-3B, and the base
-// cutouts. No separate strips needed.
+// Infield grass diamond: corners AT the base positions (so the dirt
+// cutouts above each base round off the corners visibly). Home corner
+// pulled to (0, 26) for the home-plate-area buffer. Mound is a hole.
 // =====================================================================
 function InfieldGrassDiamond() {
   const shape = useMemo(() => {
-    const oneBaseRad = BASE_DIST - BASE_INSET; // 77 ft from home along the diagonal
-    const twoBaseRad = TWO_BASE - BASE_INSET; // 114.3 ft from home
-
     const s = new Shape();
-    // Home corner pulled to 26 ft (matches the home-plate-area diameter)
-    // so the home-side dirt buffer reads as a clean strip, not a
-    // sharp diamond point butting up against the home plate circle.
-    s.moveTo(0, 26);
-    s.lineTo(oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);
-    s.lineTo(0, twoBaseRad);
-    s.lineTo(-oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);
+    s.moveTo(0, 26); // home corner pulled forward for the home plate area
+    s.lineTo(BASE_DIAG, BASE_DIAG); // 1B
+    s.lineTo(0, TWO_BASE); // 2B
+    s.lineTo(-BASE_DIAG, BASE_DIAG); // 3B
     s.closePath();
 
     // Mound hole (CW for hole winding).
@@ -122,7 +139,6 @@ function InfieldGrassDiamond() {
 
     return s;
   }, []);
-
   return (
     <mesh position={[0, Y_INFIELD_GRASS, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <shapeGeometry args={[shape]} />
@@ -133,7 +149,21 @@ function InfieldGrassDiamond() {
 
 // =====================================================================
 // Discrete dirt features that sit above the infield grass diamond.
+// The base cutouts at each base overlap the grass diamond corners,
+// creating the rounded-concave corner look from the reference photos.
 // =====================================================================
+
+function BaseCutout({ position }: { position: [number, number, number] }) {
+  return (
+    <mesh
+      position={[position[0], Y_DIRT_FEATURE, position[2]]}
+      rotation={[-Math.PI / 2, 0, 0]}
+    >
+      <circleGeometry args={[BASE_CUT_R, 32]} />
+      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
+    </mesh>
+  );
+}
 
 function HomePlateArea() {
   return (
