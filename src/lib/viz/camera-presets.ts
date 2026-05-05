@@ -28,12 +28,12 @@ export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
     position: [0, 6.5, -68],
     target: [0, 3, 0],
   },
-  // Bird's eye: high enough that the full infield diamond fits with margin
-  // and a slice of outfield reads as the rounded green sector. The diamond
-  // spans ~127 ft from home to second base.
+  // Bird's eye: the dirt extends ~155 ft from home in the outfield direction
+  // (95 ft arc from the rubber). Camera is high enough to fit the full dirt
+  // area plus a slice of outfield grass.
   top: {
-    position: [0, 195, -75],
-    target: [0, 0, -75],
+    position: [0, 230, -85],
+    target: [0, 0, -85],
   },
   // Third-base side profile: pulled back so the entire pitch path is visible
   // horizontally on a 16:9 frame with comfortable margin (~10 ft each side).

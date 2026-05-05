@@ -7,17 +7,25 @@ import { Path, Shape } from "three";
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
 //
-// Z-fighting fix: ONE dirt plane sits below ALL grass shapes. Where the
-// grass shapes have geometry, the grass wins the depth test. Where they
-// don't, the dirt is visible. The grass shapes (outfield with a hole at
-// the dirt-fan area, plus the infield diamond with a mound hole) are
-// drawn so they leave the right gaps for basepaths, home cutout, around
-// the bases, and around the mound.
+// Field dimensions per the official diagram:
+//   - Bases 90 ft apart
+//   - Pitching rubber 60'6" (60.5 ft) from home
+//   - Pitching mound 18 ft diameter (9 ft radius)
+//   - Infield/outfield grass line: 95 ft radius from FRONT OF THE RUBBER
+//     (not from home — common misconception)
+//   - 13 ft arcs around bases
+//   - Home plate area: 26 ft diameter circle
+//
+// Shape coord convention (after the -π/2 x-rotation that flattens shapes
+// onto the field): shape's x → world x, shape's y → world -z.
+// So in shape coords, the field extends in +y, with home at (0, 0),
+// the rubber at (0, 60.5), and 2B at (0, 127.28).
 
 const PLATE_TO_MOUND = 60.5;
 const BASE_DIST = 90;
 const BASE_DIAG = BASE_DIST / Math.SQRT2; // 63.64 ft
 const TWO_BASE = BASE_DIST * Math.SQRT2; // 127.28 ft
+const GRASS_LINE_R = 95; // radius from the front of the rubber
 
 const FIRST_BASE: [number, number, number] = [BASE_DIAG, 0, -BASE_DIAG];
 const SECOND_BASE: [number, number, number] = [0, 0, -TWO_BASE];
@@ -27,11 +35,27 @@ const GRASS = "#2f5e35";
 const DIRT = "#a87c52";
 const LINE = "#f1f3f5";
 
-const Y_DIRT = -0.1; // single dirt plane sits below the grass
+const Y_DIRT = -0.1; // single dirt plane sits below the grass shapes
 const Y_GRASS = 0.0;
 const Y_BASE = 0.05;
 const Y_PLATE = 0.06;
 const Y_LINE = 0.07;
+
+// Compute where the 95-ft-from-rubber arc intersects each foul line so
+// we can use the same geometry for the dirt shape and the matching hole
+// in the outfield grass.
+const FOUL_HIT = (() => {
+  // 1B foul line: (t/√2, t/√2) for t ≥ 0. Distance from rubber (0, 60.5):
+  //   t² - 60.5·√2·t + 60.5² = 95²
+  //   t² - 85.56·t - 5364.75 = 0
+  const b = 60.5 * Math.SQRT2;
+  const c = 60.5 * 60.5 - GRASS_LINE_R * GRASS_LINE_R;
+  const t = (b + Math.sqrt(b * b - 4 * c)) / 2;
+  const xy = t / Math.SQRT2;
+  // Angle of the 1B-line intersection point measured from the rubber center.
+  const ang = Math.atan2(xy - PLATE_TO_MOUND, xy);
+  return { t, xy, ang };
+})();
 
 export function Stage() {
   return (
@@ -52,41 +76,54 @@ export function Stage() {
 }
 
 // =====================================================================
-// Single dirt plane: a 95-ft fan from home (the infield-skin area).
-// Sits 0.1 ft (~5 px on a typical top-down view) below the grass shapes.
+// Single dirt plane bounded by the foul lines and the 95-ft-from-rubber
+// arc. Sits 0.1 ft below all grass shapes — z-fighting can't occur.
 // =====================================================================
+function dirtShape() {
+  const s = new Shape();
+  s.moveTo(0, 0); // home
+  s.lineTo(FOUL_HIT.xy, FOUL_HIT.xy); // along 1B foul line to the arc
+  // CCW arc through the outfield apex (passes through (0, 60.5 + 95)).
+  s.absarc(0, PLATE_TO_MOUND, GRASS_LINE_R, FOUL_HIT.ang, Math.PI - FOUL_HIT.ang, false);
+  s.lineTo(-FOUL_HIT.xy, FOUL_HIT.xy);
+  s.lineTo(0, 0);
+  return s;
+}
+
 function Dirt() {
+  const shape = useMemo(() => dirtShape(), []);
   return (
     <mesh position={[0, Y_DIRT, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <circleGeometry args={[95, 96, Math.PI / 4, Math.PI / 2]} />
+      <shapeGeometry args={[shape]} />
       <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }
 
 // =====================================================================
-// Outfield grass: 180° sector from home with a 95-ft pie-slice hole
-// matching the dirt fan, so the dirt shows through the infield area.
+// Outfield grass: 180° sector with the dirt-shape carved out as a hole.
 // =====================================================================
 function OutfieldGrass() {
   const shape = useMemo(() => {
-    // Shape coord convention: x → world x, y → world -z (after the
-    // -π/2 x-rotation). Field extends in +y in shape space.
-    // Outer: 180° sector with apex at home. CCW winding.
     const s = new Shape();
     s.moveTo(330, 0);
     s.absarc(0, 0, 330, 0, Math.PI, false);
     s.lineTo(0, 0);
     s.closePath();
 
-    // Hole: 95-ft 90° pie slice (the infield dirt fan), CW winding.
+    // Hole follows the dirt shape but with reversed winding (CW).
     const hole = new Path();
-    const cosA = Math.cos(Math.PI / 4);
-    const sinA = Math.sin(Math.PI / 4);
     hole.moveTo(0, 0);
-    hole.lineTo(-95 * cosA, 95 * sinA); // toward 3B foul-line edge of fan
-    hole.absarc(0, 0, 95, (3 * Math.PI) / 4, Math.PI / 4, true);
-    hole.lineTo(95 * cosA, 95 * sinA);
+    hole.lineTo(-FOUL_HIT.xy, FOUL_HIT.xy);
+    hole.absarc(
+      0,
+      PLATE_TO_MOUND,
+      GRASS_LINE_R,
+      Math.PI - FOUL_HIT.ang,
+      FOUL_HIT.ang,
+      true,
+    );
+    hole.lineTo(FOUL_HIT.xy, FOUL_HIT.xy);
     hole.lineTo(0, 0);
     s.holes.push(hole);
 
@@ -102,29 +139,28 @@ function OutfieldGrass() {
 }
 
 // =====================================================================
-// Infield grass diamond: corners pulled slightly inside the bases so
-// dirt shows around each base. Home corner pulled forward to 30 ft so
-// the home-plate dirt cutout appears. Hole around the pitcher's mound.
+// Infield grass diamond: corners pulled 13 ft inside each base (matching
+// the "13 ft arcs around bases" spec) so dirt buffers each base. Home
+// corner pulled forward 26 ft for the home-plate dirt cutout (Home Plate
+// Area is a 26-ft circle per spec). 9-ft hole at the mound (18 ft diameter).
 // =====================================================================
 function InfieldGrassDiamond() {
   const shape = useMemo(() => {
-    // Diamond corners (10-ft inset along radial-from-home direction at 1B/3B,
-    // 10-ft inset back from 2B, home corner at 30 ft for the home cutout).
-    const inset = 10;
-    const oneBaseRad = BASE_DIST - inset; // 80 ft
-    const twoBaseRad = TWO_BASE - inset; // ~117.3 ft
+    const inset = 13;
+    const oneBaseRad = BASE_DIST - inset; // 77 ft from home along the diagonal
+    const twoBaseRad = TWO_BASE - inset; // 114.3 ft from home
 
     const s = new Shape();
-    s.moveTo(0, 30); // home-side corner
-    s.lineTo(oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2); // 1B side
-    s.lineTo(0, twoBaseRad); // 2B side
-    s.lineTo(-oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2); // 3B side
+    s.moveTo(0, 26); // home-side corner, 26 ft for the home plate area
+    s.lineTo(oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);
+    s.lineTo(0, twoBaseRad);
+    s.lineTo(-oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);
     s.closePath();
 
-    // Mound dirt: 10-ft hole at (0, PLATE_TO_MOUND).
+    // 9-ft (18 ft diameter) hole at the mound.
     const mound = new Path();
-    mound.moveTo(10, PLATE_TO_MOUND);
-    mound.absarc(0, PLATE_TO_MOUND, 10, 0, Math.PI * 2, true);
+    mound.moveTo(9, PLATE_TO_MOUND);
+    mound.absarc(0, PLATE_TO_MOUND, 9, 0, Math.PI * 2, true);
     s.holes.push(mound);
 
     return s;
@@ -212,6 +248,7 @@ function HomePlate() {
 }
 
 function Mound() {
+  // 18 ft diameter (9 ft radius), ~10 inches tall (slightly exaggerated to 1 ft).
   const height = 1.0;
   return (
     <group position={[0, 0, -PLATE_TO_MOUND]}>
