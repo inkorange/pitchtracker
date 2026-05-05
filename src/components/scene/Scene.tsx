@@ -2,7 +2,6 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, type ReactNode } from "react";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { Stage } from "./Stage";
 import { Lighting } from "./Lighting";
 import { CameraRig } from "./CameraRig";
@@ -26,9 +25,6 @@ export function Scene({ preset, children }: SceneProps) {
         <Stage />
         <CameraRig preset={preset} />
         {children}
-        <EffectComposer>
-          <Bloom intensity={0.85} luminanceThreshold={0.2} luminanceSmoothing={0.4} mipmapBlur />
-        </EffectComposer>
       </Suspense>
     </Canvas>
   );

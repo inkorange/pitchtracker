@@ -92,13 +92,7 @@ export function PitcherArsenalScene({ pitches }: PitcherArsenalSceneProps) {
     <>
       <Scene preset={preset}>
         {ribbons.map((r) => (
-          <Ribbon
-            key={r.id}
-            path={r.path}
-            pitchType={r.pitchType}
-            radius={0.06}
-            emissiveIntensity={0.9}
-          />
+          <Ribbon key={r.id} path={r.path} pitchType={r.pitchType} radius={0.06} />
         ))}
       </Scene>
       <CameraPad current={preset} onChange={setPreset} />

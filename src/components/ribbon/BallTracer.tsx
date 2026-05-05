@@ -28,12 +28,7 @@ export function BallTracer({ path, progress }: BallTracerProps) {
   return (
     <mesh ref={meshRef}>
       <sphereGeometry args={[0.13, 16, 16]} />
-      <meshStandardMaterial
-        color="#ffffff"
-        emissive="#ffffff"
-        emissiveIntensity={1.4}
-        toneMapped={false}
-      />
+      <meshStandardMaterial color="#f5f6f8" roughness={0.4} metalness={0.05} />
     </mesh>
   );
 }
