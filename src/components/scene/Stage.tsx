@@ -2,32 +2,31 @@
 
 import { useMemo } from "react";
 import { Line } from "@react-three/drei";
-import { Shape } from "three";
+import { Path, Shape } from "three";
 
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
 //
-// Field model: a single grass plane covers the whole field (the inner
-// "infield grass" inside the 95-ft arc and the outfield grass outside it
-// are now a continuous green surface). Discrete dirt features sit on top:
-// - Home plate area (26 ft diameter / 13 ft radius circle at home)
-// - Mound (18 ft diameter / 9 ft radius circle at the rubber)
-// - 13 ft radius cutouts around each base
-// - 6 ft wide basepath strips connecting consecutive bases, including
-//   the home→1B and home→3B foul-line basepaths
-//
-// Dirt sits at y = 0.02, grass at y = 0. The 0.02 ft (~0.25") gap is
-// large enough to win the depth test reliably and small enough to be
-// visually invisible at any reasonable camera distance.
+// Field model (matches the reference photo):
+// - One big grass plane covers the whole field as the base layer.
+// - A curved dirt fan extends 120 ft from home in fair territory — the
+//   "infield skin", with foul lines as straight edges and a 90° arc
+//   connecting them through the outfield direction.
+// - Inside the dirt fan, an infield grass diamond carves out the center,
+//   with corners pulled 13 ft inside each base. The dirt that remains
+//   visible between the diamond and the fan boundary IS the basepath
+//   network (foul-line strips + 1B-2B + 2B-3B + base cutouts), all
+//   natural consequences of this geometry.
+// - The mound and home-plate area sit as additional dirt features.
 
 const PLATE_TO_MOUND = 60.5;
 const BASE_DIST = 90;
 const BASE_DIAG = BASE_DIST / Math.SQRT2; // 63.64 ft
 const TWO_BASE = BASE_DIST * Math.SQRT2; // 127.28 ft
+const DIRT_FAN_R = 120; // distance from home to the outfield-grass arc
 const HOME_AREA_R = 13; // 26 ft diameter
 const MOUND_R = 9; // 18 ft diameter
-const BASE_CUT_R = 13; // 13 ft arcs around each base
-const BASEPATH_W = 6;
+const BASE_INSET = 13; // 13 ft inside each base, so dirt buffer = 13 ft
 
 const FIRST_BASE: [number, number, number] = [BASE_DIAG, 0, -BASE_DIAG];
 const SECOND_BASE: [number, number, number] = [0, 0, -TWO_BASE];
@@ -37,25 +36,24 @@ const GRASS = "#2f5e35";
 const DIRT = "#a87c52";
 const LINE = "#f1f3f5";
 
-const Y_GRASS = 0.0;
-const Y_DIRT = 0.02;
-const Y_BASE = 0.05;
-const Y_PLATE = 0.06;
-const Y_LINE = 0.07;
+// Y stack — layered with enough separation that depth buffering is
+// reliable from any reasonable camera distance.
+const Y_GRASS_BASE = 0.0;
+const Y_DIRT_FAN = 0.05;
+const Y_INFIELD_GRASS = 0.1;
+const Y_DIRT_FEATURE = 0.15; // home plate area, mound dirt, etc.
+const Y_BASE = 0.2;
+const Y_PLATE = 0.21;
+const Y_LINE = 0.22;
 
 export function Stage() {
   return (
     <group>
-      <Grass />
+      <OutfieldGrass />
+      <InfieldDirtFan />
+      <InfieldGrassDiamond />
       <HomePlateArea />
       <MoundDirt />
-      <BaseCutout position={FIRST_BASE} />
-      <BaseCutout position={SECOND_BASE} />
-      <BaseCutout position={THIRD_BASE} />
-      <Basepath fromXY={[0, 0]} toXY={[BASE_DIAG, BASE_DIAG]} />
-      <Basepath fromXY={[BASE_DIAG, BASE_DIAG]} toXY={[0, TWO_BASE]} />
-      <Basepath fromXY={[0, TWO_BASE]} toXY={[-BASE_DIAG, BASE_DIAG]} />
-      <Basepath fromXY={[-BASE_DIAG, BASE_DIAG]} toXY={[0, 0]} />
       <FoulLines />
       <Base position={FIRST_BASE} />
       <Base position={SECOND_BASE} />
@@ -69,12 +67,12 @@ export function Stage() {
 }
 
 // =====================================================================
-// One big grass plane covering the whole visible field. 180° sector
-// from home, radius 330 ft. Outer arc gives the rounded outfield edge.
+// Base layer: 180° green sector covering the whole field. Outer arc
+// gives the rounded outfield-grass edge.
 // =====================================================================
-function Grass() {
+function OutfieldGrass() {
   return (
-    <mesh position={[0, Y_GRASS, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh position={[0, Y_GRASS_BASE, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <circleGeometry args={[330, 96, 0, Math.PI]} />
       <meshStandardMaterial color={GRASS} roughness={0.95} metalness={0} />
     </mesh>
@@ -82,12 +80,61 @@ function Grass() {
 }
 
 // =====================================================================
-// Discrete dirt features that sit on top of the grass.
+// Infield dirt: 120-ft fan from home, 90° fair-ball arc. Sits on top
+// of the outfield grass.
+// =====================================================================
+function InfieldDirtFan() {
+  return (
+    <mesh position={[0, Y_DIRT_FAN, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <circleGeometry args={[DIRT_FAN_R, 96, Math.PI / 4, Math.PI / 2]} />
+      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
+    </mesh>
+  );
+}
+
+// =====================================================================
+// Infield grass diamond: corners 13 ft inside each base; home corner
+// at the home-plate-area boundary; mound hole.
+// The dirt that shows BETWEEN this diamond and the dirt-fan boundary is
+// the basepath network — foul-line strips, 1B-2B, 2B-3B, and the base
+// cutouts. No separate strips needed.
+// =====================================================================
+function InfieldGrassDiamond() {
+  const shape = useMemo(() => {
+    const oneBaseRad = BASE_DIST - BASE_INSET; // 77 ft from home along the diagonal
+    const twoBaseRad = TWO_BASE - BASE_INSET; // 114.3 ft from home
+
+    const s = new Shape();
+    s.moveTo(0, HOME_AREA_R + 0.5); // just outside the home plate area circle
+    s.lineTo(oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);
+    s.lineTo(0, twoBaseRad);
+    s.lineTo(-oneBaseRad / Math.SQRT2, oneBaseRad / Math.SQRT2);
+    s.closePath();
+
+    // Mound hole (CW for hole winding).
+    const mound = new Path();
+    mound.moveTo(MOUND_R, PLATE_TO_MOUND);
+    mound.absarc(0, PLATE_TO_MOUND, MOUND_R, 0, Math.PI * 2, true);
+    s.holes.push(mound);
+
+    return s;
+  }, []);
+
+  return (
+    <mesh position={[0, Y_INFIELD_GRASS, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <shapeGeometry args={[shape]} />
+      <meshStandardMaterial color={GRASS} roughness={0.95} metalness={0} />
+    </mesh>
+  );
+}
+
+// =====================================================================
+// Discrete dirt features that sit above the infield grass diamond.
 // =====================================================================
 
 function HomePlateArea() {
   return (
-    <mesh position={[0, Y_DIRT, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh position={[0, Y_DIRT_FEATURE, 0]} rotation={[-Math.PI / 2, 0, 0]}>
       <circleGeometry args={[HOME_AREA_R, 48]} />
       <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
@@ -96,58 +143,11 @@ function HomePlateArea() {
 
 function MoundDirt() {
   return (
-    <mesh position={[0, Y_DIRT, -PLATE_TO_MOUND]} rotation={[-Math.PI / 2, 0, 0]}>
-      <circleGeometry args={[MOUND_R, 32]} />
-      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
-    </mesh>
-  );
-}
-
-function BaseCutout({ position }: { position: [number, number, number] }) {
-  return (
     <mesh
-      position={[position[0], Y_DIRT, position[2]]}
+      position={[0, Y_DIRT_FEATURE, -PLATE_TO_MOUND]}
       rotation={[-Math.PI / 2, 0, 0]}
     >
-      <circleGeometry args={[BASE_CUT_R, 32]} />
-      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
-    </mesh>
-  );
-}
-
-// Basepath strip: a rectangle from `fromXY` to `toXY` (in shape coords)
-// with the given width, lying flat as dirt. Used both for foul-line
-// basepaths (home↔1B, home↔3B) and middle basepaths (1B↔2B, 2B↔3B).
-function Basepath({
-  fromXY,
-  toXY,
-  width = BASEPATH_W,
-}: {
-  fromXY: [number, number];
-  toXY: [number, number];
-  width?: number;
-}) {
-  const shape = useMemo(() => {
-    const dx = toXY[0] - fromXY[0];
-    const dy = toXY[1] - fromXY[1];
-    const len = Math.sqrt(dx * dx + dy * dy);
-    const ux = dx / len;
-    const uy = dy / len;
-    // Perpendicular CCW
-    const px = (-uy * width) / 2;
-    const py = (ux * width) / 2;
-    const s = new Shape();
-    s.moveTo(fromXY[0] - px, fromXY[1] - py);
-    s.lineTo(toXY[0] - px, toXY[1] - py);
-    s.lineTo(toXY[0] + px, toXY[1] + py);
-    s.lineTo(fromXY[0] + px, fromXY[1] + py);
-    s.closePath();
-    return s;
-  }, [fromXY, toXY, width]);
-
-  return (
-    <mesh position={[0, Y_DIRT, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <shapeGeometry args={[shape]} />
+      <circleGeometry args={[MOUND_R, 32]} />
       <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );

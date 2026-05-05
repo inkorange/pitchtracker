@@ -16,12 +16,12 @@ export interface CameraPosition {
 const PATH_MID: [number, number, number] = [0, 4.2, -28];
 
 export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
-  // Hitter's eye: behind the plate looking toward the mound.
-  // Camera ~12 ft behind plate, slightly above hitter eye height; aim down
-  // the path so foreshortening reads naturally.
+  // Hitter's eye: behind the plate looking toward the mound. Camera pulled
+  // back to 16 ft and aimed at chest-area in the distance so the plate and
+  // the full strike zone both fit in the lower portion of the frame.
   front: {
-    position: [0, 5.5, 12],
-    target: [0, 4.5, -55],
+    position: [0, 4, 16],
+    target: [0, 2.5, -55],
   },
   // Pitcher's view: behind the mound looking at the plate.
   back: {
