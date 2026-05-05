@@ -81,10 +81,10 @@ export function CameraRig({ preset }: CameraRigProps) {
       // Dampen the wheel/pinch zoom so a single scroll doesn't fly the
       // camera across the scene (default zoomSpeed is 1.0).
       zoomSpeed={0.4}
-      // Constrain orbit to top and sides — never below the horizon. Keeps the
-      // ground plane and stadium silhouette from clipping other objects when
-      // the camera tries to look up from underneath.
-      maxPolarAngle={Math.PI / 2 - 0.05}
+      // Allow the camera to tilt slightly past horizontal (~10° below the
+      // horizon) so low-angle views of the pitch path are usable, but not
+      // far enough to look up at the scene from below the ground plane.
+      maxPolarAngle={Math.PI / 2 + 0.18}
       makeDefault
     />
   );
