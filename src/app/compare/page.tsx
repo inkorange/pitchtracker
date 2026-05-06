@@ -13,6 +13,7 @@ import {
 } from "@/lib/viz/colors";
 import { ComparisonScene } from "./ComparisonScene";
 import { CompareSideFilters } from "./CompareSideFilters";
+import { CompareSharedFilters } from "./CompareSharedFilters";
 import { CompareLinkActions } from "./CompareLinkActions";
 import { CompareSlotSearch } from "./CompareSlotSearch";
 import { TunnelingPanel } from "./TunnelingPanel";
@@ -27,12 +28,12 @@ interface PageProps {
     bSeason?: string;
     aPitch?: string;
     bPitch?: string;
-    aHand?: string;
-    bHand?: string;
     aGame?: string;
     bGame?: string;
-    aOutcome?: string;
-    bOutcome?: string;
+    // Batter side and outcome are shared across both pitchers — single
+    // value applied to both datasets.
+    hand?: string;
+    outcome?: string;
     syncRelease?: string;
   }>;
 }
@@ -93,23 +94,26 @@ export default async function ComparePage({ searchParams }: PageProps) {
     ensurePitcherSeasonCache(bId, bSeason),
   ]);
 
+  const sharedHand = parseHand(sp.hand);
+  const sharedOutcomes = parseOutcomes(sp.outcome);
+
   const [aCtx, bCtx] = await Promise.all([
     loadSideContext(supabase, {
       pitcherId: aId,
       season: aSeason,
       pitchTypes: (sp.aPitch ?? "").split(",").filter(Boolean),
-      hand: parseHand(sp.aHand),
+      hand: sharedHand,
       gamePk: parseGame(sp.aGame),
-      outcomes: parseOutcomes(sp.aOutcome),
+      outcomes: sharedOutcomes,
       currentYear,
     }),
     loadSideContext(supabase, {
       pitcherId: bId,
       season: bSeason,
       pitchTypes: (sp.bPitch ?? "").split(",").filter(Boolean),
-      hand: parseHand(sp.bHand),
+      hand: sharedHand,
       gamePk: parseGame(sp.bGame),
-      outcomes: parseOutcomes(sp.bOutcome),
+      outcomes: sharedOutcomes,
       currentYear,
     }),
   ]);
@@ -136,11 +140,11 @@ export default async function ComparePage({ searchParams }: PageProps) {
           normalizeRelease={syncRelease}
         />
 
-        <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
+        <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
           <div className="flex gap-3 items-center pointer-events-auto">
             <Link
               href="/"
-              className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
+              className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
             >
               ← pitchtracker
             </Link>
@@ -153,7 +157,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
 
         <OutcomeLegend />
 
-        <section className="absolute top-20 left-6 w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+        <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
           <HoverableSide side="a">
             <PitcherCard
               side="a"
@@ -177,6 +181,9 @@ export default async function ComparePage({ searchParams }: PageProps) {
               games={bCtx.gameOptions}
             />
           </HoverableSide>
+
+          <div className="border-t border-white/[0.08]" />
+          <CompareSharedFilters />
 
           <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
 
@@ -223,31 +230,45 @@ async function loadSideContext(
     .from("pitch_pitcher_aggregates")
     .select("season")
     .eq("pitcher_id", pitcherId);
+
+  // Single source of truth for "which games has this pitcher pitched
+  // in." pitch_pitcher_games is bounded by games-per-pitcher (~30-80
+  // per season), so an unfiltered query is safe — no row-cap risk.
+  // pitch_game_pitches in contrast holds thousands of rows per pitcher
+  // per season and silently truncates at PostgREST's 1000-row default.
+  //
+  // game_type=R restricts to regular-season games — spring training and
+  // exhibitions get filtered both at ingest (Savant URL) and at query
+  // time (defensive).
   const { data: pitcherGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk")
-    .eq("pitcher_id", pitcherId);
-  const distinctPitcherGamePks = Array.from(
-    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
-  );
-  const { data: pitcherGameSeasons } =
-    distinctPitcherGamePks.length > 0
-      ? await supabase
-          .from("pitch_games")
-          .select("game_pk, game_date, season, home_team_id, away_team_id")
-          .in("game_pk", distinctPitcherGamePks)
-      : { data: [] };
+    .from("pitch_pitcher_games")
+    .select(
+      "game_pk, pitch_games!inner(game_date, season, home_team_id, away_team_id, game_type)",
+    )
+    .eq("pitcher_id", pitcherId)
+    .eq("pitch_games.game_type", "R");
+
+  type PitcherGameRow = {
+    game_pk: number;
+    pitch_games: {
+      game_date: string;
+      season: number;
+      home_team_id: number | null;
+      away_team_id: number | null;
+    };
+  };
+  const pitcherGames = (pitcherGameRows ?? []) as unknown as PitcherGameRow[];
+
   const seasonsWithData = new Set<number>();
   for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
-  for (const r of pitcherGameSeasons ?? []) seasonsWithData.add(r.season);
+  for (const g of pitcherGames) seasonsWithData.add(g.pitch_games.season);
   seasonsWithData.add(currentYear);
   const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
 
-  const { data: seasonGames } = await supabase
-    .from("pitch_games")
-    .select("game_pk")
-    .eq("season", season);
-  const seasonGamePks = new Set((seasonGames ?? []).map((g) => g.game_pk));
+  const seasonGames = pitcherGames.filter(
+    (g) => g.pitch_games.season === season,
+  );
+  const seasonGamePks = new Set(seasonGames.map((g) => g.game_pk));
 
   // Pitch-type filtering is now done in JS so the arsenal display can
   // ignore it (the type chips are how the user toggles types — they
@@ -308,15 +329,12 @@ async function loadSideContext(
     }))
     .sort((a, b) => b.pitch_count - a.pitch_count);
 
-  // Game dropdown options (cached games for this pitcher in this season).
-  const cachedGamePksForSeason = distinctPitcherGamePks.filter((pk) => seasonGamePks.has(pk));
-  const seasonGameMeta = (pitcherGameSeasons ?? []).filter((g) =>
-    cachedGamePksForSeason.includes(g.game_pk),
-  );
+  // Game dropdown options (every game this pitcher pitched in this
+  // season, sourced from pitch_pitcher_games).
   const teamIds = new Set<number>();
-  for (const g of seasonGameMeta) {
-    if (g.home_team_id) teamIds.add(g.home_team_id);
-    if (g.away_team_id) teamIds.add(g.away_team_id);
+  for (const g of seasonGames) {
+    if (g.pitch_games.home_team_id) teamIds.add(g.pitch_games.home_team_id);
+    if (g.pitch_games.away_team_id) teamIds.add(g.pitch_games.away_team_id);
   }
   const { data: teamRows } =
     teamIds.size > 0
@@ -328,12 +346,16 @@ async function loadSideContext(
   const teamAbbr = new Map<number, string>(
     (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
   );
-  const gameOptions: GameOption[] = seasonGameMeta
+  const gameOptions: GameOption[] = seasonGames
     .map((g) => ({
       game_pk: g.game_pk,
-      game_date: g.game_date,
-      away: g.away_team_id ? (teamAbbr.get(g.away_team_id) ?? "?") : "?",
-      home: g.home_team_id ? (teamAbbr.get(g.home_team_id) ?? "?") : "?",
+      game_date: g.pitch_games.game_date,
+      away: g.pitch_games.away_team_id
+        ? (teamAbbr.get(g.pitch_games.away_team_id) ?? "?")
+        : "?",
+      home: g.pitch_games.home_team_id
+        ? (teamAbbr.get(g.pitch_games.home_team_id) ?? "?")
+        : "?",
     }))
     .sort((a, b) => b.game_date.localeCompare(a.game_date));
 
@@ -506,7 +528,7 @@ function PitcherCard({
         ) : null}
       </div>
       {aggregates.length === 0 ? (
-        <div className="text-xs text-white/55">No arsenal data cached for {season}.</div>
+        <div className="text-xs text-white/55">No arsenal data for {season}.</div>
       ) : (
         <ul className="space-y-1">
           {aggregates.slice(0, 6).map((a) => (

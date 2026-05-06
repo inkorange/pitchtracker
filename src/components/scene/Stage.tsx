@@ -57,6 +57,10 @@ function useMowGrassMaterial() {
       color: GRASS,
       roughness: 0.95,
       metalness: 0,
+      // Distant grass fades to alpha 0 (see shader patch), so the field
+      // dissolves into the sky instead of cutting off at a hard edge.
+      transparent: true,
+      depthWrite: false,
     });
     mat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
@@ -93,6 +97,10 @@ function useMowGrassMaterial() {
           vec3 darkGrass  = vec3(0.220, 0.315, 0.195);
           vec3 lightGrass = vec3(0.350, 0.470, 0.275);
           diffuseColor.rgb = mix(darkGrass, lightGrass, blend);
+          // Distance-based alpha fade so the field dissolves into the
+          // sky in the distance. Measured horizontally from home plate.
+          float vMowDist = length(vMowWorldPos.xz);
+          diffuseColor.a *= 1.0 - smoothstep(300.0, 650.0, vMowDist);
           `,
         );
     };
@@ -144,11 +152,11 @@ export function Stage() {
 function OutfieldGrass({ material }: { material: MeshStandardMaterial }) {
   return (
     <mesh
-      position={[0, Y_GRASS_BASE, -100]}
+      position={[0, Y_GRASS_BASE, -200]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
     >
-      <planeGeometry args={[800, 800]} />
+      <planeGeometry args={[1400, 1400]} />
     </mesh>
   );
 }

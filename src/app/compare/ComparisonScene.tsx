@@ -287,7 +287,7 @@ export function ComparisonScene({
             )}
             <Html
               position={selectedRibbon.labelPosition}
-              zIndexRange={[100, 0]}
+              zIndexRange={[10, 0]}
               style={{ pointerEvents: "none" }}
             >
               {/* Two labels anchored at the same 3D point. The wrapper has

@@ -44,6 +44,7 @@ export async function GET(request: Request) {
     home_team_id: g.teams.home.team.id,
     away_team_id: g.teams.away.team.id,
     status: g.status.detailedState ?? g.status.abstractGameState ?? "Unknown",
+    game_type: g.gameType ?? null,
     venue_name: g.venue?.name ?? null,
     updated_at: new Date().toISOString(),
   }));

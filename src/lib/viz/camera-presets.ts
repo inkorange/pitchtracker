@@ -12,15 +12,14 @@ export interface CameraPosition {
   target: [number, number, number];
 }
 
-// Path midpoint (release ~55 ft from plate, plate at z=0): z = -28, y = 4.
-const PATH_MID: [number, number, number] = [0, 4.2, -28];
-
 export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
-  // Hitter's eye: behind the plate looking toward the mound. Camera pulled
-  // back to 16 ft and aimed at chest-area in the distance so the plate and
-  // the full strike zone both fit in the lower portion of the frame.
+  // Hitter's eye: behind the plate looking toward the mound. Slightly
+  // off-center (toward the 1B side) and slightly elevated so the view
+  // feels less like a centered diagram and more like a real broadcast
+  // camera; pulled in to 11 ft for a tighter framing on the release-to-
+  // plate path.
   front: {
-    position: [0, 4, 16],
+    position: [1.2, 4.3, 11],
     target: [0, 2.5, -55],
   },
   // Pitcher's view: behind the mound looking at the plate.
@@ -39,10 +38,14 @@ export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
     position: [0, 100, -29],
     target: [0, 0, -30],
   },
-  // Third-base side profile: pulled back so the entire pitch path is visible
-  // horizontally on a 16:9 frame with comfortable margin (~10 ft each side).
+  // Third-base side profile. Camera moved closer to home plate (z=-10
+  // instead of z=-28) so the strike zone area + batter silhouette sit
+  // central in the frame. The release end of the path (z≈-55) lands
+  // near the left edge of the canvas — still visible on desktop, may
+  // clip slightly on mobile portrait, which is the right tradeoff
+  // since the batter and plate are the focus of an at-bat.
   side: {
-    position: [-50, 5.5, -28],
-    target: PATH_MID,
+    position: [-55, 5.5, -10],
+    target: [0, 3, -15],
   },
 };

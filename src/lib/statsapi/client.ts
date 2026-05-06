@@ -25,6 +25,9 @@ export interface MlbPlayer {
 export interface MlbScheduleGame {
   gamePk: number;
   gameDate: string;
+  // Single-letter code: R, S, E, F, D, L, W, A. Used to filter out
+  // spring training / exhibition games at the schedule layer.
+  gameType?: string;
   status: { abstractGameState: string; detailedState: string };
   teams: {
     home: { team: { id: number; name: string } };
@@ -132,6 +135,43 @@ export async function fetchPerson(playerId: number): Promise<MlbPlayer | null> {
     mlbDebutDate: person.mlbDebutDate,
     active: person.active,
   };
+}
+
+// Batch fetch detail for many players via /people?personIds=...
+// Long-cached because player names rarely change. Used for the at-bat
+// browser which needs ~25 distinct batter names per game.
+export async function fetchPersonsCached(
+  playerIds: number[],
+): Promise<Map<number, MlbPlayer>> {
+  const result = new Map<number, MlbPlayer>();
+  if (playerIds.length === 0) return result;
+
+  const dedup = Array.from(new Set(playerIds));
+  const CHUNK = 50;
+  for (let i = 0; i < dedup.length; i += CHUNK) {
+    const chunk = dedup.slice(i, i + CHUNK);
+    try {
+      const data = await fetchJson<RawPersonResponse>(
+        `${BASE}/people?personIds=${chunk.join(",")}`,
+        { cache: "force-cache" },
+      );
+      for (const p of data.people) {
+        result.set(p.id, {
+          id: p.id,
+          fullName: p.fullName,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          primaryPosition: p.primaryPosition,
+          pitchHand: p.pitchHand,
+          mlbDebutDate: p.mlbDebutDate,
+          active: p.active,
+        });
+      }
+    } catch {
+      // Skip the chunk on failure — partial data is better than none.
+    }
+  }
+  return result;
 }
 
 // Fetch the schedule between two dates inclusive. ISO YYYY-MM-DD strings.

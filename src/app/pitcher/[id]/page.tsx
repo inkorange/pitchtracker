@@ -76,10 +76,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id)",
+      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id, game_type)",
     )
     .eq("pitcher_id", pitcherId)
     .eq("pitch_games.season", season)
+    .eq("pitch_games.game_type", "R")
     .range(0, 4999);
   if (sp.hand === "L" || sp.hand === "R") {
     pitchQuery = pitchQuery.eq("stand", sp.hand);
@@ -201,7 +202,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
 
       <OutcomeLegend />
 
-      <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
+      <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
         <div className="flex gap-4 items-center pointer-events-auto">
           <Link
             href="/"
@@ -221,7 +222,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         </div>
       </header>
 
-      <section className="absolute top-20 left-6 w-[340px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center gap-3">
           <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
             <Image
@@ -265,7 +266,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
           {(aggregates ?? []).length === 0 ? (
             <div className="text-xs text-white/55 leading-relaxed">
-              No arsenal data cached for {season}.
+              No arsenal data for {season}.
             </div>
           ) : (
             <ul className="space-y-1.5">
@@ -304,6 +305,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
               pitch_count: a.pitch_count,
             }))}
             games={games}
+            season={season}
           />
         </div>
 
@@ -314,7 +316,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         )}
         {(cachedPitches ?? []).length === 0 && (
           <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-            No pitch trajectory data cached yet for this filter.
+            No pitch trajectory data available for this filter.
           </div>
         )}
       </section>

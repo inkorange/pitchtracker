@@ -16,7 +16,7 @@ interface CameraPadProps {
 
 export function CameraPad({ current, onChange }: CameraPadProps) {
   return (
-    <div className="absolute bottom-6 right-6 flex gap-1 p-1 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg">
+    <div className="absolute bottom-6 right-3 sm:right-6 z-20 flex gap-1 p-1 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg">
       {PRESETS.map((p) => (
         <button
           key={p.key}
