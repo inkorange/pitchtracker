@@ -91,9 +91,13 @@ export function ComparisonScene({
       const aRelease = avgFirstPoint(aRaw);
       const bRelease = avgFirstPoint(bRaw);
       if (aRelease && bRelease) {
+        // Only align lateral (X) and height (Z). Shifting depth (Y, distance
+        // from plate) would push B's plate end off the plate plane, so the
+        // ball would render in front of or behind the strike zone instead
+        // of at it.
         releaseOffset = [
           aRelease[0] - bRelease[0],
-          aRelease[1] - bRelease[1],
+          0,
           aRelease[2] - bRelease[2],
         ];
         bRibbons = bRaw.map((r) => ({
@@ -391,7 +395,7 @@ function SideLayer({
               }}
             />
             <Sphere
-              args={[isSelectedAverage ? 0.22 : 0.18, 18, 18]}
+              args={[isSelectedAverage ? 0.16 : 0.12, 18, 18]}
               position={endPos}
               onPointerOver={(e) => {
                 e.stopPropagation();

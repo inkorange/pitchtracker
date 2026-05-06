@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Line } from "@react-three/drei";
-import { Path, Shape } from "three";
+import { MeshStandardMaterial, Path, Shape } from "three";
 
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
@@ -46,6 +46,60 @@ const Y_BASE = 0.2;
 const Y_PLATE = 0.21;
 const Y_LINE = 0.22;
 
+// Mow-pattern shader: paints the classic ballpark crosshatch onto any grass
+// mesh by sampling world XZ position. Stripes are aligned with the foul lines
+// (one set parallel to the 1B line, one parallel to the 3B line); their
+// overlap gives four shades — like a real reel mower laying down passes in
+// alternating directions, then re-mowing perpendicular.
+function useMowGrassMaterial() {
+  return useMemo(() => {
+    const mat = new MeshStandardMaterial({
+      color: GRASS,
+      roughness: 0.95,
+      metalness: 0,
+    });
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          `#include <common>\nvarying vec3 vMowWorldPos;`,
+        )
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>\nvMowWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+        );
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          `#include <common>\nvarying vec3 vMowWorldPos;`,
+        )
+        .replace(
+          "#include <color_fragment>",
+          `#include <color_fragment>
+          // Stripe directions perpendicular to the foul lines (so stripes RUN
+          // parallel to them). Each stripe is ~10 ft wide.
+          float STRIPE_W = 6.0;
+          vec2 dirA = vec2(0.7071, 0.7071);   // perpendicular to 1B line
+          vec2 dirB = vec2(0.7071, -0.7071);  // perpendicular to 3B line
+          float a = dot(vMowWorldPos.xz, dirA) / (STRIPE_W * 2.0);
+          float b = dot(vMowWorldPos.xz, dirB) / (STRIPE_W * 2.0);
+          // Soft-edge stripe (smoothstep over a small fraction of one stripe).
+          float fa = fract(a);
+          float fb = fract(b);
+          float sA = smoothstep(0.48, 0.52, fa) - smoothstep(0.98, 1.02, fa);
+          float sB = smoothstep(0.48, 0.52, fb) - smoothstep(0.98, 1.02, fb);
+          float blend = (sA + sB) * 0.5; // 0, 0.5, or 1
+          vec3 darkGrass  = vec3(0.220, 0.315, 0.195);
+          vec3 lightGrass = vec3(0.350, 0.470, 0.275);
+          diffuseColor.rgb = mix(darkGrass, lightGrass, blend);
+          `,
+        );
+    };
+    return mat;
+  }, []);
+}
+
 // Compute where the 95-ft-from-rubber arc intersects each foul line.
 const FOUL_HIT = (() => {
   const b = PLATE_TO_MOUND * Math.SQRT2;
@@ -58,11 +112,12 @@ const FOUL_HIT = (() => {
 })();
 
 export function Stage() {
+  const mowMaterial = useMowGrassMaterial();
   return (
     <group>
-      <OutfieldGrass />
+      <OutfieldGrass material={mowMaterial} />
       <InfieldDirtFan />
-      <InfieldGrassDiamond />
+      <InfieldGrassDiamond material={mowMaterial} />
       <FoulLineBasepath side="first" />
       <FoulLineBasepath side="third" />
       <BaseCutout position={FIRST_BASE} />
@@ -86,14 +141,14 @@ export function Stage() {
 // home so it covers the field plus generous margins to the sides and
 // behind the plate. No more black void around the field.
 // =====================================================================
-function OutfieldGrass() {
+function OutfieldGrass({ material }: { material: MeshStandardMaterial }) {
   return (
     <mesh
       position={[0, Y_GRASS_BASE, -100]}
       rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
     >
       <planeGeometry args={[800, 800]} />
-      <meshStandardMaterial color={GRASS} roughness={0.95} metalness={0} />
     </mesh>
   );
 }
@@ -129,7 +184,7 @@ function InfieldDirtFan() {
 // triangular dirt wedge in front of the plate — just narrow basepath
 // strips on the foul lines (rendered separately, layered above this).
 // =====================================================================
-function InfieldGrassDiamond() {
+function InfieldGrassDiamond({ material }: { material: MeshStandardMaterial }) {
   const shape = useMemo(() => {
     const exitFirst = HOME_AREA_R / Math.SQRT2; // 9.19
     const s = new Shape();
@@ -151,9 +206,12 @@ function InfieldGrassDiamond() {
     return s;
   }, []);
   return (
-    <mesh position={[0, Y_INFIELD_GRASS, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh
+      position={[0, Y_INFIELD_GRASS, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
+    >
       <shapeGeometry args={[shape]} />
-      <meshStandardMaterial color={GRASS} roughness={0.95} metalness={0} />
     </mesh>
   );
 }

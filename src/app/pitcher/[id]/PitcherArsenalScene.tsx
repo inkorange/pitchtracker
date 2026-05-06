@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Scene } from "@/components/scene/Scene";
@@ -127,6 +127,39 @@ export function PitcherArsenalScene({ pitches, pitcherLabel }: PitcherArsenalSce
 
   const hasSelection = selectedEntry !== null;
 
+  // Left/right arrows cycle through the visible pitches. Skipped when the
+  // user is typing in an input (the search box) so the keys still work
+  // normally there.
+  useEffect(() => {
+    const handleKeyDown = (ev: KeyboardEvent) => {
+      if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+      const target = ev.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (entries.length === 0) return;
+      ev.preventDefault();
+      const dir = ev.key === "ArrowRight" ? 1 : -1;
+      setSelectedId((curr) => {
+        const idx = curr ? entries.findIndex((entry) => entry.id === curr) : -1;
+        const next =
+          idx === -1
+            ? dir === 1
+              ? 0
+              : entries.length - 1
+            : (idx + dir + entries.length) % entries.length;
+        return entries[next].id;
+      });
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [entries]);
+
   return (
     <>
       <Scene
@@ -152,7 +185,7 @@ export function PitcherArsenalScene({ pitches, pitcherLabel }: PitcherArsenalSce
               />
               {e.platePosition && (
                 <Sphere
-                  args={[isSelected ? 0.18 : 0.12, 16, 16]}
+                  args={[isSelected ? 0.13 : 0.1, 16, 16]}
                   position={e.platePosition}
                   onPointerOver={(ev) => {
                     ev.stopPropagation();
