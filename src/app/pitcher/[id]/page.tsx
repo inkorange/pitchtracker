@@ -11,6 +11,7 @@ import {
   type OutcomeCategory,
 } from "@/lib/viz/colors";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
+import { PitcherCardCollapse } from "./PitcherCardCollapse";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
@@ -221,103 +222,112 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         <PitcherSearch placeholder="Search another pitcher…" />
       </div>
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
-        <div className="flex items-center gap-3">
-          <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-            <Image
-              src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
-              alt=""
-              fill
-              sizes="56px"
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-          <div className="min-w-0">
-            <div className="text-base font-medium text-white truncate">{pitcher.full_name}</div>
-            <div className="text-[11px] text-white/55 tabular-nums">
-              {pitcher.throws ? `${pitcher.throws}HP` : "—"}
-              {team ? ` · ${team.abbreviation}` : ""}
-              {pitcher.debut_year ? ` · debut ${pitcher.debut_year}` : ""}
-            </div>
-          </div>
-          {team ? (
-            <div className="relative w-10 h-10 flex-shrink-0">
-              <Image
-                src={teamLogoUrl(team.mlb_id)}
-                alt={team.name}
-                fill
-                sizes="40px"
-                className="object-contain"
-                unoptimized
-              />
-            </div>
-          ) : null}
-        </div>
-
-        <SeasonPicker
-          pitcherId={pitcher.mlb_id}
-          season={season}
-          available={availableSeasons.length ? availableSeasons : [season]}
-        />
-
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
-          {(aggregates ?? []).length === 0 ? (
-            <div className="text-xs text-white/55 leading-relaxed">
-              No arsenal data for {season}.
-            </div>
-          ) : (
-            <ul className="space-y-1.5">
-              {aggregates!.map((a) => (
-                <li
-                  key={a.pitch_type}
-                  className="space-y-0.5"
-                >
-                  <div className="flex items-center gap-2 text-xs tabular-nums">
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ background: getPitchColor(a.pitch_type) }}
-                    />
-                    <span className="text-white/85 flex-1 truncate">
-                      {getPitchLabel(a.pitch_type)}
-                    </span>
-                    <span className="text-white/55">
-                      {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
-                    </span>
-                    <span className="text-white/45 w-16 text-right">
-                      {a.usage_pct != null
-                        ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
-                        : "—"}
-                    </span>
+      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+        <PitcherCardCollapse
+          header={
+            <>
+              <div className="flex items-center gap-3">
+                <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+                  <Image
+                    src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
+                    alt=""
+                    fill
+                    sizes="56px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-base font-medium text-white truncate">{pitcher.full_name}</div>
+                  <div className="text-[11px] text-white/55 tabular-nums">
+                    {pitcher.throws ? `${pitcher.throws}HP` : "—"}
+                    {team ? ` · ${team.abbreviation}` : ""}
+                    {pitcher.debut_year ? ` · debut ${pitcher.debut_year}` : ""}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                </div>
+                {team ? (
+                  <div className="hidden sm:block relative w-10 h-10 flex-shrink-0">
+                    <Image
+                      src={teamLogoUrl(team.mlb_id)}
+                      alt={team.name}
+                      fill
+                      sizes="40px"
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </div>
+                ) : null}
+              </div>
 
-        <div className="border-t border-white/[0.08] pt-3">
-          <PitcherFilters
-            arsenal={(aggregates ?? []).map((a) => ({
-              pitch_type: a.pitch_type,
-              pitch_count: a.pitch_count,
-            }))}
-            games={games}
-            season={season}
-          />
-        </div>
+              <SeasonPicker
+                pitcherId={pitcher.mlb_id}
+                season={season}
+                available={availableSeasons.length ? availableSeasons : [season]}
+              />
+            </>
+          }
+          body={
+            <>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
+                {(aggregates ?? []).length === 0 ? (
+                  <div className="text-xs text-white/55 leading-relaxed">
+                    No arsenal data for {season}.
+                  </div>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {aggregates!.map((a) => (
+                      <li
+                        key={a.pitch_type}
+                        className="space-y-0.5"
+                      >
+                        <div className="flex items-center gap-2 text-xs tabular-nums">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: getPitchColor(a.pitch_type) }}
+                          />
+                          <span className="text-white/85 flex-1 truncate">
+                            {getPitchLabel(a.pitch_type)}
+                          </span>
+                          <span className="text-white/55">
+                            {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
+                          </span>
+                          <span className="text-white/45 w-16 text-right">
+                            {a.usage_pct != null
+                              ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
+                              : "—"}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-        {renderable.length > 0 && (
-          <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
-            Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
-          </div>
-        )}
-        {(cachedPitches ?? []).length === 0 && (
-          <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-            No pitch trajectory data available for this filter.
-          </div>
-        )}
+              <div className="border-t border-white/[0.08] pt-3">
+                <PitcherFilters
+                  arsenal={(aggregates ?? []).map((a) => ({
+                    pitch_type: a.pitch_type,
+                    pitch_count: a.pitch_count,
+                  }))}
+                  games={games}
+                  season={season}
+                />
+              </div>
+
+              {renderable.length > 0 && (
+                <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
+                  Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
+                </div>
+              )}
+              {(cachedPitches ?? []).length === 0 && (
+                <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
+                  No pitch trajectory data available for this filter.
+                </div>
+              )}
+            </>
+          }
+        />
       </section>
     </main>
   );

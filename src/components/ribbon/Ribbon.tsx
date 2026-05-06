@@ -70,8 +70,12 @@ export function Ribbon({
   const color = side ? getPitchColorForSide(pitchType, side) : getPitchColor(pitchType);
 
   // Material is always transparent so toggling opacity at runtime works
-  // without needing material.needsUpdate. depthWrite stays on so opaque
-  // ribbons still occlude correctly when opacity is 1.
+  // without needing material.needsUpdate. depthWrite is gated on near-
+  // full opacity: opaque ribbons still occlude correctly, but a faded
+  // ribbon (e.g. 10% in tunnel mode, or 18% when another pitch is
+  // selected) MUST NOT write depth or it will block the tunnel cone /
+  // other transparent layers behind it.
+  const writeDepth = opacity >= 0.95;
   return (
     <mesh
       geometry={geometry}
@@ -85,6 +89,7 @@ export function Ribbon({
         metalness={0.05}
         transparent
         opacity={opacity}
+        depthWrite={writeDepth}
       />
     </mesh>
   );
