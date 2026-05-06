@@ -8,12 +8,19 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
 
   // Legacy direct-AB lookup: /at-bat/lookup?gamePk=...&atBatNumber=...
-  const gamePk = Number(url.searchParams.get("gamePk"));
-  const atBatNumber = Number(url.searchParams.get("atBatNumber"));
-  if (Number.isFinite(gamePk) && Number.isFinite(atBatNumber)) {
-    return NextResponse.redirect(
-      new URL(`/at-bat/${gamePk}/${atBatNumber}`, request.url),
-    );
+  // Check string presence first — Number(null) is 0 and Number.isFinite(0)
+  // is true, so a naive Number+isFinite check would always hit this branch
+  // with the new team/date form (which omits these params).
+  const gamePkRaw = url.searchParams.get("gamePk");
+  const atBatRaw = url.searchParams.get("atBatNumber");
+  if (gamePkRaw && atBatRaw) {
+    const gamePk = Number(gamePkRaw);
+    const atBatNumber = Number(atBatRaw);
+    if (Number.isFinite(gamePk) && Number.isFinite(atBatNumber)) {
+      return NextResponse.redirect(
+        new URL(`/at-bat/${gamePk}/${atBatNumber}`, request.url),
+      );
+    }
   }
 
   // New team+date flow.
