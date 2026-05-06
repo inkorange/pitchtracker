@@ -230,35 +230,40 @@ async function loadSideContext(
     .from("pitch_pitcher_aggregates")
     .select("season")
     .eq("pitcher_id", pitcherId);
+
+  // Single source of truth for "which games has this pitcher pitched
+  // in." pitch_pitcher_games is bounded by games-per-pitcher (~30-80
+  // per season), so an unfiltered query is safe — no row-cap risk.
+  // pitch_game_pitches in contrast holds thousands of rows per pitcher
+  // per season and silently truncates at PostgREST's 1000-row default.
   const { data: pitcherGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk")
+    .from("pitch_pitcher_games")
+    .select(
+      "game_pk, pitch_games!inner(game_date, season, home_team_id, away_team_id)",
+    )
     .eq("pitcher_id", pitcherId);
-  const distinctPitcherGamePks = Array.from(
-    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
-  );
-  const { data: pitcherGameSeasons } =
-    distinctPitcherGamePks.length > 0
-      ? await supabase
-          .from("pitch_games")
-          .select("game_pk, game_date, season, home_team_id, away_team_id")
-          .in("game_pk", distinctPitcherGamePks)
-      : { data: [] };
+
+  type PitcherGameRow = {
+    game_pk: number;
+    pitch_games: {
+      game_date: string;
+      season: number;
+      home_team_id: number | null;
+      away_team_id: number | null;
+    };
+  };
+  const pitcherGames = (pitcherGameRows ?? []) as unknown as PitcherGameRow[];
+
   const seasonsWithData = new Set<number>();
   for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
-  for (const r of pitcherGameSeasons ?? []) seasonsWithData.add(r.season);
+  for (const g of pitcherGames) seasonsWithData.add(g.pitch_games.season);
   seasonsWithData.add(currentYear);
   const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
 
-  // Derive the active-season game_pks from this pitcher's already-loaded
-  // game metadata. Querying pitch_games by season directly hits Supabase's
-  // default 1000-row cap on a full MLB season (~2430 games), which would
-  // silently drop any cached games beyond that window.
-  const seasonGamePks = new Set(
-    (pitcherGameSeasons ?? [])
-      .filter((g) => g.season === season)
-      .map((g) => g.game_pk),
+  const seasonGames = pitcherGames.filter(
+    (g) => g.pitch_games.season === season,
   );
+  const seasonGamePks = new Set(seasonGames.map((g) => g.game_pk));
 
   // Pitch-type filtering is now done in JS so the arsenal display can
   // ignore it (the type chips are how the user toggles types — they
@@ -319,14 +324,12 @@ async function loadSideContext(
     }))
     .sort((a, b) => b.pitch_count - a.pitch_count);
 
-  // Game dropdown options (cached games for this pitcher in this season).
-  const seasonGameMeta = (pitcherGameSeasons ?? []).filter(
-    (g) => g.season === season,
-  );
+  // Game dropdown options (every game this pitcher pitched in this
+  // season, sourced from pitch_pitcher_games).
   const teamIds = new Set<number>();
-  for (const g of seasonGameMeta) {
-    if (g.home_team_id) teamIds.add(g.home_team_id);
-    if (g.away_team_id) teamIds.add(g.away_team_id);
+  for (const g of seasonGames) {
+    if (g.pitch_games.home_team_id) teamIds.add(g.pitch_games.home_team_id);
+    if (g.pitch_games.away_team_id) teamIds.add(g.pitch_games.away_team_id);
   }
   const { data: teamRows } =
     teamIds.size > 0
@@ -338,12 +341,16 @@ async function loadSideContext(
   const teamAbbr = new Map<number, string>(
     (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
   );
-  const gameOptions: GameOption[] = seasonGameMeta
+  const gameOptions: GameOption[] = seasonGames
     .map((g) => ({
       game_pk: g.game_pk,
-      game_date: g.game_date,
-      away: g.away_team_id ? (teamAbbr.get(g.away_team_id) ?? "?") : "?",
-      home: g.home_team_id ? (teamAbbr.get(g.home_team_id) ?? "?") : "?",
+      game_date: g.pitch_games.game_date,
+      away: g.pitch_games.away_team_id
+        ? (teamAbbr.get(g.pitch_games.away_team_id) ?? "?")
+        : "?",
+      home: g.pitch_games.home_team_id
+        ? (teamAbbr.get(g.pitch_games.home_team_id) ?? "?")
+        : "?",
     }))
     .sort((a, b) => b.game_date.localeCompare(a.game_date));
 

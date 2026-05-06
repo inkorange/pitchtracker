@@ -26,27 +26,16 @@ export async function ensurePitcherSeasonCache(
 async function doEnsure(pitcherId: number, season: number): Promise<void> {
   const supabase = createAdminClient();
 
-  // "Already cached?" check, done via the pitcher's own (small) set of
-  // game_pks. Never query "all games in season X" — a full MLB
-  // schedule is ~2400 rows and Postgrest defaults to 1000, which used
-  // to silently truncate the membership set.
-  const { data: pitcherGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk")
-    .eq("pitcher_id", pitcherId);
-  const pitcherGamePks = Array.from(
-    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
-  );
-  if (pitcherGamePks.length > 0) {
-    const { data: pitcherGameMeta } = await supabase
-      .from("pitch_games")
-      .select("game_pk, season")
-      .in("game_pk", pitcherGamePks);
-    const cachedSeasonGames = (pitcherGameMeta ?? []).filter(
-      (g) => g.season === season,
-    );
-    if (cachedSeasonGames.length > 0) return; // pitcher already cached for this season
-  }
+  // "Already cached?" check via the pitch_pitcher_games mapping table.
+  // This is the small per-pitcher mapping (~30-80 rows/season), so the
+  // join filter on pitch_games.season returns only this pitcher's games
+  // in the active season — no row-cap risk.
+  const { data: existingPitcherGames } = await supabase
+    .from("pitch_pitcher_games")
+    .select("game_pk, pitch_games!inner(season)")
+    .eq("pitcher_id", pitcherId)
+    .eq("pitch_games.season", season);
+  if ((existingPitcherGames ?? []).length > 0) return;
 
   // Pull from Savant.
   let fresh;
@@ -151,6 +140,16 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
   for (let i = 0; i < rows.length; i += 200) {
     const chunk = rows.slice(i, i + 200);
     await supabase.from("pitch_game_pitches").upsert(chunk);
+  }
+
+  // Mirror the pitcher × game pairs into the mapping table so the
+  // dropdown can be queried directly without scanning pitches.
+  const pitcherGameRows: TablesInsert<"pitch_pitcher_games">[] = Array.from(
+    gameByPk.keys(),
+  ).map((gpk) => ({ pitcher_id: pitcherId, game_pk: gpk }));
+  for (let i = 0; i < pitcherGameRows.length; i += 200) {
+    const chunk = pitcherGameRows.slice(i, i + 200);
+    await supabase.from("pitch_pitcher_games").upsert(chunk);
   }
 
   // Recompute aggregates so the arsenal panel populates.
