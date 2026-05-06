@@ -19,10 +19,19 @@ import type { CameraPreset } from "@/lib/viz/camera-presets";
 import { TunnelMarker } from "./TunnelMarker";
 import { OutcomeMarkers } from "./OutcomeMarkers";
 import { useCompareHover, useOpacityForSide } from "./CompareHoverContext";
-import type { CompareSide } from "@/lib/viz/colors";
+import { getPitchColorForSide, type CompareSide } from "@/lib/viz/colors";
+import { Sphere } from "@react-three/drei";
 
 interface PitchWithOutcome extends CachedPitchSubset {
   description?: string | null;
+}
+
+interface ShapeMetrics {
+  spinRpm: number | null;
+  spinAxis: number | null;
+  pfxXIn: number | null; // horizontal break, inches
+  pfxZIn: number | null; // induced vertical break, inches
+  extensionFt: number | null;
 }
 
 interface ComparisonSceneProps {
@@ -169,6 +178,13 @@ export function ComparisonScene({
         labelPosition: statcastToThree(path[path.length - 1]),
         label,
         velocity: row.release_speed,
+        metrics: {
+          spinRpm: row.release_spin_rate ?? null,
+          spinAxis: row.spin_axis ?? null,
+          pfxXIn: row.pfx_x != null ? row.pfx_x * 12 : null,
+          pfxZIn: row.pfx_z != null ? row.pfx_z * 12 : null,
+          extensionFt: row.release_extension ?? null,
+        } satisfies ShapeMetrics,
       };
     }
 
@@ -177,6 +193,8 @@ export function ComparisonScene({
     // path comes through correctly without additional translation.
     const r = sideRibbons.find((x) => x.pitchType === selected.pitchType);
     if (!r) return null;
+    const sourcePitches = selected.side === "a" ? aPitches : bPitches;
+    const metrics = averageMetrics(sourcePitches, selected.pitchType);
     return {
       pitchType: r.pitchType,
       path: r.path,
@@ -184,6 +202,7 @@ export function ComparisonScene({
       labelPosition: statcastToThree(r.path[r.path.length - 1]),
       label,
       velocity: r.releaseSpeed,
+      metrics,
     };
   }, [selected, aPitches, bPitches, aRibbons, bRibbons, releaseOffset, aLabel, bLabel]);
 
@@ -267,13 +286,21 @@ export function ComparisonScene({
               zIndexRange={[100, 0]}
               style={{ pointerEvents: "none" }}
             >
-              <div className="whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg translate-x-3 -translate-y-1/2">
-                <span className="font-medium">{selectedRibbon.label}</span>
-                {selectedRibbon.velocity != null && (
-                  <span className="text-white/70 ml-1.5">
-                    {Number(selectedRibbon.velocity).toFixed(1)} mph
-                  </span>
-                )}
+              {/* Two labels anchored at the same 3D point. The wrapper has
+                  zero size, so left:0 / right:0 both refer to the anchor. */}
+              <div style={{ position: "relative", width: 0, height: 0 }}>
+                <div
+                  className="absolute whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg"
+                  style={{ left: 0, top: 0, transform: "translate(12px, -50%)" }}
+                >
+                  <span className="font-medium">{selectedRibbon.label}</span>
+                  {selectedRibbon.velocity != null && (
+                    <span className="text-white/70 ml-1.5">
+                      {Number(selectedRibbon.velocity).toFixed(1)} mph
+                    </span>
+                  )}
+                </div>
+                <MetricsPanel metrics={selectedRibbon.metrics} />
               </div>
             </Html>
           </>
@@ -346,21 +373,51 @@ function SideLayer({
         // (if any) stays full strength and gets a thicker tube.
         const ribbonOpacity =
           hoverOpacity * (hasSelection && !isSelectedAverage ? 0.18 : 1);
+        const endPos = statcastToThree(r.path[r.path.length - 1]);
+        const ballColor = getPitchColorForSide(r.pitchType, side);
         return (
-          <Ribbon
-            key={`${side}-${r.pitchType}`}
-            path={r.path}
-            pitchType={r.pitchType}
-            radius={isSelectedAverage ? 0.13 : 0.1}
-            side={side}
-            opacity={ribbonOpacity}
-            onPointerOver={onOver}
-            onPointerOut={onOut}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectAverage(r.pitchType);
-            }}
-          />
+          <group key={`${side}-${r.pitchType}`}>
+            <Ribbon
+              path={r.path}
+              pitchType={r.pitchType}
+              radius={isSelectedAverage ? 0.13 : 0.1}
+              side={side}
+              opacity={ribbonOpacity}
+              onPointerOver={onOver}
+              onPointerOut={onOut}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectAverage(r.pitchType);
+              }}
+            />
+            <Sphere
+              args={[isSelectedAverage ? 0.22 : 0.18, 18, 18]}
+              position={endPos}
+              onPointerOver={(e) => {
+                e.stopPropagation();
+                document.body.style.cursor = "pointer";
+                onOver();
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "";
+                onOut();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectAverage(r.pitchType);
+              }}
+            >
+              <meshStandardMaterial
+                color={ballColor}
+                roughness={0.4}
+                metalness={0.05}
+                transparent
+                opacity={ribbonOpacity}
+                emissive={isSelectedAverage ? ballColor : "#000000"}
+                emissiveIntensity={isSelectedAverage ? 0.6 : 0}
+              />
+            </Sphere>
+          </group>
         );
       })}
       <OutcomeMarkers
@@ -427,6 +484,93 @@ function tunnelMarkerPosition(
     (pa[1] + pb[1] + bOffset[1]) / 2,
     (pa[2] + pb[2] + bOffset[2]) / 2,
   ];
+}
+
+function MetricsPanel({ metrics }: { metrics: ShapeMetrics }) {
+  const rows: Array<{ label: string; value: string }> = [];
+  if (metrics.spinRpm != null) {
+    rows.push({ label: "Spin", value: `${Math.round(metrics.spinRpm)} rpm` });
+  }
+  if (metrics.pfxZIn != null) {
+    rows.push({ label: "iVB", value: formatBreak(metrics.pfxZIn) });
+  }
+  if (metrics.pfxXIn != null) {
+    rows.push({ label: "HB", value: formatBreak(metrics.pfxXIn) });
+  }
+  if (metrics.spinAxis != null) {
+    rows.push({ label: "Axis", value: `${Math.round(metrics.spinAxis)}°` });
+  }
+  if (metrics.extensionFt != null) {
+    rows.push({ label: "Ext", value: `${metrics.extensionFt.toFixed(1)} ft` });
+  }
+  if (rows.length === 0) return null;
+
+  return (
+    <div
+      className="absolute whitespace-nowrap px-2 py-1.5 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg"
+      style={{ right: 0, top: 0, transform: "translate(-12px, -50%)" }}
+    >
+      <div className="flex flex-col gap-0.5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex justify-between gap-3">
+            <span className="text-white/55">{r.label}</span>
+            <span>{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatBreak(inches: number): string {
+  const sign = inches >= 0 ? "+" : "";
+  return `${sign}${inches.toFixed(1)}"`;
+}
+
+function averageMetrics(
+  pitches: PitchWithOutcome[],
+  pitchType: string,
+): ShapeMetrics {
+  let spinSum = 0,
+    spinN = 0,
+    axisSum = 0,
+    axisN = 0,
+    pxSum = 0,
+    pxN = 0,
+    pzSum = 0,
+    pzN = 0,
+    extSum = 0,
+    extN = 0;
+  for (const p of pitches) {
+    if (p.pitch_type !== pitchType) continue;
+    if (p.release_spin_rate != null) {
+      spinSum += p.release_spin_rate;
+      spinN += 1;
+    }
+    if (p.spin_axis != null) {
+      axisSum += p.spin_axis;
+      axisN += 1;
+    }
+    if (p.pfx_x != null) {
+      pxSum += p.pfx_x;
+      pxN += 1;
+    }
+    if (p.pfx_z != null) {
+      pzSum += p.pfx_z;
+      pzN += 1;
+    }
+    if (p.release_extension != null) {
+      extSum += p.release_extension;
+      extN += 1;
+    }
+  }
+  return {
+    spinRpm: spinN > 0 ? spinSum / spinN : null,
+    spinAxis: axisN > 0 ? axisSum / axisN : null,
+    pfxXIn: pxN > 0 ? (pxSum / pxN) * 12 : null,
+    pfxZIn: pzN > 0 ? (pzSum / pzN) * 12 : null,
+    extensionFt: extN > 0 ? extSum / extN : null,
+  };
 }
 
 function safeDuration(p: Pitch): number {

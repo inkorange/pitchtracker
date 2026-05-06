@@ -255,7 +255,7 @@ async function loadSideContext(
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, pitch_type, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, stand, description",
+      "game_pk, pitch_type, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, stand, description, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
     )
     .eq("pitcher_id", pitcherId)
     .limit(1500);
@@ -425,6 +425,11 @@ interface PitchRow {
   release_speed: number | null;
   stand: string | null;
   description: string | null;
+  release_spin_rate: number | null;
+  spin_axis: number | null;
+  pfx_x: number | null;
+  pfx_z: number | null;
+  release_extension: number | null;
 }
 
 interface GameOption {

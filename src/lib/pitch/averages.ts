@@ -24,6 +24,13 @@ export interface CachedPitchSubset {
   plate_x: number | null;
   plate_z: number | null;
   release_speed: number | null;
+  // Optional shape metrics — not used for trajectory math but carried
+  // along so consumers can display them.
+  release_spin_rate?: number | null;
+  spin_axis?: number | null;
+  pfx_x?: number | null;
+  pfx_z?: number | null;
+  release_extension?: number | null;
 }
 
 const REQUIRED: Array<keyof CachedPitchSubset> = [
