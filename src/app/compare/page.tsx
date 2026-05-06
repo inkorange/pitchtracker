@@ -13,6 +13,7 @@ import {
 } from "@/lib/viz/colors";
 import { ComparisonScene } from "./ComparisonScene";
 import { CompareSideFilters } from "./CompareSideFilters";
+import { CompareSharedFilters } from "./CompareSharedFilters";
 import { CompareLinkActions } from "./CompareLinkActions";
 import { CompareSlotSearch } from "./CompareSlotSearch";
 import { TunnelingPanel } from "./TunnelingPanel";
@@ -27,12 +28,12 @@ interface PageProps {
     bSeason?: string;
     aPitch?: string;
     bPitch?: string;
-    aHand?: string;
-    bHand?: string;
     aGame?: string;
     bGame?: string;
-    aOutcome?: string;
-    bOutcome?: string;
+    // Batter side and outcome are shared across both pitchers — single
+    // value applied to both datasets.
+    hand?: string;
+    outcome?: string;
     syncRelease?: string;
   }>;
 }
@@ -93,23 +94,26 @@ export default async function ComparePage({ searchParams }: PageProps) {
     ensurePitcherSeasonCache(bId, bSeason),
   ]);
 
+  const sharedHand = parseHand(sp.hand);
+  const sharedOutcomes = parseOutcomes(sp.outcome);
+
   const [aCtx, bCtx] = await Promise.all([
     loadSideContext(supabase, {
       pitcherId: aId,
       season: aSeason,
       pitchTypes: (sp.aPitch ?? "").split(",").filter(Boolean),
-      hand: parseHand(sp.aHand),
+      hand: sharedHand,
       gamePk: parseGame(sp.aGame),
-      outcomes: parseOutcomes(sp.aOutcome),
+      outcomes: sharedOutcomes,
       currentYear,
     }),
     loadSideContext(supabase, {
       pitcherId: bId,
       season: bSeason,
       pitchTypes: (sp.bPitch ?? "").split(",").filter(Boolean),
-      hand: parseHand(sp.bHand),
+      hand: sharedHand,
       gamePk: parseGame(sp.bGame),
-      outcomes: parseOutcomes(sp.bOutcome),
+      outcomes: sharedOutcomes,
       currentYear,
     }),
   ]);
@@ -177,6 +181,9 @@ export default async function ComparePage({ searchParams }: PageProps) {
               games={bCtx.gameOptions}
             />
           </HoverableSide>
+
+          <div className="border-t border-white/[0.08]" />
+          <CompareSharedFilters />
 
           <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
 

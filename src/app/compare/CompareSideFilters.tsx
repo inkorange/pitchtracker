@@ -6,10 +6,7 @@ import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
 import {
   getPitchColorForSide,
   getPitchLabel,
-  OUTCOME_COLORS,
-  OUTCOME_LABELS,
   type CompareSide,
-  type OutcomeCategory,
 } from "@/lib/viz/colors";
 
 interface ArsenalEntry {
@@ -44,9 +41,7 @@ export function CompareSideFilters({
 
   const seasonKey = `${side}Season`;
   const pitchKey = `${side}Pitch`;
-  const handKey = `${side}Hand`;
   const gameKey = `${side}Game`;
-  const outcomeKey = `${side}Outcome`;
 
   const update = useCallback(
     (next: Record<string, string | null>) => {
@@ -65,16 +60,7 @@ export function CompareSideFilters({
 
   const currentSeason = Number(params.get(seasonKey)) || availableSeasons[0] || new Date().getFullYear();
   const activePitchTypes = (params.get(pitchKey) ?? "").split(",").filter(Boolean);
-  const activeHand = params.get(handKey) ?? "";
   const activeGame = params.get(gameKey) ?? "";
-  const activeOutcomes = (params.get(outcomeKey) ?? "").split(",").filter(Boolean);
-
-  const toggleOutcome = (cat: OutcomeCategory) => {
-    const cur = new Set(activeOutcomes);
-    if (cur.has(cat)) cur.delete(cat);
-    else cur.add(cat);
-    update({ [outcomeKey]: cur.size > 0 ? Array.from(cur).join(",") : null });
-  };
 
   const togglePitch = (type: string) => {
     const cur = new Set(activePitchTypes);
@@ -150,61 +136,6 @@ export function CompareSideFilters({
         </div>
       )}
 
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
-          Batter side
-        </div>
-        <div className="flex gap-1">
-          {[
-            { key: "", label: "Both" },
-            { key: "L", label: "vs LHB" },
-            { key: "R", label: "vs RHB" },
-          ].map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => update({ [handKey]: opt.key === activeHand ? null : opt.key })}
-              className={`px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.1em] transition-colors ${
-                activeHand === opt.key
-                  ? "bg-white/12 text-white"
-                  : "bg-white/[0.04] text-white/55 hover:text-white hover:bg-white/[0.08]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
-          Outcome
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {(["whiff", "called", "ball", "foul", "inplay"] as const).map((cat) => {
-            const active = activeOutcomes.length === 0 || activeOutcomes.includes(cat);
-            const dim = activeOutcomes.length > 0 && !active;
-            return (
-              <button
-                key={cat}
-                onClick={() => toggleOutcome(cat)}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors ${
-                  dim
-                    ? "bg-white/[0.02] text-white/35 border border-white/5"
-                    : "bg-white/[0.06] text-white/85 border border-white/10 hover:bg-white/[0.1]"
-                }`}
-                aria-pressed={!dim}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: OUTCOME_COLORS[cat], opacity: dim ? 0.3 : 1 }}
-                />
-                {OUTCOME_LABELS[cat]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {games.length > 0 && (
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">Game</div>
@@ -223,11 +154,9 @@ export function CompareSideFilters({
         </div>
       )}
 
-      {(activePitchTypes.length > 0 || activeHand || activeGame) && (
+      {(activePitchTypes.length > 0 || activeGame) && (
         <button
-          onClick={() =>
-            update({ [pitchKey]: null, [handKey]: null, [gameKey]: null })
-          }
+          onClick={() => update({ [pitchKey]: null, [gameKey]: null })}
           className="text-[10px] uppercase tracking-[0.14em] text-white/40 hover:text-white/80 transition-colors"
         >
           Clear filters
