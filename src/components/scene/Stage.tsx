@@ -77,7 +77,6 @@ export function Stage() {
       <HomePlate />
       <Mound />
       <StrikeZone />
-      <StadiumSilhouette />
     </group>
   );
 }
@@ -338,11 +337,3 @@ function Mound() {
   );
 }
 
-function StadiumSilhouette() {
-  return (
-    <mesh position={[0, 25, -380]}>
-      <planeGeometry args={[800, 140]} />
-      <meshBasicMaterial color="#0c1320" />
-    </mesh>
-  );
-}
