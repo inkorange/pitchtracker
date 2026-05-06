@@ -25,6 +25,9 @@ export interface MlbPlayer {
 export interface MlbScheduleGame {
   gamePk: number;
   gameDate: string;
+  // Single-letter code: R, S, E, F, D, L, W, A. Used to filter out
+  // spring training / exhibition games at the schedule layer.
+  gameType?: string;
   status: { abstractGameState: string; detailedState: string };
   teams: {
     home: { team: { id: number; name: string } };

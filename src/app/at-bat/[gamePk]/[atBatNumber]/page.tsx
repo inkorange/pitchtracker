@@ -349,16 +349,16 @@ function NotCachedState({
           ← pitchtracker
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">
-          At-bat not cached
+          At-bat not available
         </h1>
         <p className="text-sm text-white/55">
-          We don&apos;t have pitch data cached for at-bat #{atBatNumber} of game{" "}
+          We don&apos;t have pitch data for at-bat #{atBatNumber} of game{" "}
           {gamePk}
           {game?.game_date ? ` (${game.game_date})` : ""} yet.
         </p>
         <p className="text-sm text-white/55">
-          Visit a pitcher&apos;s profile and pick a season we&apos;ve cached, or
-          come back once the at-bat lands in the daily notable feed.
+          Visit a pitcher&apos;s profile to load that season&apos;s pitches,
+          or come back once the at-bat lands in the daily notable feed.
         </p>
       </div>
     </main>

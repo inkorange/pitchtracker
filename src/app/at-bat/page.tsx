@@ -43,6 +43,7 @@ export default async function AtBatIndex() {
           .from("pitch_games")
           .select("game_pk, game_date, home_team_id, away_team_id, season")
           .in("game_pk", orderedGamePks)
+          .eq("game_type", "R")
       : { data: [] };
 
   const gameByPk = new Map<number, GameRow>();
@@ -81,8 +82,8 @@ export default async function AtBatIndex() {
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">At-bat replays</h1>
           <p className="text-sm text-white/55 max-w-prose">
-            Pick a recently cached game to browse its at-bats, or jump
-            directly to a specific at-bat by game ID and at-bat number.
+            Pick a recent game to browse its at-bats, or jump directly
+            to a specific at-bat by game ID and at-bat number.
           </p>
         </div>
 
@@ -90,12 +91,12 @@ export default async function AtBatIndex() {
 
         <section className="space-y-3">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-white/55">
-            Recent cached games
+            Recent games
           </h2>
           {games.length === 0 ? (
             <p className="text-sm text-white/55">
-              No games cached yet. Visit a pitcher&apos;s page to trigger
-              the first backfill.
+              No games available yet. Visit a pitcher&apos;s page to load
+              their season data.
             </p>
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">

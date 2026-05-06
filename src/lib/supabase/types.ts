@@ -597,6 +597,7 @@ export type Database = {
           away_team_id: number | null
           game_date: string
           game_pk: number
+          game_type: string | null
           home_team_id: number | null
           season: number
           status: string
@@ -607,6 +608,7 @@ export type Database = {
           away_team_id?: number | null
           game_date: string
           game_pk: number
+          game_type?: string | null
           home_team_id?: number | null
           season: number
           status: string
@@ -617,6 +619,7 @@ export type Database = {
           away_team_id?: number | null
           game_date?: string
           game_pk?: number
+          game_type?: string | null
           home_team_id?: number | null
           season?: number
           status?: string

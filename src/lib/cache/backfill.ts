@@ -71,6 +71,10 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
       home_team_id: homeId,
       away_team_id: awayId,
       status: "Scheduled",
+      // game_type comes straight from Savant's CSV. Savant URL filter
+      // limits this fetcher to R only, but capture whatever lands so a
+      // wider future query (e.g. postseason) records accurately.
+      game_type: p.game_type ?? null,
       venue_name: null,
       updated_at: new Date().toISOString(),
     });

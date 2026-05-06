@@ -1,6 +1,7 @@
 "use client";
 
 import { useTexture } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three";
 
@@ -14,14 +15,23 @@ import * as THREE from "three";
 // (high minimum channel value = near-white) keep their authored white.
 export function SkyDome() {
   const skyTexture = useTexture("/sky-map.jpg");
+  const gl = useThree((s) => s.gl);
 
   const material = useMemo(() => {
     skyTexture.colorSpace = THREE.SRGBColorSpace;
+    // Max anisotropy so glancing-angle samples (toward the horizon) pick
+    // the right mip level instead of producing the stair-step / blocky
+    // pattern visible at low anisotropy. Linear min/mag filtering with
+    // mipmaps gives smooth interpolation at every distance.
+    skyTexture.anisotropy = gl.capabilities.getMaxAnisotropy();
+    skyTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    skyTexture.magFilter = THREE.LinearFilter;
+    skyTexture.generateMipmaps = true;
     skyTexture.needsUpdate = true;
 
     const mat = new THREE.MeshBasicMaterial({
       map: skyTexture,
-      color: new THREE.Color("#3d72a8"),
+      color: new THREE.Color("#5e7d96"),
       side: THREE.BackSide,
       depthWrite: false,
       toneMapped: false,
@@ -50,11 +60,11 @@ export function SkyDome() {
     };
 
     return mat;
-  }, [skyTexture]);
+  }, [skyTexture, gl]);
 
   return (
     <mesh scale={[-1, 1, 1]}>
-      <sphereGeometry args={[1000, 64, 32]} />
+      <sphereGeometry args={[1500, 64, 32]} />
       <primitive object={material} attach="material" />
     </mesh>
   );

@@ -100,7 +100,7 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
 
         {sortedPitchers.length === 0 ? (
           <div className="text-sm text-white/55">
-            No roster cached for this team in {season}.
+            No roster available for this team in {season}.
           </div>
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

@@ -211,7 +211,7 @@ export default async function GameAtBatsPage({ params }: PageProps) {
             </span>
           </div>
           <p className="text-[11px] text-white/45 tabular-nums">
-            {atBats.length} at-bats · {pitches.length} pitches cached
+            {atBats.length} at-bats · {pitches.length} pitches
           </p>
         </div>
 
@@ -330,11 +330,10 @@ function NotCachedState({ gamePk }: { gamePk: number }) {
         >
           ← All games
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">No pitches cached for this game</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">No pitches for this game</h1>
         <p className="text-sm text-white/55">
-          Game {gamePk} doesn&apos;t have any pitches in our cache yet.
-          Caching happens on first visit to a pitcher × season — try
-          loading a pitcher who appeared in this game.
+          Game {gamePk} doesn&apos;t have any pitch data yet. Try loading
+          a pitcher who appeared in this game from their profile page.
         </p>
       </div>
     </main>

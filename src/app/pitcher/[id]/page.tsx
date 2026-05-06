@@ -76,10 +76,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id)",
+      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id, game_type)",
     )
     .eq("pitcher_id", pitcherId)
     .eq("pitch_games.season", season)
+    .eq("pitch_games.game_type", "R")
     .range(0, 4999);
   if (sp.hand === "L" || sp.hand === "R") {
     pitchQuery = pitchQuery.eq("stand", sp.hand);
@@ -265,7 +266,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
           {(aggregates ?? []).length === 0 ? (
             <div className="text-xs text-white/55 leading-relaxed">
-              No arsenal data cached for {season}.
+              No arsenal data for {season}.
             </div>
           ) : (
             <ul className="space-y-1.5">
@@ -304,6 +305,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
               pitch_count: a.pitch_count,
             }))}
             games={games}
+            season={season}
           />
         </div>
 
@@ -314,7 +316,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         )}
         {(cachedPitches ?? []).length === 0 && (
           <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-            No pitch trajectory data cached yet for this filter.
+            No pitch trajectory data available for this filter.
           </div>
         )}
       </section>

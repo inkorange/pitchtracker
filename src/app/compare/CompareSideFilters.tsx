@@ -144,7 +144,7 @@ export function CompareSideFilters({
             onChange={(e) => update({ [gameKey]: e.target.value || null })}
             className="w-full bg-white/[0.04] border border-white/10 rounded px-2 py-1.5 text-[11px] text-white/85 tabular-nums focus:outline-none focus:border-white/25"
           >
-            <option value="">All cached games ({games.length})</option>
+            <option value="">All games in {currentSeason}</option>
             {games.map((g) => (
               <option key={g.game_pk} value={g.game_pk}>
                 {g.game_date} · {g.away} @ {g.home}

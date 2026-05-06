@@ -14,6 +14,8 @@ const SEARCH_BASE = "https://baseballsavant.mlb.com/statcast_search/csv";
 export interface SavantPitchRow extends StatcastRow {
   game_pk: number;
   game_date: string;
+  // R, S, E, F, D, L, W, A — see pitch_games migrations for the codes.
+  game_type: string | null;
   pitcher: number;
   batter: number;
   at_bat_number: number;
@@ -110,6 +112,12 @@ export async function fetchGamePitches(gamePk: number): Promise<SavantPitchRow[]
 
 // Fetch all of a pitcher's pitches for a given season. Used by the
 // on-demand backfill when a pitcher × season has no cached data yet.
+//
+// hfGT=R%7C restricts to regular-season games only (pipe-separated
+// list of game-type codes; R is "Regular Season"). This drops spring
+// training and exhibition pitches at the source so we don't ingest
+// data the UI doesn't surface anyway. Add PO%7C to include
+// postseason if/when we want it.
 export async function fetchPitcherSeasonPitches(
   pitcherId: number,
   season: number,
@@ -117,7 +125,7 @@ export async function fetchPitcherSeasonPitches(
   // pitchers_lookup[] needs the literal brackets, which URLSearchParams
   // would percent-encode as %5B%5D — Savant accepts both, but we build
   // the URL manually here to keep it readable.
-  const url = `${SEARCH_BASE}?all=true&type=details&hfSea=${season}%7C&player_type=pitcher&pitchers_lookup%5B%5D=${pitcherId}`;
+  const url = `${SEARCH_BASE}?all=true&type=details&hfSea=${season}%7C&hfGT=R%7C&player_type=pitcher&pitchers_lookup%5B%5D=${pitcherId}`;
   return fetchSavantCsv(url, `pitcher ${pitcherId} season ${season}`);
 }
 

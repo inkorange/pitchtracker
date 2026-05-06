@@ -147,8 +147,7 @@ export default async function DailyPage() {
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">Daily picks</h1>
           <p className="text-sm text-white/55 max-w-prose">
-            Auto-curated from every cached at-bat. Refreshed nightly via the
-            notable-at-bats cron.
+            Auto-curated from every available at-bat. Refreshed nightly.
           </p>
         </div>
 

@@ -236,12 +236,17 @@ async function loadSideContext(
   // per season), so an unfiltered query is safe — no row-cap risk.
   // pitch_game_pitches in contrast holds thousands of rows per pitcher
   // per season and silently truncates at PostgREST's 1000-row default.
+  //
+  // game_type=R restricts to regular-season games — spring training and
+  // exhibitions get filtered both at ingest (Savant URL) and at query
+  // time (defensive).
   const { data: pitcherGameRows } = await supabase
     .from("pitch_pitcher_games")
     .select(
-      "game_pk, pitch_games!inner(game_date, season, home_team_id, away_team_id)",
+      "game_pk, pitch_games!inner(game_date, season, home_team_id, away_team_id, game_type)",
     )
-    .eq("pitcher_id", pitcherId);
+    .eq("pitcher_id", pitcherId)
+    .eq("pitch_games.game_type", "R");
 
   type PitcherGameRow = {
     game_pk: number;
@@ -523,7 +528,7 @@ function PitcherCard({
         ) : null}
       </div>
       {aggregates.length === 0 ? (
-        <div className="text-xs text-white/55">No arsenal data cached for {season}.</div>
+        <div className="text-xs text-white/55">No arsenal data for {season}.</div>
       ) : (
         <ul className="space-y-1">
           {aggregates.slice(0, 6).map((a) => (
