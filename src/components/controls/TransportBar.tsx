@@ -74,7 +74,7 @@ export function TransportBar({ flightDuration, speed = 0.5, onProgressChange }: 
   };
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg">
+    <div className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2 flex items-center gap-3 px-4 py-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg">
       <button
         onClick={togglePlay}
         className="text-white/85 hover:text-white text-xs uppercase tracking-[0.14em] w-12"

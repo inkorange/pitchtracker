@@ -257,7 +257,7 @@ function SelectedLabels({
     rows.push({ label: "Ext", value: `${p.release_extension.toFixed(1)} ft` });
   }
   return (
-    <Html position={anchor} zIndexRange={[100, 0]} style={{ pointerEvents: "none" }}>
+    <Html position={anchor} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
       <div style={{ position: "relative", width: 0, height: 0 }}>
         <div
           className="absolute whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg"

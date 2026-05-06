@@ -141,7 +141,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         initialPitchIdx={initialPitchIdx}
       />
 
-      <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
+      <header className="absolute top-6 left-6 right-6 z-20 flex items-start justify-between gap-6 pointer-events-none">
         <div className="flex gap-3 items-center pointer-events-auto">
           <Link
             href="/"
@@ -163,7 +163,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         </div>
       </header>
 
-      <section className="absolute top-20 left-6 w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-6 z-20 w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/45">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}

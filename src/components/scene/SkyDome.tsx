@@ -1,78 +1,61 @@
 "use client";
 
+import { useTexture } from "@react-three/drei";
 import { useMemo } from "react";
-import { Cloud, Clouds } from "@react-three/drei";
 import * as THREE from "three";
 
-// drei's <Sky> is the Preetham scattering shader — looks great in
-// theory but its HDR output gets crushed to near-white by the
-// renderer's default ACES tone mapping. A plain inverted sphere with a
-// vertical gradient texture is way more predictable: deep blue at the
-// zenith fading to a hazy near-horizon. We pair it with a few <Cloud>
-// billboards drifting up high so the field doesn't sit in a void.
+// Inverted sphere with a sky panorama texture mapped to its inside.
+// public/sky-map.jpg is a 4:1 horizontal panorama with cumulus clouds in
+// the upper band and a hazy horizon at the middle.
 //
-// Cloud positions are kept high (y ≥ 60 ft) and well outside the pitch
-// envelope so they never clip into ribbons or trajectories.
+// The material's `color` is used as a tint multiplier, but a custom
+// shader patch only applies it to non-cloud pixels — so the blue sky
+// can be pulled toward a deep, saturated daytime blue while clouds
+// (high minimum channel value = near-white) keep their authored white.
 export function SkyDome() {
-  const skyTexture = useMemo(() => {
-    if (typeof document === "undefined") return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = 2;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    const grad = ctx.createLinearGradient(0, 0, 0, 512);
-    grad.addColorStop(0.0, "#1e5fa8"); // zenith — deep daylight blue
-    grad.addColorStop(0.5, "#5e9ed1"); // mid sky
-    grad.addColorStop(0.85, "#a9c8e2"); // upper horizon haze
-    grad.addColorStop(1.0, "#cdd9e3"); // horizon — pale grey-blue
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 2, 512);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-    return tex;
-  }, []);
+  const skyTexture = useTexture("/sky-map.jpg");
 
-  const seeds = useMemo(
-    () => [
-      { x: 120, y: 70, z: -350, speed: 0.12, volume: 18, segments: 24, opacity: 0.95 },
-      { x: -160, y: 90, z: -260, speed: 0.08, volume: 22, segments: 28, opacity: 0.9 },
-      { x: 60, y: 110, z: -480, speed: 0.05, volume: 28, segments: 28, opacity: 0.85 },
-      { x: -80, y: 65, z: 180, speed: 0.1, volume: 14, segments: 20, opacity: 0.95 },
-      { x: 200, y: 80, z: 80, speed: 0.07, volume: 16, segments: 22, opacity: 0.9 },
-      { x: 0, y: 130, z: -120, speed: 0.04, volume: 30, segments: 30, opacity: 0.8 },
-    ],
-    [],
-  );
+  const material = useMemo(() => {
+    skyTexture.colorSpace = THREE.SRGBColorSpace;
+    skyTexture.needsUpdate = true;
+
+    const mat = new THREE.MeshBasicMaterial({
+      map: skyTexture,
+      color: new THREE.Color("#3d72a8"),
+      side: THREE.BackSide,
+      depthWrite: false,
+      toneMapped: false,
+    });
+
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <map_fragment>",
+        `
+        #ifdef USE_MAP
+          vec4 sampledDiffuseColor = texture2D(map, vMapUv);
+          // cloudMask ≈ 1 for near-white cloud pixels, 0 for blue sky.
+          // Threshold on min(r,g,b) since clouds are nearly neutral and
+          // blue sky has a low red channel.
+          float minC = min(min(sampledDiffuseColor.r, sampledDiffuseColor.g), sampledDiffuseColor.b);
+          float cloudMask = smoothstep(0.55, 0.85, minC);
+          vec3 tinted = sampledDiffuseColor.rgb * diffuseColor.rgb;
+          // Clouds keep their hue but get knocked down so they don't
+          // read as burnt-white against the deeper sky.
+          vec3 cloudVal = sampledDiffuseColor.rgb * vec3(0.74, 0.78, 0.82);
+          diffuseColor.rgb = mix(tinted, cloudVal, cloudMask);
+          diffuseColor.a *= sampledDiffuseColor.a;
+        #endif
+        `,
+      );
+    };
+
+    return mat;
+  }, [skyTexture]);
 
   return (
-    <>
-      {skyTexture && (
-        <mesh scale={[-1, 1, 1]}>
-          <sphereGeometry args={[1000, 32, 16]} />
-          <meshBasicMaterial
-            map={skyTexture}
-            side={THREE.BackSide}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-      )}
-      <Clouds material={THREE.MeshBasicMaterial}>
-        {seeds.map((s, i) => (
-          <Cloud
-            key={i}
-            position={[s.x, s.y, s.z]}
-            speed={s.speed}
-            segments={s.segments}
-            bounds={[s.volume, s.volume * 0.4, s.volume * 0.6]}
-            volume={s.volume}
-            opacity={s.opacity}
-            color="#ffffff"
-          />
-        ))}
-      </Clouds>
-    </>
+    <mesh scale={[-1, 1, 1]}>
+      <sphereGeometry args={[1000, 64, 32]} />
+      <primitive object={material} attach="material" />
+    </mesh>
   );
 }

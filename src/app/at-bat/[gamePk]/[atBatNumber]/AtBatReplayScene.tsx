@@ -449,7 +449,7 @@ function PlateChip({
   const cat = categorizeDescription(description);
   const color = OUTCOME_COLORS[cat];
   return (
-    <Html position={position} zIndexRange={[100, 0]} style={{ pointerEvents: "none" }}>
+    <Html position={position} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
       <div
         className="px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums shadow"
         style={{
@@ -492,7 +492,7 @@ function PitchStepper({
   const velocity = active?.raw.release_speed ?? null;
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center gap-3 text-white/90">
         <button
           type="button"
