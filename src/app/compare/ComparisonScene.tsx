@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
@@ -12,7 +12,7 @@ import type { Pitch } from "@/lib/pitch/Pitch";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
 import { TunnelMarker } from "./TunnelMarker";
 import { OutcomeMarkers } from "./OutcomeMarkers";
-import { useOpacityForSide } from "./CompareHoverContext";
+import { useCompareHover, useOpacityForSide } from "./CompareHoverContext";
 import type { CompareSide } from "@/lib/viz/colors";
 
 interface PitchWithOutcome extends CachedPitchSubset {
@@ -158,8 +158,26 @@ interface SideLayerProps {
 
 function SideLayer({ side, ribbons, pitches, progress, showTracers }: SideLayerProps) {
   const opacity = useOpacityForSide(side);
+  const { setHoveredSide } = useCompareHover();
+
+  // r3f bubbles pointerover/out for every child boundary, so a ref-counter
+  // is the simplest way to dedupe transitions between sibling meshes inside
+  // this side's group — only clear when truly outside every child.
+  const hoverCount = useRef(0);
+
   return (
-    <>
+    <group
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        hoverCount.current += 1;
+        if (hoverCount.current === 1) setHoveredSide(side);
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        hoverCount.current = Math.max(0, hoverCount.current - 1);
+        if (hoverCount.current === 0) setHoveredSide(null);
+      }}
+    >
       {ribbons.map((r) => (
         <Ribbon
           key={`${side}-${r.pitchType}`}
@@ -179,7 +197,7 @@ function SideLayer({ side, ribbons, pitches, progress, showTracers }: SideLayerP
             progress={progress}
           />
         ))}
-    </>
+    </group>
   );
 }
 
