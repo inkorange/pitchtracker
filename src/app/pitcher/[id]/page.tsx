@@ -9,6 +9,7 @@ import { PitcherArsenalScene } from "./PitcherArsenalScene";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
+import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -37,8 +38,16 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
 
   const currentYear = new Date().getFullYear();
 
-  // All seasons we have data for this pitcher — aggregates OR cached pitches —
-  // plus the current year (always selectable).
+  // Pitchers can pick any of the last few years even if we haven't cached
+  // anything for them yet — selecting a fresh year triggers backfill
+  // (ensurePitcherSeasonCache below). Aggregate/pitches lookups still
+  // contribute so debut years older than the rolling window stay
+  // selectable.
+  const FALLBACK_YEARS = 6;
+  const fallbackSeasons = Array.from(
+    { length: FALLBACK_YEARS + 1 },
+    (_, i) => currentYear - i,
+  );
   const { data: aggSeasonRows } = await supabase
     .from("pitch_pitcher_aggregates")
     .select("season")
@@ -54,10 +63,9 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     pitcherGamePks.length > 0
       ? await supabase.from("pitch_games").select("season").in("game_pk", pitcherGamePks)
       : { data: [] };
-  const seasonsWithData = new Set<number>();
+  const seasonsWithData = new Set<number>(fallbackSeasons);
   for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
   for (const r of pitcherGameSeasons ?? []) seasonsWithData.add(r.season);
-  seasonsWithData.add(currentYear);
   const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
 
   const season = sp.season ? Number(sp.season) : currentYear;
@@ -66,29 +74,31 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // × season yet, pull from Savant on demand. No-op once cached.
   await ensurePitcherSeasonCache(pitcherId, season);
 
-  const { data: aggregates } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select("*")
-    .eq("pitcher_id", pitcherId)
-    .eq("season", season)
-    .eq("batter_hand", "*")
-    .gt("pitch_count", 0) // skip empty/stale pitch types
-    .order("usage_pct", { ascending: false, nullsFirst: false });
+  // Look up game metadata for just the game_pks this pitcher actually has
+  // pitches for. Going via the pitcher's game_pks (always ≤30 games) avoids
+  // the 1000-row default cap on a "select * from pitch_games where season"
+  // — a full MLB schedule has ~2400 games and was getting silently
+  // truncated, sometimes excluding the very games this pitcher appeared in.
+  const { data: pitcherGamesMeta } =
+    pitcherGamePks.length > 0
+      ? await supabase
+          .from("pitch_games")
+          .select("game_pk, game_date, season, home_team_id, away_team_id")
+          .in("game_pk", pitcherGamePks)
+      : { data: [] };
+  const seasonGameMetas = (pitcherGamesMeta ?? []).filter(
+    (g) => g.season === season,
+  );
+  const seasonGamePks = new Set(seasonGameMetas.map((g) => g.game_pk));
 
-  // Get the set of game_pks for this pitcher in the active season — used for
-  // both the cached-pitch query and the game dropdown so neither leaks games
-  // from other years.
-  const { data: seasonGamesRows } = await supabase
-    .from("pitch_games")
-    .select("game_pk")
-    .eq("season", season);
-  const seasonGamePks = new Set((seasonGamesRows ?? []).map((g) => g.game_pk));
-
-  // Cached pitches for this pitcher × season.
+  // Cached pitches for this pitcher × season. Pitch-type filter is
+  // applied in JS so the arsenal table reflects season+game+hand filters
+  // but not the pitch-type chips themselves (those would otherwise blank
+  // the arsenal whenever a chip is active).
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z",
+      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
     )
     .eq("pitcher_id", pitcherId)
     .limit(1500);
@@ -98,11 +108,6 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     // No games for this season → no pitches.
     pitchQuery = pitchQuery.eq("game_pk", -1);
   }
-
-  const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
-  if (pitchTypes.length > 0) {
-    pitchQuery = pitchQuery.in("pitch_type", pitchTypes);
-  }
   if (sp.hand === "L" || sp.hand === "R") {
     pitchQuery = pitchQuery.eq("stand", sp.hand);
   }
@@ -111,26 +116,45 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   }
 
   const { data: cachedPitches } = await pitchQuery;
-  const renderable = (cachedPitches ?? []).filter(
+
+  // Arsenal totals come from the filter-but-no-pitch-type set so the chips
+  // remain functional when one is selected.
+  const arsenalPitches = cachedPitches ?? [];
+  const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
+  const pitchTypeSet = new Set(pitchTypes);
+  const filteredPitches =
+    pitchTypeSet.size === 0
+      ? arsenalPitches
+      : arsenalPitches.filter(
+          (p) => p.pitch_type != null && pitchTypeSet.has(p.pitch_type),
+        );
+  const renderable = filteredPitches.filter(
     (p) => p.vx0 != null && p.vy0 != null && p.vz0 != null,
   );
 
-  // Distinct cached games for the game dropdown — restricted to the active
-  // season so we don't list 2025 games when the user is viewing 2026.
-  const { data: distinctGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk")
-    .eq("pitcher_id", pitcherId);
-  const distinctGamePks = Array.from(
-    new Set((distinctGameRows ?? []).map((r) => r.game_pk)),
-  ).filter((pk) => seasonGamePks.has(pk));
-  const { data: gameMetaRows } =
-    distinctGamePks.length > 0
-      ? await supabase
-          .from("pitch_games")
-          .select("game_pk, game_date, home_team_id, away_team_id")
-          .in("game_pk", distinctGamePks)
-      : { data: [] };
+  type AggBucket = { count: number; sumVel: number; nVel: number };
+  const aggBuckets = new Map<string, AggBucket>();
+  for (const p of arsenalPitches) {
+    if (!p.pitch_type) continue;
+    const b = aggBuckets.get(p.pitch_type) ?? { count: 0, sumVel: 0, nVel: 0 };
+    b.count += 1;
+    if (p.release_speed != null) {
+      b.sumVel += p.release_speed;
+      b.nVel += 1;
+    }
+    aggBuckets.set(p.pitch_type, b);
+  }
+  const totalArsenal = arsenalPitches.length;
+  const aggregates = Array.from(aggBuckets.entries())
+    .map(([pitch_type, b]) => ({
+      pitch_type,
+      pitch_count: b.count,
+      usage_pct: totalArsenal > 0 ? (b.count / totalArsenal) * 100 : 0,
+      avg_velocity: b.nVel > 0 ? b.sumVel / b.nVel : null,
+    }))
+    .sort((a, b) => b.pitch_count - a.pitch_count);
+
+  const gameMetaRows = seasonGameMetas;
   const teamIds = new Set<number>();
   for (const g of gameMetaRows ?? []) {
     if (g.home_team_id) teamIds.add(g.home_team_id);
@@ -163,7 +187,9 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
 
   return (
     <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
-      <PitcherArsenalScene pitches={renderable} />
+      <PitcherArsenalScene pitches={renderable} pitcherLabel={pitcherLastName(pitcher)} />
+
+      <OutcomeLegend />
 
       <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
         <div className="flex gap-4 items-center pointer-events-auto">
@@ -255,11 +281,6 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                         : "—"}
                     </span>
                   </div>
-                  {a.avg_break_onset_ft != null && (
-                    <div className="pl-4 text-[10px] tabular-nums text-white/40">
-                      break onset · {Number(a.avg_break_onset_ft).toFixed(1)} ft
-                    </div>
-                  )}
                 </li>
               ))}
             </ul>
@@ -289,5 +310,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       </section>
     </main>
   );
+}
+
+function pitcherLastName(p: { full_name: string; last_name?: string | null }): string {
+  if (p.last_name && p.last_name.trim().length > 0) return p.last_name;
+  const parts = p.full_name.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? p.full_name;
 }
 
