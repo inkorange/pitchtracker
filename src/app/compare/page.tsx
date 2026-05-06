@@ -131,6 +131,8 @@ export default async function ComparePage({ searchParams }: PageProps) {
         <ComparisonScene
           aPitches={aCtx.pitches}
           bPitches={bCtx.pitches}
+          aLabel={pitcherLabel(aPitcher)}
+          bLabel={pitcherLabel(bPitcher)}
           normalizeRelease={syncRelease}
         />
 
@@ -319,6 +321,13 @@ async function loadSideContext(
     pitches: filteredPitches as PitchRow[],
     gameOptions,
   };
+}
+
+function pitcherLabel(p: PitcherRow): string {
+  if (p.last_name && p.last_name.trim().length > 0) return p.last_name;
+  // Fall back to last token of full_name when last_name isn't populated.
+  const parts = p.full_name.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? p.full_name;
 }
 
 function parseHand(v: string | undefined): "L" | "R" | null {

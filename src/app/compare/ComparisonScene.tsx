@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { Html } from "@react-three/drei";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
@@ -26,6 +27,8 @@ interface PitchWithOutcome extends CachedPitchSubset {
 interface ComparisonSceneProps {
   aPitches: PitchWithOutcome[];
   bPitches: PitchWithOutcome[];
+  aLabel: string;
+  bLabel: string;
   // When true (default), translate both pitchers' paths so they share a
   // common release origin. Lets the user compare pitch SHAPE rather than
   // arm-slot differences. Set false for "true release" mode.
@@ -46,6 +49,8 @@ interface MatchedTunnel {
 export function ComparisonScene({
   aPitches,
   bPitches,
+  aLabel,
+  bLabel,
   normalizeRelease = true,
 }: ComparisonSceneProps) {
   const [preset, setPreset] = useState<CameraPreset>("side");
@@ -145,12 +150,17 @@ export function ComparisonScene({
           ] as [number, number, number],
       );
     }
+    const labelPosition: [number, number, number] = path[path.length - 1];
+    const label = selected.side === "a" ? aLabel : bLabel;
     return {
       pitchType: row.pitch_type ?? "",
       path,
       side: selected.side,
+      labelPosition,
+      label,
+      velocity: row.release_speed,
     };
-  }, [selected, aPitches, bPitches, releaseOffset]);
+  }, [selected, aPitches, bPitches, releaseOffset, aLabel, bLabel]);
 
   const showTracers = aRibbons.length + bRibbons.length > 0;
   const hasSelection = selected !== null;
@@ -188,12 +198,30 @@ export function ComparisonScene({
           onSelect={(idx) => selectPitch("b", idx)}
         />
         {selectedRibbon && (
-          <Ribbon
-            path={selectedRibbon.path}
-            pitchType={selectedRibbon.pitchType}
-            radius={0.13}
-            side={selectedRibbon.side}
-          />
+          <>
+            <Ribbon
+              path={selectedRibbon.path}
+              pitchType={selectedRibbon.pitchType}
+              radius={0.13}
+              side={selectedRibbon.side}
+            />
+            <Html
+              position={selectedRibbon.labelPosition}
+              center
+              distanceFactor={10}
+              zIndexRange={[100, 0]}
+              style={{ pointerEvents: "none" }}
+            >
+              <div className="whitespace-nowrap px-2 py-1 rounded bg-black/70 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg -translate-y-6">
+                <span className="font-medium">{selectedRibbon.label}</span>
+                {selectedRibbon.velocity != null && (
+                  <span className="text-white/70 ml-1.5">
+                    {Number(selectedRibbon.velocity).toFixed(1)} mph
+                  </span>
+                )}
+              </div>
+            </Html>
+          </>
         )}
         {tunnels.map((t) => (
           <TunnelMarker
