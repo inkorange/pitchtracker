@@ -181,7 +181,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         </div>
       </header>
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto max-h-[14rem] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto h-[11rem] sm:h-auto sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/45">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
@@ -329,11 +329,16 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
             </span>
           </div>
           <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.14em] text-white/55">
-            <BaserunnerDiamond
-              on1b={first.on_1b != null}
-              on2b={first.on_2b != null}
-              on3b={first.on_3b != null}
-            />
+            {/* Baserunner diamond eats horizontal space without adding
+                much value on a phone — hide it on mobile, keep it on
+                sm+ where there's room. */}
+            <div className="hidden sm:flex">
+              <BaserunnerDiamond
+                on1b={first.on_1b != null}
+                on2b={first.on_2b != null}
+                on3b={first.on_3b != null}
+              />
+            </div>
             <span className="tabular-nums normal-case text-white/65">
               {first.outs_when_up ?? 0}{" "}
               {(first.outs_when_up ?? 0) === 1 ? "out" : "outs"}

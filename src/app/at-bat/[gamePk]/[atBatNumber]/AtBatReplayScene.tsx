@@ -754,13 +754,13 @@ function PitchStepper({
   const velocity = active?.raw.release_speed ?? null;
 
   return (
-    // Mobile: dock the stepper tight against the bottom of the
-    // pitcher/batter panel. Side panel is capped at max-h-[14rem]
-    // starting at top-20 (5rem) → ends at 19rem at most. Stepper at
-    // top-[19.5rem] sits flush with a 0.5rem breathing gap. Keeps
-    // the rest of the screen free for the 3D scene.
+    // Mobile: dock the stepper flush to the bottom of the pitcher/
+    // batter panel. Side panel is now a fixed h-[11rem] starting at
+    // top-20 (5rem) → bottom at 16rem. Stepper at top-[16.5rem] sits
+    // with a 0.5rem breathing gap. Keeps the rest of the screen
+    // free for the 3D scene.
     // sm+: revert to the canonical bottom-center transport bar.
-    <div className="absolute top-[19.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute top-[16.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
