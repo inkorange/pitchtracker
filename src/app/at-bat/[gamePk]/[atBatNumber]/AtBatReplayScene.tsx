@@ -217,17 +217,22 @@ export function AtBatReplayScene({
 
   // Front-preset camera angle depends on batter handedness so the
   // strike zone projects to the side of the screen opposite the
-  // batter (per request: L → SZ on right, R → SZ on left). Camera
-  // shifts slightly to the OPPOSITE side of the plate from where the
-  // batter stands; ±1 ft is enough to push the SZ visibly off-center
-  // without warping the framing.
+  // batter AND a slice of the batter silhouette stays in frame on
+  // mobile portrait. Two adjustments from the static preset:
+  //
+  //   1. Shift x by ±1 ft toward the opposite side of the plate from
+  //      the batter (L → camera at -x, SZ on right; R → mirror).
+  //   2. Pull the camera back from z=11 to z=18. At z=11 mobile
+  //      portrait's narrow horizontal FOV cropped the silhouette
+  //      (~2.2 ft off-axis) entirely; at z=18 the silhouette's
+  //      angular offset from view direction shrinks enough to keep
+  //      its edge in frame on mobile while staying close enough on
+  //      desktop to feel like a hitter's-eye view.
   const frontPresetOverride: CameraPosition | null = useMemo(() => {
     if (preset !== "front" || !batterStand) return null;
-    // L batter is at +x (1B side); shifting camera to -x makes SZ
-    // project right-of-center. R batter mirrors.
     const cameraX = batterStand === "L" ? -1 : 1;
     return {
-      position: [cameraX, 4.3, 11],
+      position: [cameraX, 4.3, 18],
       target: [0, 2.5, -55],
     };
   }, [preset, batterStand]);

@@ -154,12 +154,18 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
       />
 
       <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
-        <div className="flex gap-3 items-center pointer-events-auto">
+        <div className="flex gap-2 sm:gap-3 items-center pointer-events-auto flex-wrap">
+          <Link
+            href={`/at-bat/${gamePkN}`}
+            className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
+          >
+            ← Game
+          </Link>
           <Link
             href="/"
             className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
           >
-            ← pitchtracker
+            pitchtracker
           </Link>
           {pitcher ? (
             <Link
