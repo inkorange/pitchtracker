@@ -197,6 +197,15 @@ export function AtBatReplayScene({
 
   const activePitch = prepared[currentIdx];
   const isLast = currentIdx >= prepared.length - 1;
+  // Stand is the same for the whole at-bat (one batter); first valid
+  // value wins. "L" / "R" only — anything else (rare data nulls)
+  // hides the silhouette to avoid guessing.
+  const batterStand: "L" | "R" | null = (() => {
+    for (const p of prepared) {
+      if (p.raw.stand === "L" || p.raw.stand === "R") return p.raw.stand;
+    }
+    return null;
+  })();
 
   // Manual selection — when the user clicks a ribbon, we jump there
   // and show the shape-metrics overlay. selectedDetailIdx is what the
@@ -257,6 +266,7 @@ export function AtBatReplayScene({
           progress={intraProgress}
           phase={phase}
         />
+        {batterStand ? <BatterSilhouette stand={batterStand} /> : null}
         {/* Outcome chip on every pitch that has already landed (idx <
             currentIdx, plus the active pitch once it's settled). */}
         {prepared.map((p, i) => {
@@ -486,6 +496,49 @@ function ReplayDriver({
         );
       })}
     </>
+  );
+}
+
+// Translucent silhouette of the batter standing in the box, mirrored
+// by handedness. In our coordinate system 1B is +x and 3B is −x; a
+// right-handed batter stands in the third-base box (catcher's right)
+// at −x, a left-handed batter stands first-base side at +x. The
+// shape is intentionally crude — a cylinder body + sphere head — and
+// rendered with low opacity so it reads as a visual anchor for the
+// strike zone without competing with the pitch ribbons.
+function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
+  const xOffset = stand === "R" ? -2.2 : 2.2;
+  // Slight forward offset toward catcher (negative z = away from
+  // mound) so the silhouette sits in the back of the box rather than
+  // straddling the front of the plate.
+  const zOffset = 0.8;
+  const color = "#101418";
+  const opacity = 0.42;
+  return (
+    <group position={[xOffset, 0, zOffset]}>
+      {/* Torso */}
+      <mesh position={[0, 2.6, 0]}>
+        <cylinderGeometry args={[0.42, 0.42, 4, 18]} />
+        <meshStandardMaterial
+          color={color}
+          roughness={0.95}
+          metalness={0}
+          transparent
+          opacity={opacity}
+        />
+      </mesh>
+      {/* Head */}
+      <mesh position={[0, 5.1, 0]}>
+        <sphereGeometry args={[0.4, 18, 18]} />
+        <meshStandardMaterial
+          color={color}
+          roughness={0.95}
+          metalness={0}
+          transparent
+          opacity={opacity}
+        />
+      </mesh>
+    </group>
   );
 }
 
