@@ -249,7 +249,7 @@ export function AtBatReplayScene({
       <button
         type="button"
         onClick={() => setFollowMode((f) => !f)}
-        className={`absolute bottom-20 right-6 px-3 py-1.5 rounded text-[10px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors pointer-events-auto ${
+        className={`absolute bottom-20 right-3 sm:right-6 z-20 px-3 py-1.5 rounded text-[10px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors pointer-events-auto ${
           followMode
             ? "bg-white/15 border-white/25 text-white"
             : "bg-black/35 border-white/15 text-white/65 hover:text-white hover:bg-black/50"
@@ -381,9 +381,11 @@ function ReplayDriver({
               drawProgress={drawProgress}
               opacity={opacity}
             />
-            {isActive ? (
-              <BallTracer path={p.path} progress={drawProgress} />
-            ) : null}
+            {/* Show the ball at its final plate position for past pitches
+                and the settled current pitch (drawProgress=1), and as a
+                live tracer while flying. Balls accumulate across the
+                at-bat instead of disappearing on landing. */}
+            <BallTracer path={p.path} progress={drawProgress} />
           </group>
         );
       })}
@@ -492,8 +494,34 @@ function PitchStepper({
   const velocity = active?.raw.release_speed ?? null;
 
   return (
-    <div className="absolute bottom-6 left-1/2 z-20 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
-      <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center gap-3 text-white/90">
+    // bottom-24 on mobile lifts the stepper above CameraPad (bottom-6)
+    // and the follow toggle (bottom-20) so they don't fight for the
+    // same band. sm:bottom-6 reverts to the desktop position. left-3
+    // and right-3 keep the card from running off either edge on a
+    // 320-375px viewport.
+    <div className="absolute bottom-24 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+      <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
+        <button
+          type="button"
+          onClick={() => onJumpTo(0, true)}
+          className="p-1.5 rounded text-white/55 hover:text-white hover:bg-white/[0.08] transition-colors"
+          aria-label="Restart from first pitch"
+          title="Restart"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M3 12a9 9 0 1 0 9-9" />
+            <path d="M3 4v5h5" />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={() => onJumpTo(currentIdx - 1, false)}
@@ -519,7 +547,10 @@ function PitchStepper({
         >
           next →
         </button>
-        <div className="border-l border-white/10 pl-3 ml-1 flex items-center gap-2 text-[11px] tabular-nums">
+        {/* Pitch info: full detail (type + velo + count) on sm+, just
+            count on mobile so the row never wraps awkwardly on a
+            320px viewport. */}
+        <div className="hidden sm:flex border-l border-white/10 pl-3 ml-1 items-center gap-2 text-[11px] tabular-nums">
           <span className="text-white/55">P{(active?.raw.pitch_number ?? 1)}</span>
           <span className="text-white/85">{pitchLabel}</span>
           <span className="text-white/55">
@@ -529,8 +560,13 @@ function PitchStepper({
             {balls}-{strikes}
           </span>
         </div>
+        <div className="sm:hidden border-l border-white/10 pl-2 ml-1 flex items-center gap-1 text-[11px] tabular-nums text-white/65">
+          <span>P{active?.raw.pitch_number ?? 1}</span>
+          <span>·</span>
+          <span>{balls}-{strikes}</span>
+        </div>
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-wrap justify-center max-w-full px-2">
         {prepared.map((p, i) => (
           <button
             key={`dot-${i}`}

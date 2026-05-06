@@ -51,7 +51,7 @@ interface PitchEntry {
 }
 
 export function PitcherArsenalScene({ pitches, pitcherLabel }: PitcherArsenalSceneProps) {
-  const [preset, setPreset] = useState<CameraPreset>("side");
+  const [preset, setPreset] = useState<CameraPreset>("front");
   const [presetTick, setPresetTick] = useState(0);
   const handlePresetChange = (next: CameraPreset) => {
     setPreset(next);

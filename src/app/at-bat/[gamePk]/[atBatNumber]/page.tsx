@@ -141,7 +141,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         initialPitchIdx={initialPitchIdx}
       />
 
-      <header className="absolute top-6 left-6 right-6 z-20 flex items-start justify-between gap-6 pointer-events-none">
+      <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
         <div className="flex gap-3 items-center pointer-events-auto">
           <Link
             href="/"
@@ -163,7 +163,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         </div>
       </header>
 
-      <section className="absolute top-20 left-6 z-20 w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/45">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
@@ -171,69 +171,126 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
           <span>{game?.game_date ?? ""}</span>
         </div>
 
-        {/* Pitcher card */}
-        <div className="flex items-center gap-3">
-          {pitcher ? (
-            <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-              <Image
-                src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
-                alt=""
-                fill
-                sizes="48px"
-                className="object-cover"
-                unoptimized
-              />
+        {/* Pitcher + batter: stacked rows on sm+, single combined row
+            on mobile so the side panel doesn't eat the whole screen. */}
+        <div className="hidden sm:flex sm:flex-col sm:gap-4">
+          {/* Pitcher card */}
+          <div className="flex items-center gap-3">
+            {pitcher ? (
+              <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+                <Image
+                  src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
+                  alt=""
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+                Pitcher
+              </div>
+              <div className="text-sm font-medium text-white truncate">
+                {pitcher?.full_name ?? `Pitcher #${pitcherId ?? "—"}`}
+              </div>
+              <div className="text-[11px] text-white/55 tabular-nums">
+                {pitcher?.throws ? `${pitcher.throws}HP` : ""}
+              </div>
             </div>
-          ) : null}
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-              Pitcher
-            </div>
-            <div className="text-sm font-medium text-white truncate">
-              {pitcher?.full_name ?? `Pitcher #${pitcherId ?? "—"}`}
-            </div>
-            <div className="text-[11px] text-white/55 tabular-nums">
-              {pitcher?.throws ? `${pitcher.throws}HP` : ""}
+            {pitcher?.current_team_id ? (
+              <div className="relative w-9 h-9 flex-shrink-0">
+                <Image
+                  src={teamLogoUrl(pitcher.current_team_id)}
+                  alt=""
+                  fill
+                  sizes="36px"
+                  className="object-contain"
+                  unoptimized
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {/* Batter card */}
+          <div className="flex items-center gap-3 pt-3 border-t border-white/[0.08]">
+            {batterId ? (
+              <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+                <Image
+                  src={pitcherHeadshotUrl(batterId, 120)}
+                  alt=""
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+                Batter
+              </div>
+              <div className="text-sm font-medium text-white truncate">
+                {batterName ?? `Batter #${batterId ?? "—"}`}
+              </div>
+              <div className="text-[11px] text-white/55 tabular-nums">
+                {first.stand ? `${first.stand}HB` : ""}
+              </div>
             </div>
           </div>
-          {pitcher?.current_team_id ? (
-            <div className="relative w-9 h-9 flex-shrink-0">
-              <Image
-                src={teamLogoUrl(pitcher.current_team_id)}
-                alt=""
-                fill
-                sizes="36px"
-                className="object-contain"
-                unoptimized
-              />
-            </div>
-          ) : null}
         </div>
 
-        {/* Batter card */}
-        <div className="flex items-center gap-3 pt-3 border-t border-white/[0.08]">
-          {batterId ? (
-            <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-              <Image
-                src={pitcherHeadshotUrl(batterId, 120)}
-                alt=""
-                fill
-                sizes="48px"
-                className="object-cover"
-                unoptimized
-              />
+        {/* Mobile: single tight row — pitcher | vs | batter, headshots
+            shrunk to 28px and the secondary lines (throws, hand) folded
+            into the name lines. Cuts ~120px of vertical chrome. */}
+        <div className="flex sm:hidden items-center gap-2">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            {pitcher ? (
+              <div className="relative w-7 h-7 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+                <Image
+                  src={pitcherHeadshotUrl(pitcher.mlb_id, 80)}
+                  alt=""
+                  fill
+                  sizes="28px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-white truncate">
+                {pitcher?.full_name ?? `Pitcher #${pitcherId ?? "—"}`}
+              </div>
+              <div className="text-[10px] text-white/45 tabular-nums">
+                {pitcher?.throws ? `${pitcher.throws}HP` : ""}
+              </div>
             </div>
-          ) : null}
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-              Batter
+          </div>
+          <span className="text-[10px] uppercase tracking-[0.16em] text-white/35 flex-shrink-0">
+            vs
+          </span>
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
+            <div className="min-w-0 flex-1 text-right">
+              <div className="text-xs font-medium text-white truncate">
+                {batterName ?? `Batter #${batterId ?? "—"}`}
+              </div>
+              <div className="text-[10px] text-white/45 tabular-nums">
+                {first.stand ? `${first.stand}HB` : ""}
+              </div>
             </div>
-            <div className="text-sm font-medium text-white truncate">
-              {batterName ?? `Batter #${batterId ?? "—"}`}
-            </div>
-            <div className="text-[11px] text-white/55 tabular-nums">
-              {first.stand ? `${first.stand}HB` : ""}
-            </div>
+            {batterId ? (
+              <div className="relative w-7 h-7 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+                <Image
+                  src={pitcherHeadshotUrl(batterId, 80)}
+                  alt=""
+                  fill
+                  sizes="28px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 

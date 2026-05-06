@@ -21,7 +21,7 @@ export function Scene({ preset, presetTick, children, onPointerMissed }: ScenePr
       gl={{ antialias: true, powerPreference: "high-performance" }}
       dpr={[1, 2]}
       style={{ background: "#7ea7c8" }}
-      camera={{ fov: 45, near: 0.1, far: 1500 }}
+      camera={{ fov: 45, near: 0.1, far: 2500 }}
       onPointerMissed={onPointerMissed}
     >
       <Suspense fallback={null}>
