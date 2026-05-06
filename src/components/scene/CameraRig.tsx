@@ -85,9 +85,10 @@ export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
       // Dampen the wheel/pinch zoom further so a single scroll only nudges
       // the camera (default zoomSpeed is 1.0).
       zoomSpeed={0.18}
-      // Stop a few degrees short of horizontal so the camera can never dip
-      // below the ground plane (which would render the field upside-down).
-      maxPolarAngle={Math.PI / 2 - 0.05}
+      // Stop just short of horizontal so the camera never dips below the
+      // ground plane. ~1.15° gap is enough to avoid flipping while still
+      // letting the user get a near-eye-level look at the pitch.
+      maxPolarAngle={Math.PI / 2 - 0.02}
       makeDefault
     />
   );
