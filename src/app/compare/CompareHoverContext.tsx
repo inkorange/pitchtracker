@@ -1,6 +1,15 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { CompareSide } from "@/lib/viz/colors";
 
 interface CompareHoverState {
@@ -14,8 +23,34 @@ const Ctx = createContext<CompareHoverState>({
 });
 
 export function CompareHoverProvider({ children }: { children: ReactNode }) {
-  const [hoveredSide, setHoveredSide] = useState<CompareSide | null>(null);
-  const value = useMemo(() => ({ hoveredSide, setHoveredSide }), [hoveredSide]);
+  const [hoveredSide, setHoveredSideState] = useState<CompareSide | null>(null);
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Defer "clear" by a tick so a pointerout on one mesh followed
+  // immediately by a pointerover on the next mesh doesn't flicker — the
+  // pointerover cancels the pending clear.
+  const setHoveredSide = useCallback((side: CompareSide | null) => {
+    if (clearTimer.current) {
+      clearTimeout(clearTimer.current);
+      clearTimer.current = null;
+    }
+    if (side === null) {
+      clearTimer.current = setTimeout(() => {
+        setHoveredSideState(null);
+        clearTimer.current = null;
+      }, 16);
+    } else {
+      setHoveredSideState(side);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (clearTimer.current) clearTimeout(clearTimer.current);
+    };
+  }, []);
+
+  const value = useMemo(() => ({ hoveredSide, setHoveredSide }), [hoveredSide, setHoveredSide]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

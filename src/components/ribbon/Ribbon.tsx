@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { CatmullRomCurve3, TubeGeometry, Vector3 } from "three";
+import type { ThreeEvent } from "@react-three/fiber";
 import { statcastToThree } from "@/lib/viz/coords";
 import { type CompareSide, getPitchColor, getPitchColorForSide } from "@/lib/viz/colors";
 
@@ -14,6 +15,8 @@ interface RibbonProps {
   // the default semantic color.
   side?: CompareSide;
   opacity?: number;
+  onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
+  onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
 }
 
 export function Ribbon({
@@ -23,6 +26,8 @@ export function Ribbon({
   drawProgress = 1,
   side,
   opacity = 1,
+  onPointerOver,
+  onPointerOut,
 }: RibbonProps) {
   const geometry = useMemo(() => {
     const points = path.map((p) => new Vector3(...statcastToThree(p)));
@@ -35,7 +40,7 @@ export function Ribbon({
   const transparent = opacity < 1;
 
   return (
-    <mesh geometry={geometry}>
+    <mesh geometry={geometry} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
       <meshStandardMaterial
         color={color}
         roughness={0.55}

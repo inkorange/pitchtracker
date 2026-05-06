@@ -82,12 +82,12 @@ export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
       // Users can zoom in from any preset, but never further out than the
       // top preset's framing.
       maxDistance={100}
-      // Dampen the wheel/pinch zoom so a single scroll doesn't fly the
-      // camera across the scene (default zoomSpeed is 1.0).
-      zoomSpeed={0.4}
-      // Camera can reach exactly horizontal but never below it — the
-      // ground plane should never be above the camera's eye line.
-      maxPolarAngle={Math.PI / 2}
+      // Dampen the wheel/pinch zoom further so a single scroll only nudges
+      // the camera (default zoomSpeed is 1.0).
+      zoomSpeed={0.18}
+      // Stop a few degrees short of horizontal so the camera can never dip
+      // below the ground plane (which would render the field upside-down).
+      maxPolarAngle={Math.PI / 2 - 0.05}
       makeDefault
     />
   );

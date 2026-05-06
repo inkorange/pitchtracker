@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Sphere } from "@react-three/drei";
+import type { ThreeEvent } from "@react-three/fiber";
 import { statcastToThree } from "@/lib/viz/coords";
 import { getOutcomeColor } from "@/lib/viz/colors";
 
@@ -14,6 +15,8 @@ interface PitchPoint {
 interface OutcomeMarkersProps {
   pitches: PitchPoint[];
   opacity?: number;
+  onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
+  onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
 }
 
 // Renders a small colored dot at each pitch's plate location, colored
@@ -21,7 +24,12 @@ interface OutcomeMarkersProps {
 // pitchers' spray charts overlay on the same strike zone regardless of
 // any release-point normalization, since the strike zone is what
 // matters for the outcome.
-export function OutcomeMarkers({ pitches, opacity = 1 }: OutcomeMarkersProps) {
+export function OutcomeMarkers({
+  pitches,
+  opacity = 1,
+  onPointerOver,
+  onPointerOut,
+}: OutcomeMarkersProps) {
   const markers = useMemo(
     () =>
       pitches
@@ -42,7 +50,13 @@ export function OutcomeMarkers({ pitches, opacity = 1 }: OutcomeMarkersProps) {
   return (
     <>
       {markers.map((m) => (
-        <Sphere key={m.id} args={[0.12, 12, 12]} position={m.position}>
+        <Sphere
+          key={m.id}
+          args={[0.12, 12, 12]}
+          position={m.position}
+          onPointerOver={onPointerOver}
+          onPointerOut={onPointerOut}
+        >
           <meshStandardMaterial
             color={m.color}
             roughness={0.4}

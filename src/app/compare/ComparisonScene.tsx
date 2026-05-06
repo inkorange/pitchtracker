@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
@@ -160,24 +160,14 @@ function SideLayer({ side, ribbons, pitches, progress, showTracers }: SideLayerP
   const opacity = useOpacityForSide(side);
   const { setHoveredSide } = useCompareHover();
 
-  // r3f bubbles pointerover/out for every child boundary, so a ref-counter
-  // is the simplest way to dedupe transitions between sibling meshes inside
-  // this side's group — only clear when truly outside every child.
-  const hoverCount = useRef(0);
+  // Per-mesh handlers: each ribbon and each outcome sphere reports its own
+  // hover. The provider debounces "clear" by a tick so transitioning
+  // between two meshes (within or across sides) doesn't flicker.
+  const onOver = useCallback(() => setHoveredSide(side), [setHoveredSide, side]);
+  const onOut = useCallback(() => setHoveredSide(null), [setHoveredSide]);
 
   return (
-    <group
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        hoverCount.current += 1;
-        if (hoverCount.current === 1) setHoveredSide(side);
-      }}
-      onPointerOut={(e) => {
-        e.stopPropagation();
-        hoverCount.current = Math.max(0, hoverCount.current - 1);
-        if (hoverCount.current === 0) setHoveredSide(null);
-      }}
-    >
+    <>
       {ribbons.map((r) => (
         <Ribbon
           key={`${side}-${r.pitchType}`}
@@ -186,9 +176,16 @@ function SideLayer({ side, ribbons, pitches, progress, showTracers }: SideLayerP
           radius={0.1}
           side={side}
           opacity={opacity}
+          onPointerOver={onOver}
+          onPointerOut={onOut}
         />
       ))}
-      <OutcomeMarkers pitches={pitches} opacity={opacity} />
+      <OutcomeMarkers
+        pitches={pitches}
+        opacity={opacity}
+        onPointerOver={onOver}
+        onPointerOut={onOut}
+      />
       {showTracers &&
         ribbons.map((r) => (
           <BallTracer
@@ -197,7 +194,7 @@ function SideLayer({ side, ribbons, pitches, progress, showTracers }: SideLayerP
             progress={progress}
           />
         ))}
-    </group>
+    </>
   );
 }
 
