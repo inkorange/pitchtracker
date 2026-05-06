@@ -80,7 +80,7 @@ function parseNum(v: string): number | null {
 // Parse Savant's CSV via papaparse. The Savant CSV has a BOM, quoted
 // fields, and embedded commas inside quoted strings (e.g. "Laureano, Ramón"),
 // so a naive split breaks. papaparse handles all of those plus type coercion.
-function parseCsv(csv: string): Record<string, string>[] {
+export function parseCsv(csv: string): Record<string, string>[] {
   const result = Papa.parse<Record<string, string>>(csv, {
     header: true,
     skipEmptyLines: true,
@@ -89,7 +89,7 @@ function parseCsv(csv: string): Record<string, string>[] {
   return result.data;
 }
 
-function castRow(raw: Record<string, string>): SavantPitchRow {
+export function castRow(raw: Record<string, string>): SavantPitchRow {
   const cast: Record<string, unknown> = { ...raw };
   for (const f of NUMERIC_FIELDS) {
     if (f in raw) {
