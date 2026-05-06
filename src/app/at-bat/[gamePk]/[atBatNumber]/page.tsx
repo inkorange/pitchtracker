@@ -122,16 +122,23 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
       .filter((e): e is string => typeof e === "string" && e.length > 0)
       .pop() ?? null;
 
+  // Default to the hitter's-eye view — the strike zone sits centrally
+  // in the frame on every aspect ratio, including mobile portrait
+  // where the side preset's narrow horizontal FOV clipped the plate.
+  // Users can still switch to side / back / top via the CameraPad.
   const initialCamera: CameraPreset =
     sp.camera === "front" ||
     sp.camera === "back" ||
     sp.camera === "top" ||
     sp.camera === "side"
       ? sp.camera
-      : "side";
-  // ?pitch=N matches the AB-relative pitch_number, not an array index.
-  // Resolves correctly even if Statcast records gaps in pitch_number.
-  const initialPitchIdx = (() => {
+      : "front";
+  // ?pitch=N highlights a specific pitch (used by the OG image link
+  // and the daily-features deep link), but it should NOT skip the
+  // playback past the preceding pitches — playback starts at pitch 1
+  // and animates through. The highlight is a separate concern handled
+  // by selectedDetailIdx in the scene component.
+  const initialHighlightPitch = (() => {
     const n = Number(sp.pitch);
     if (!Number.isFinite(n)) return null;
     const idx = pitches.findIndex((p) => p.pitch_number === n);
@@ -143,7 +150,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
       <AtBatReplayScene
         pitches={pitches}
         initialCamera={initialCamera}
-        initialPitchIdx={initialPitchIdx}
+        initialHighlightIdx={initialHighlightPitch}
       />
 
       <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
@@ -168,7 +175,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         </div>
       </header>
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto max-h-[18rem] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/45">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}

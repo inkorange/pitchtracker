@@ -57,7 +57,12 @@ export interface ReplayPitch {
 interface AtBatReplaySceneProps {
   pitches: ReplayPitch[];
   initialCamera: CameraPreset;
-  initialPitchIdx: number | null;
+  // Optional pitch index to highlight (selectedDetailIdx) on mount —
+  // used by the daily-feature / OG deep links. Does NOT skip playback
+  // past prior pitches; playback always starts at idx 0 and animates
+  // through. The highlight just shows the metrics overlay on that
+  // specific pitch once it's landed (or when manually clicked).
+  initialHighlightIdx: number | null;
 }
 
 interface PreparedPitch {
@@ -79,7 +84,7 @@ const FLIGHT_TIME_MULTIPLIER = 2.5;
 export function AtBatReplayScene({
   pitches,
   initialCamera,
-  initialPitchIdx,
+  initialHighlightIdx,
 }: AtBatReplaySceneProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -133,13 +138,13 @@ export function AtBatReplayScene({
     [pitches],
   );
 
-  // The clamped, valid initial pitch index (or 0 if none specified).
-  const startIdx = initialPitchIdx ?? 0;
-
   // currentIdx ∈ [0, pitches.length). Within a pitch, intraProgress
   // climbs 0 → 1 across the flight; once at 1, it sits at 1 during the
-  // post-pitch delay; then advances to the next pitch.
-  const [currentIdx, setCurrentIdx] = useState(startIdx);
+  // post-pitch delay; then advances to the next pitch. Always starts
+  // at 0 — even when ?pitch=N is in the URL — so the user gets a full
+  // pitch-by-pitch playback rather than landing on a pre-populated
+  // scene with all preceding pitches already drawn.
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [intraProgress, setIntraProgress] = useState(0);
   const [phase, setPhase] = useState<"flying" | "settled" | "done">("flying");
   const [playing, setPlaying] = useState(true);
@@ -211,7 +216,12 @@ export function AtBatReplayScene({
   // and show the shape-metrics overlay. selectedDetailIdx is what the
   // overlay reads; null = use the active pitch (auto-updates with
   // playback). Click empty space (Scene onPointerMissed) to clear.
-  const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(null);
+  // Seed from initialHighlightIdx so deep-links (?pitch=N) point the
+  // overlay at the linked pitch — but playback still animates from
+  // pitch 1 through to it, not skipping ahead.
+  const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
+    initialHighlightIdx ?? null,
+  );
   const detailIdx = selectedDetailIdx ?? currentIdx;
   const detailPitch = prepared[detailIdx];
   // Only surface the metrics overlay once the pitch has actually
@@ -716,12 +726,14 @@ function PitchStepper({
   const velocity = active?.raw.release_speed ?? null;
 
   return (
-    // Mobile: dock the stepper just below the pitcher/batter panel
-    // (top-20 + ~150px content height + small gap = ~15rem). Keeps the
-    // bottom half of the screen free for the 3D scene so the strike
-    // zone never sits behind chrome.
+    // Mobile: dock the stepper just below the pitcher/batter panel.
+    // Side panel is capped at max-h-[18rem] starting at top-20 (5rem)
+    // — so it ends at 23rem at most. Stepper at top-[24rem] gives a
+    // 1rem gap and stays clear of the panel even when the panel hits
+    // its cap. Keeps the bottom half of the screen free for the 3D
+    // scene so the strike zone never sits behind chrome.
     // sm+: revert to the canonical bottom-center transport bar.
-    <div className="absolute top-[15rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute top-[24rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
