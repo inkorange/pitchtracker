@@ -7,8 +7,16 @@
 --
 -- For existing rows we don't have game_type recorded, so heuristic-mark
 -- pre-March-20 of each season as Spring Training and the rest as
--- Regular Season. Future inserts will set this column accurately from
--- Savant's CSV / MLB Stats API.
+-- Regular Season. The heuristic mis-classifies late spring games
+-- (e.g. 2026-03-21 was preseason but >= 2026-03-20). For accurate
+-- backfill, follow this migration with a one-shot pass that reads
+-- gameType from MLB Stats API:
+--   for year in 2024..currentSeason
+--   curl https://statsapi.mlb.com/api/v1/schedule?sportId=1&season=$year&gameType=S
+--   UPDATE pitch_games SET game_type='S' WHERE game_pk IN (...)
+-- Future inserts set this column accurately from Savant's CSV /
+-- MLB Stats API gameType fields, so the heuristic only matters for
+-- the initial one-time seed.
 
 alter table public.pitch_games add column game_type text;
 
