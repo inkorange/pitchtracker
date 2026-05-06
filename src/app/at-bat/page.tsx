@@ -16,17 +16,36 @@ interface GameRow {
   season: number;
 }
 
-export default async function AtBatIndex() {
+interface TeamRow {
+  mlb_id: number;
+  abbreviation: string;
+  name: string;
+}
+
+interface PageProps {
+  searchParams: Promise<{ error?: string; team?: string; date?: string }>;
+}
+
+export default async function AtBatIndex({ searchParams }: PageProps) {
+  const sp = await searchParams;
   const supabase = await createClient();
 
   // Pull the most recently fetched (pitcher, game) pairs and dedupe to
   // distinct games. Bounded by how aggressively we've been backfilling,
   // not by the schedule.
-  const { data: ppgRows } = await supabase
-    .from("pitch_pitcher_games")
-    .select("game_pk, fetched_at")
-    .order("fetched_at", { ascending: false })
-    .limit(500);
+  const [{ data: ppgRows }, { data: teamsRaw }] = await Promise.all([
+    supabase
+      .from("pitch_pitcher_games")
+      .select("game_pk, fetched_at")
+      .order("fetched_at", { ascending: false })
+      .limit(500),
+    // All 30 MLB teams. Used for both the team-date lookup form and
+    // resolving abbreviations on the recent games list.
+    supabase
+      .from("pitch_teams")
+      .select("mlb_id, abbreviation, name")
+      .order("name"),
+  ]);
 
   const seenGamePks = new Set<number>();
   const orderedGamePks: number[] = [];
@@ -54,21 +73,29 @@ export default async function AtBatIndex() {
     .filter((g): g is GameRow => g !== undefined)
     .sort((a, b) => b.game_date.localeCompare(a.game_date));
 
-  const teamIds = new Set<number>();
-  for (const g of games) {
-    if (g.home_team_id) teamIds.add(g.home_team_id);
-    if (g.away_team_id) teamIds.add(g.away_team_id);
-  }
-  const { data: teamsRaw } =
-    teamIds.size > 0
-      ? await supabase
-          .from("pitch_teams")
-          .select("mlb_id, abbreviation, name")
-          .in("mlb_id", Array.from(teamIds))
-      : { data: [] };
-  const teamById = new Map(
-    (teamsRaw ?? []).map((t) => [t.mlb_id, t]),
+  const teams = (teamsRaw ?? []) as TeamRow[];
+  const teamById = new Map(teams.map((t) => [t.mlb_id, t]));
+
+  // Default the date input to yesterday in America/New_York — the
+  // canonical "baseball day" boundary regardless of where the user is.
+  // en-CA locale outputs YYYY-MM-DD which is what <input type="date">
+  // expects.
+  const yesterdayIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString(
+    "en-CA",
+    { timeZone: "America/New_York" },
   );
+
+  const errorMessage = (() => {
+    if (sp.error === "notfound") {
+      const team = teams.find((t) => String(t.mlb_id) === sp.team);
+      const teamLabel = team?.name ?? "that team";
+      return `No regular-season game for ${teamLabel} on ${sp.date ?? "that date"}.`;
+    }
+    if (sp.error === "missing") {
+      return "Pick a team and a date to find a game.";
+    }
+    return null;
+  })();
 
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
@@ -82,12 +109,20 @@ export default async function AtBatIndex() {
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">At-bat replays</h1>
           <p className="text-sm text-white/55 max-w-prose">
-            Pick a recent game to browse its at-bats, or jump directly
-            to a specific at-bat by game ID and at-bat number.
+            Pick a team and a date to jump to that day&apos;s game, or
+            browse a recent game below.
           </p>
         </div>
 
-        <DirectLookupForm />
+        <TeamDateLookupForm
+          teams={teams}
+          defaultDate={yesterdayIso}
+          initialTeam={sp.team}
+          initialDate={sp.date}
+        />
+        {errorMessage ? (
+          <p className="text-[12px] text-amber-400/85 -mt-6">{errorMessage}</p>
+        ) : null}
 
         <section className="space-y-3">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-white/55">
@@ -158,53 +193,72 @@ export default async function AtBatIndex() {
   );
 }
 
-function DirectLookupForm() {
-  // Server-action approach via a plain GET form: posts to /at-bat/lookup
-  // (a route that just redirects to the canonical URL). Keeps this page
-  // a pure server component without a client-side router push.
+function TeamDateLookupForm({
+  teams,
+  defaultDate,
+  initialTeam,
+  initialDate,
+}: {
+  teams: TeamRow[];
+  defaultDate: string;
+  initialTeam?: string;
+  initialDate?: string;
+}) {
+  // Plain GET form posts to /at-bat/lookup, which resolves the
+  // (team, date) pair to a game_pk and 302s to /at-bat/[gamePk].
+  // Keeps this page a server component with no client JS for the
+  // lookup itself.
   return (
     <form
       action="/at-bat/lookup"
       method="get"
-      className="flex flex-wrap gap-2 items-end p-4 rounded-lg bg-white/[0.04] border border-white/10"
+      className="flex flex-wrap gap-3 items-end p-4 rounded-lg bg-white/[0.04] border border-white/10"
     >
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
         <label
-          htmlFor="gamePk"
+          htmlFor="team"
           className="text-[10px] uppercase tracking-[0.14em] text-white/45"
         >
-          Game ID
+          Team
         </label>
-        <input
-          id="gamePk"
-          name="gamePk"
-          type="number"
+        <select
+          id="team"
+          name="team"
           required
-          placeholder="831547"
-          className="px-3 py-1.5 rounded bg-black/40 border border-white/10 text-white text-sm tabular-nums focus:outline-none focus:border-white/25 w-32"
-        />
+          defaultValue={initialTeam ?? ""}
+          className="px-3 py-1.5 rounded bg-black/40 border border-white/10 text-white text-sm focus:outline-none focus:border-white/25"
+        >
+          <option value="" disabled>
+            Pick a team…
+          </option>
+          {teams.map((t) => (
+            <option key={t.mlb_id} value={t.mlb_id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="flex flex-col gap-1">
         <label
-          htmlFor="atBatNumber"
+          htmlFor="date"
           className="text-[10px] uppercase tracking-[0.14em] text-white/45"
         >
-          At-bat #
+          Date
         </label>
         <input
-          id="atBatNumber"
-          name="atBatNumber"
-          type="number"
+          id="date"
+          name="date"
+          type="date"
           required
-          placeholder="39"
-          className="px-3 py-1.5 rounded bg-black/40 border border-white/10 text-white text-sm tabular-nums focus:outline-none focus:border-white/25 w-24"
+          defaultValue={initialDate ?? defaultDate}
+          className="px-3 py-1.5 rounded bg-black/40 border border-white/10 text-white text-sm tabular-nums focus:outline-none focus:border-white/25"
         />
       </div>
       <button
         type="submit"
         className="px-3 py-1.5 rounded text-[11px] uppercase tracking-[0.14em] bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 text-white transition-colors"
       >
-        Open replay
+        Find game
       </button>
     </form>
   );
