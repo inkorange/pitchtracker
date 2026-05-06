@@ -61,7 +61,6 @@ export function OutcomeMarkers({
         // is selected. Selected dot stays at full strength regardless.
         const focusOpacity = !hasSelection || isSelected ? 1 : 0.25;
         const finalOpacity = opacity * focusOpacity;
-        const transparent = finalOpacity < 1;
         const radius = isSelected ? 0.18 : 0.12;
         return (
           <Sphere
@@ -89,9 +88,8 @@ export function OutcomeMarkers({
               color={m.color}
               roughness={0.4}
               metalness={0.05}
-              transparent={transparent}
+              transparent
               opacity={finalOpacity}
-              depthWrite={!transparent}
               emissive={isSelected ? m.color : "#000000"}
               emissiveIntensity={isSelected ? 0.6 : 0}
             />

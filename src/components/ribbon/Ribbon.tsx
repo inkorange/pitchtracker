@@ -37,17 +37,18 @@ export function Ribbon({
   }, [path, radius, drawProgress]);
 
   const color = side ? getPitchColorForSide(pitchType, side) : getPitchColor(pitchType);
-  const transparent = opacity < 1;
 
+  // Material is always transparent so toggling opacity at runtime works
+  // without needing material.needsUpdate. depthWrite stays on so opaque
+  // ribbons still occlude correctly when opacity is 1.
   return (
     <mesh geometry={geometry} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
       <meshStandardMaterial
         color={color}
         roughness={0.55}
         metalness={0.05}
-        transparent={transparent}
+        transparent
         opacity={opacity}
-        depthWrite={!transparent}
       />
     </mesh>
   );
