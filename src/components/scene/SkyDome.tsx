@@ -1,19 +1,39 @@
 "use client";
 
 import { useMemo } from "react";
-import { Sky, Cloud, Clouds } from "@react-three/drei";
+import { Cloud, Clouds } from "@react-three/drei";
 import * as THREE from "three";
 
-// drei's <Sky> is a Preetham atmospheric scattering shader rendered on a
-// huge sphere; it stays at infinity behind everything else. We pair it
-// with a handful of <Cloud> billboards drifting in mid-air so the field
-// no longer sits in a black void.
+// drei's <Sky> is the Preetham scattering shader — looks great in
+// theory but its HDR output gets crushed to near-white by the
+// renderer's default ACES tone mapping. A plain inverted sphere with a
+// vertical gradient texture is way more predictable: deep blue at the
+// zenith fading to a hazy near-horizon. We pair it with a few <Cloud>
+// billboards drifting up high so the field doesn't sit in a void.
 //
 // Cloud positions are kept high (y ≥ 60 ft) and well outside the pitch
 // envelope so they never clip into ribbons or trajectories.
 export function SkyDome() {
-  // Material/seed handles aren't truly stable across HMR; useMemo keeps
-  // the cloud positions stable across re-renders within a session.
+  const skyTexture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const canvas = document.createElement("canvas");
+    canvas.width = 2;
+    canvas.height = 512;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const grad = ctx.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0.0, "#1e5fa8"); // zenith — deep daylight blue
+    grad.addColorStop(0.5, "#5e9ed1"); // mid sky
+    grad.addColorStop(0.85, "#a9c8e2"); // upper horizon haze
+    grad.addColorStop(1.0, "#cdd9e3"); // horizon — pale grey-blue
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 2, 512);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  }, []);
+
   const seeds = useMemo(
     () => [
       { x: 120, y: 70, z: -350, speed: 0.12, volume: 18, segments: 24, opacity: 0.95 },
@@ -28,19 +48,17 @@ export function SkyDome() {
 
   return (
     <>
-      <Sky
-        distance={450000}
-        // Tuned for a clearly blue daytime sky. Lower turbidity =
-        // less haze, higher rayleigh = stronger blue scattering. Sun
-        // sits behind the camera (positive z) so the visible field of
-        // view is on the cool side of the sky, not the white "sun
-        // halo" side.
-        sunPosition={[40, 80, 200]}
-        turbidity={2}
-        rayleigh={4}
-        mieCoefficient={0.003}
-        mieDirectionalG={0.7}
-      />
+      {skyTexture && (
+        <mesh scale={[-1, 1, 1]}>
+          <sphereGeometry args={[1000, 32, 16]} />
+          <meshBasicMaterial
+            map={skyTexture}
+            side={THREE.BackSide}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
       <Clouds material={THREE.MeshBasicMaterial}>
         {seeds.map((s, i) => (
           <Cloud
