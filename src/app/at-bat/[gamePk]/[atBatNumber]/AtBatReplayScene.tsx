@@ -3,13 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
-import { CatmullRomCurve3, Vector3 } from "three";
+import { Billboard, Html, Sphere, useTexture } from "@react-three/drei";
+import {
+  CatmullRomCurve3,
+  Color,
+  ShaderMaterial,
+  SRGBColorSpace,
+  Vector3,
+} from "three";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
 import { CameraPad } from "@/components/controls/CameraPad";
-import { Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
@@ -541,48 +546,67 @@ function ReplayDriver({
   );
 }
 
-// Translucent silhouette of the batter standing in the box, mirrored
-// by handedness. In our coordinate system 1B is +x and 3B is −x; a
-// right-handed batter stands in the third-base box (catcher's right)
-// at −x, a left-handed batter stands first-base side at +x. The
-// shape is intentionally crude — a cylinder body + sphere head — and
-// rendered with low opacity so it reads as a visual anchor for the
-// strike zone without competing with the pitch ribbons.
+// Silhouette of the batter standing in the box, mirrored by
+// handedness. RHB stands at −x (third-base box), LHB at +x (first-base
+// box). The shape comes from public/batter.png — its luminance is
+// inverted into alpha at draw time so the black silhouette reads as
+// the opaque pixels. Wrapped in a <Billboard> so the figure always
+// faces the camera, keeping the silhouette readable from any preset.
 function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
   const xOffset = stand === "R" ? -2.2 : 2.2;
-  // Sit close to the front of the plate. The batter's box starts
-  // ~6 inches off the plate; a small forward offset (z=0.3) places
-  // the silhouette near the front of the box where batters actually
-  // stand to reach pitches, rather than parked at the back of the
-  // box.
   const zOffset = 0.3;
-  const color = "#101418";
-  const opacity = 0.42;
+  const texture = useTexture("/batter.png");
+
+  const material = useMemo(() => {
+    texture.colorSpace = SRGBColorSpace;
+    return new ShaderMaterial({
+      uniforms: {
+        uMap: { value: texture },
+        uColor: { value: new Color("#101418") },
+        uOpacity: { value: 0.55 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D uMap;
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        void main() {
+          vec4 t = texture2D(uMap, vUv);
+          // Source is a black silhouette on a white background. Use
+          // 1 − luminance as alpha so the silhouette becomes opaque.
+          float lum = max(t.r, max(t.g, t.b));
+          float a = 1.0 - lum;
+          if (a < 0.5) discard;
+          gl_FragColor = vec4(uColor, uOpacity);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+    });
+  }, [texture]);
+
+  // Source image aspect (1196 × 1920 ≈ 0.62) at MLB-typical batter
+  // height of ~6.2 ft (helmet included).
+  const height = 6.2;
+  const width = height * (1196 / 1920);
+  // Mirror so each handedness ends up with the bat on the correct
+  // shoulder relative to the camera.
+  const flipX = stand === "L" ? -1 : 1;
+
   return (
-    <group position={[xOffset, 0, zOffset]}>
-      {/* Torso */}
-      <mesh position={[0, 2.6, 0]}>
-        <cylinderGeometry args={[0.42, 0.42, 4, 18]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.95}
-          metalness={0}
-          transparent
-          opacity={opacity}
-        />
+    <Billboard position={[xOffset, height / 2, zOffset]} lockX lockZ>
+      <mesh scale={[flipX, 1, 1]}>
+        <planeGeometry args={[width, height]} />
+        <primitive object={material} attach="material" />
       </mesh>
-      {/* Head */}
-      <mesh position={[0, 5.1, 0]}>
-        <sphereGeometry args={[0.4, 18, 18]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.95}
-          metalness={0}
-          transparent
-          opacity={opacity}
-        />
-      </mesh>
-    </group>
+    </Billboard>
   );
 }
 

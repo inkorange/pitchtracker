@@ -174,14 +174,6 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
             />
             <span>pitchtracker</span>
           </Link>
-          {pitcher ? (
-            <Link
-              href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
-              className="px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.14em] bg-black/35 hover:bg-black/50 border border-white/15 text-white transition-colors backdrop-blur-sm"
-            >
-              View pitcher
-            </Link>
-          ) : null}
         </div>
         <div className="text-[10px] uppercase tracking-[0.16em] text-white/55 pointer-events-none">
           At-bat replay
@@ -217,9 +209,18 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
                 Pitcher
               </div>
-              <div className="text-sm font-medium text-white truncate">
-                {pitcher?.full_name ?? `Pitcher #${pitcherId ?? "—"}`}
-              </div>
+              {pitcher ? (
+                <Link
+                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
+                  className="text-sm font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
+                >
+                  {pitcher.full_name}
+                </Link>
+              ) : (
+                <div className="text-sm font-medium text-white truncate">
+                  Pitcher #{pitcherId ?? "—"}
+                </div>
+              )}
               <div className="text-[11px] text-white/55 tabular-nums">
                 {pitcher?.throws ? `${pitcher.throws}HP` : ""}
               </div>
@@ -284,9 +285,18 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-white truncate">
-                {pitcher?.full_name ?? `Pitcher #${pitcherId ?? "—"}`}
-              </div>
+              {pitcher ? (
+                <Link
+                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
+                  className="text-xs font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
+                >
+                  {pitcher.full_name}
+                </Link>
+              ) : (
+                <div className="text-xs font-medium text-white truncate">
+                  Pitcher #{pitcherId ?? "—"}
+                </div>
+              )}
               <div className="text-[10px] text-white/45 tabular-nums">
                 {pitcher?.throws ? `${pitcher.throws}HP` : ""}
               </div>
