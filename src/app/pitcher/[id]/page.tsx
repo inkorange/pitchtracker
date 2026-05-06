@@ -4,7 +4,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
-import { getPitchLabel, getPitchColor } from "@/lib/viz/colors";
+import {
+  categorizeDescription,
+  getPitchLabel,
+  getPitchColor,
+  type OutcomeCategory,
+} from "@/lib/viz/colors";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
@@ -18,6 +23,7 @@ interface PageProps {
     pitch?: string;
     hand?: string;
     game?: string;
+    outcome?: string;
   }>;
 }
 
@@ -118,8 +124,19 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   const { data: cachedPitches } = await pitchQuery;
 
   // Arsenal totals come from the filter-but-no-pitch-type set so the chips
-  // remain functional when one is selected.
-  const arsenalPitches = cachedPitches ?? [];
+  // remain functional when one is selected. Outcomes filter applies in JS
+  // — Statcast description strings have too many edge cases to express
+  // cleanly in SQL.
+  const outcomes = (sp.outcome ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is OutcomeCategory =>
+      ["whiff", "called", "ball", "foul", "inplay", "other"].includes(s),
+    );
+  const outcomeSet = new Set(outcomes);
+  const arsenalPitches = (cachedPitches ?? []).filter(
+    (p) => outcomeSet.size === 0 || outcomeSet.has(categorizeDescription(p.description)),
+  );
   const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
   const pitchTypeSet = new Set(pitchTypes);
   const filteredPitches =

@@ -2,7 +2,13 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
-import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
+import {
+  getPitchColor,
+  getPitchLabel,
+  OUTCOME_COLORS,
+  OUTCOME_LABELS,
+  type OutcomeCategory,
+} from "@/lib/viz/colors";
 import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
 
 interface ArsenalEntry {
@@ -46,12 +52,20 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
   const activePitchTypes = (params.get("pitch") ?? "").split(",").filter(Boolean);
   const activeHand = params.get("hand") ?? "";
   const activeGame = params.get("game") ?? "";
+  const activeOutcomes = (params.get("outcome") ?? "").split(",").filter(Boolean);
 
   const togglePitch = (type: string) => {
     const current = new Set(activePitchTypes);
     if (current.has(type)) current.delete(type);
     else current.add(type);
     update({ pitch: current.size > 0 ? Array.from(current).join(",") : null });
+  };
+
+  const toggleOutcome = (cat: OutcomeCategory) => {
+    const current = new Set(activeOutcomes);
+    if (current.has(cat)) current.delete(cat);
+    else current.add(cat);
+    update({ outcome: current.size > 0 ? Array.from(current).join(",") : null });
   };
 
   const setHand = (hand: string) => {
@@ -92,6 +106,36 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
           </div>
         </div>
       )}
+
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
+          Outcome
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(["whiff", "called", "ball", "foul", "inplay"] as const).map((cat) => {
+            const active = activeOutcomes.length === 0 || activeOutcomes.includes(cat);
+            const dim = activeOutcomes.length > 0 && !active;
+            return (
+              <button
+                key={cat}
+                onClick={() => toggleOutcome(cat)}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors ${
+                  dim
+                    ? "bg-white/[0.02] text-white/35 border border-white/5"
+                    : "bg-white/[0.06] text-white/85 border border-white/10 hover:bg-white/[0.1]"
+                }`}
+                aria-pressed={!dim}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: OUTCOME_COLORS[cat], opacity: dim ? 0.3 : 1 }}
+                />
+                {OUTCOME_LABELS[cat]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
@@ -136,9 +180,14 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
         </div>
       )}
 
-      {(activePitchTypes.length > 0 || activeHand || activeGame) && (
+      {(activePitchTypes.length > 0 ||
+        activeHand ||
+        activeGame ||
+        activeOutcomes.length > 0) && (
         <button
-          onClick={() => update({ pitch: null, hand: null, game: null })}
+          onClick={() =>
+            update({ pitch: null, hand: null, game: null, outcome: null })
+          }
           className="text-[10px] uppercase tracking-[0.14em] text-white/40 hover:text-white/80 transition-colors"
         >
           Clear filters
