@@ -11,6 +11,7 @@ import {
   type OutcomeCategory,
 } from "@/lib/viz/colors";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
+import { TopNav } from "@/components/chrome/TopNav";
 import { AtBatReplayScene, type ReplayPitch } from "./AtBatReplayScene";
 
 interface PageProps {
@@ -153,32 +154,10 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         initialHighlightIdx={initialHighlightPitch}
       />
 
-      <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
-        <div className="flex gap-2 sm:gap-3 items-center pointer-events-auto flex-wrap">
-          <Link
-            href={`/at-bat/${gamePkN}`}
-            className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
-          >
-            ← Game
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
-          >
-            <Image
-              src="/Major_League_Baseball_logo.svg"
-              alt=""
-              width={26}
-              height={14}
-              className="h-3.5 w-auto"
-            />
-            <span>pitchtracker</span>
-          </Link>
-        </div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-white/55 pointer-events-none">
-          At-bat replay
-        </div>
-      </header>
+      <TopNav
+        back={{ href: `/at-bat/${gamePkN}`, label: "Game" }}
+        title="At-bat replay"
+      />
 
       <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto h-[11rem] sm:h-auto sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/45">
@@ -462,22 +441,9 @@ function NotCachedState({
   game: GameRow | null;
 }) {
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/", label: "Home" }} title="At-bat replay" />
       <div className="max-w-2xl mx-auto space-y-6">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-        >
-          <span>←</span>
-          <Image
-            src="/Major_League_Baseball_logo.svg"
-            alt=""
-            width={26}
-            height={14}
-            className="h-3.5 w-auto"
-          />
-          <span>pitchtracker</span>
-        </Link>
         <h1 className="text-2xl font-semibold tracking-tight">
           At-bat not available
         </h1>

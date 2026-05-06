@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { categorizeDescription, OUTCOME_COLORS } from "@/lib/viz/colors";
+import { TopNav } from "@/components/chrome/TopNav";
 
 interface PageProps {
   params: Promise<{ gamePk: string }>;
@@ -167,15 +168,10 @@ export default async function GameAtBatsPage({ params }: PageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/at-bat", label: "All games" }} title="Game" />
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="space-y-2">
-          <Link
-            href="/at-bat"
-            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-          >
-            ← All games
-          </Link>
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3">
               {awayTeam?.mlb_id ? (
@@ -322,14 +318,9 @@ function formatEvent(events: string | null): string | null {
 
 function NotCachedState({ gamePk }: { gamePk: number }) {
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/at-bat", label: "All games" }} title="Game" />
       <div className="max-w-2xl mx-auto space-y-6">
-        <Link
-          href="/at-bat"
-          className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-        >
-          ← All games
-        </Link>
         <h1 className="text-2xl font-semibold tracking-tight">No pitches for this game</h1>
         <p className="text-sm text-white/55">
           Game {gamePk} doesn&apos;t have any pitch data yet. Try loading

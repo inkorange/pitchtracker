@@ -19,6 +19,7 @@ import { CompareSlotSearch } from "./CompareSlotSearch";
 import { TunnelingPanel } from "./TunnelingPanel";
 import { CompareHoverProvider, HoverableSide } from "./CompareHoverContext";
 import { OutcomeLegend } from "./OutcomeLegend";
+import { TopNav } from "@/components/chrome/TopNav";
 
 interface PageProps {
   searchParams: Promise<{
@@ -140,28 +141,11 @@ export default async function ComparePage({ searchParams }: PageProps) {
           normalizeRelease={syncRelease}
         />
 
-        <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
-          <div className="flex gap-3 items-center pointer-events-auto">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
-            >
-              <span>←</span>
-              <Image
-                src="/Major_League_Baseball_logo.svg"
-                alt=""
-                width={26}
-                height={14}
-                className="h-3.5 w-auto"
-              />
-              <span>pitchtracker</span>
-            </Link>
-            <CompareLinkActions />
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.16em] text-white/45 pointer-events-none">
-            Compare
-          </div>
-        </header>
+        <TopNav
+          back={{ href: "/", label: "Home" }}
+          title="Compare"
+          rightSlot={<CompareLinkActions />}
+        />
 
         <OutcomeLegend />
 
@@ -603,7 +587,13 @@ async function EmptyState({ aId, bId }: { aId: number | null; bId: number | null
               height={14}
               className="h-3.5 w-auto"
             />
-            <span>pitchtracker</span>
+            <Image
+              src="/pitchtracker-logo.svg"
+              alt="pitchtracker"
+              width={65}
+              height={20}
+              className="h-5 w-auto"
+            />
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">Compare two pitchers</h1>
           <p className="text-sm text-white/55">

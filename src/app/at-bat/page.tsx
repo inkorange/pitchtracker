@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl } from "@/lib/viz/headshot";
+import { TopNav } from "@/components/chrome/TopNav";
 
 export const metadata: Metadata = {
   title: "At-bat replay · pitchtracker",
@@ -127,23 +128,10 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
     : "No games available yet. Visit a pitcher's page to load their season data.";
 
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/", label: "Home" }} title="At-bat replays" />
       <div className="max-w-3xl mx-auto space-y-10">
         <div className="space-y-2">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-          >
-            <span>←</span>
-            <Image
-              src="/Major_League_Baseball_logo.svg"
-              alt=""
-              width={26}
-              height={14}
-              className="h-3.5 w-auto"
-            />
-            <span>pitchtracker</span>
-          </Link>
           <h1 className="text-2xl font-semibold tracking-tight">At-bat replays</h1>
           <p className="text-sm text-white/55 max-w-prose">
             Pick a date to see every game that day, or add a team to

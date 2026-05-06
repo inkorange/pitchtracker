@@ -13,7 +13,13 @@ export default function Loading() {
             height={14}
             className="h-3.5 w-auto"
           />
-          <span>pitchtracker</span>
+          <Image
+            src="/pitchtracker-logo.svg"
+            alt="pitchtracker"
+            width={65}
+            height={20}
+            className="h-5 w-auto"
+          />
         </div>
       </div>
       <div className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto sm:w-[340px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-3">

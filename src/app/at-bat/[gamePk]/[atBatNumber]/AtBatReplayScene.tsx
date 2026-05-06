@@ -579,11 +579,14 @@ function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
         varying vec2 vUv;
         void main() {
           vec4 t = texture2D(uMap, vUv);
-          // Source is a black silhouette on a white background. Use
-          // 1 − luminance as alpha so the silhouette becomes opaque.
+          // Robust silhouette extraction across PNG variants:
+          //  - Transparent-background PNG: t.a is 0 outside the figure
+          //    (regardless of RGB), so multiplying by t.a clips the bg.
+          //  - Solid white-background PNG: t.a is 1 everywhere, so the
+          //    (1 − luminance) term clips the bright pixels.
           float lum = max(t.r, max(t.g, t.b));
-          float a = 1.0 - lum;
-          if (a < 0.5) discard;
+          float a = (1.0 - lum) * t.a;
+          if (a < 0.3) discard;
           gl_FragColor = vec4(uColor, uOpacity);
         }
       `,

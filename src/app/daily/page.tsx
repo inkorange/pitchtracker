@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
+import { TopNav } from "@/components/chrome/TopNav";
 
 export const metadata: Metadata = {
   title: "Daily picks · pitchtracker",
@@ -136,23 +137,10 @@ export default async function DailyPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/", label: "Home" }} title="Daily" />
       <div className="max-w-3xl mx-auto space-y-10">
         <div className="space-y-2">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-          >
-            <span>←</span>
-            <Image
-              src="/Major_League_Baseball_logo.svg"
-              alt=""
-              width={26}
-              height={14}
-              className="h-3.5 w-auto"
-            />
-            <span>pitchtracker</span>
-          </Link>
           <h1 className="text-2xl font-semibold tracking-tight">Daily picks</h1>
           <p className="text-sm text-white/55 max-w-prose">
             Auto-curated from every available at-bat. Refreshed nightly.
