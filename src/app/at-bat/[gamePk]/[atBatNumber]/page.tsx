@@ -5,13 +5,11 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPerson } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
-import {
-  OUTCOME_COLORS,
-  OUTCOME_LABELS,
-  type OutcomeCategory,
-} from "@/lib/viz/colors";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
+import { TopNav } from "@/components/chrome/TopNav";
+import { ensureGameCache } from "@/lib/cache/backfill";
 import { AtBatReplayScene, type ReplayPitch } from "./AtBatReplayScene";
+import { AtBatOutcomeLegend } from "./AtBatOutcomeLegend";
 
 interface PageProps {
   params: Promise<{ gamePk: string; atBatNumber: string }>;
@@ -44,6 +42,9 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
   if (!Number.isFinite(gamePkN) || !Number.isFinite(atBatN)) notFound();
 
   const supabase = await createClient();
+
+  // Lazy-fetch from Savant if the game's pitches aren't cached yet.
+  await ensureGameCache(gamePkN);
 
   const { data: pitchesRaw } = await supabase
     .from("pitch_game_pitches")
@@ -115,6 +116,24 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
   const homeTeam = game?.home_team_id ? teamById.get(game.home_team_id) : null;
   const awayTeam = game?.away_team_id ? teamById.get(game.away_team_id) : null;
 
+  // Prev/next at-bat in this game so the pitcher card can offer in-game
+  // navigation. One row per pitch in the table; collapse to distinct
+  // at_bat_numbers and find the neighbors of the current one.
+  const { data: abNumbersRaw } = await supabase
+    .from("pitch_game_pitches")
+    .select("at_bat_number")
+    .eq("game_pk", gamePkN)
+    .order("at_bat_number", { ascending: true });
+  const abNumbers = Array.from(
+    new Set((abNumbersRaw ?? []).map((r) => r.at_bat_number)),
+  );
+  const currentAbIdx = abNumbers.indexOf(atBatN);
+  const prevAb = currentAbIdx > 0 ? abNumbers[currentAbIdx - 1] : null;
+  const nextAb =
+    currentAbIdx >= 0 && currentAbIdx < abNumbers.length - 1
+      ? abNumbers[currentAbIdx + 1]
+      : null;
+
   const lastPitch = pitches[pitches.length - 1];
   const finalEvent =
     pitches
@@ -122,16 +141,23 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
       .filter((e): e is string => typeof e === "string" && e.length > 0)
       .pop() ?? null;
 
+  // Default to the hitter's-eye view — the strike zone sits centrally
+  // in the frame on every aspect ratio, including mobile portrait
+  // where the side preset's narrow horizontal FOV clipped the plate.
+  // Users can still switch to side / back / top via the CameraPad.
   const initialCamera: CameraPreset =
     sp.camera === "front" ||
     sp.camera === "back" ||
     sp.camera === "top" ||
     sp.camera === "side"
       ? sp.camera
-      : "side";
-  // ?pitch=N matches the AB-relative pitch_number, not an array index.
-  // Resolves correctly even if Statcast records gaps in pitch_number.
-  const initialPitchIdx = (() => {
+      : "front";
+  // ?pitch=N highlights a specific pitch (used by the OG image link
+  // and the daily-features deep link), but it should NOT skip the
+  // playback past the preceding pitches — playback starts at pitch 1
+  // and animates through. The highlight is a separate concern handled
+  // by selectedDetailIdx in the scene component.
+  const initialHighlightPitch = (() => {
     const n = Number(sp.pitch);
     if (!Number.isFinite(n)) return null;
     const idx = pitches.findIndex((p) => p.pitch_number === n);
@@ -143,44 +169,28 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
       <AtBatReplayScene
         pitches={pitches}
         initialCamera={initialCamera}
-        initialPitchIdx={initialPitchIdx}
+        initialHighlightIdx={initialHighlightPitch}
       />
 
-      <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
-        <div className="flex gap-3 items-center pointer-events-auto">
-          <Link
-            href="/"
-            className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
-          >
-            ← pitchtracker
-          </Link>
-          {pitcher ? (
-            <Link
-              href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
-              className="px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.14em] bg-black/35 hover:bg-black/50 border border-white/15 text-white transition-colors backdrop-blur-sm"
-            >
-              View pitcher
-            </Link>
-          ) : null}
-        </div>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-white/55 pointer-events-none">
-          At-bat replay
-        </div>
-      </header>
+      <TopNav
+        back={{ href: `/at-bat/${gamePkN}`, label: "Game" }}
+        title="At-bat replay"
+      />
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
-        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/45">
+      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto h-[11rem] sm:h-auto sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/75">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
           </span>
           <span>{game?.game_date ?? ""}</span>
         </div>
 
-        {/* Pitcher + batter: stacked rows on sm+, single combined row
-            on mobile so the side panel doesn't eat the whole screen. */}
-        <div className="hidden sm:flex sm:flex-col sm:gap-4">
-          {/* Pitcher card */}
+        {/* Pitcher + batter on a single mirrored row (desktop): pitcher
+            headshot + name flush left, batter name + headshot flush
+            right. Mobile keeps its own tight combined row below. */}
+        <div className="hidden sm:flex sm:flex-col sm:gap-3">
           <div className="flex items-center gap-3">
+            {/* Pitcher (left) */}
             {pitcher ? (
               <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
                 <Image
@@ -193,33 +203,39 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
                 />
               </div>
             ) : null}
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+            <div className="min-w-0 flex-1 text-left">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-white/70">
                 Pitcher
               </div>
-              <div className="text-sm font-medium text-white truncate">
-                {pitcher?.full_name ?? `Pitcher #${pitcherId ?? "—"}`}
-              </div>
-              <div className="text-[11px] text-white/55 tabular-nums">
+              {pitcher ? (
+                <Link
+                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
+                  className="text-sm font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
+                >
+                  {pitcher.full_name}
+                </Link>
+              ) : (
+                <div className="text-sm font-medium text-white truncate">
+                  Pitcher #{pitcherId ?? "—"}
+                </div>
+              )}
+              <div className="text-[11px] text-white/85 tabular-nums">
                 {pitcher?.throws ? `${pitcher.throws}HP` : ""}
               </div>
             </div>
-            {pitcher?.current_team_id ? (
-              <div className="relative w-9 h-9 flex-shrink-0">
-                <Image
-                  src={teamLogoUrl(pitcher.current_team_id)}
-                  alt=""
-                  fill
-                  sizes="36px"
-                  className="object-contain"
-                  unoptimized
-                />
-              </div>
-            ) : null}
-          </div>
 
-          {/* Batter card */}
-          <div className="flex items-center gap-3 pt-3 border-t border-white/[0.08]">
+            {/* Batter (right) */}
+            <div className="min-w-0 flex-1 text-right">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-white/70">
+                Batter
+              </div>
+              <div className="text-sm font-medium text-white truncate">
+                {batterName ?? `Batter #${batterId ?? "—"}`}
+              </div>
+              <div className="text-[11px] text-white/85 tabular-nums">
+                {first.stand ? `${first.stand}HB` : ""}
+              </div>
+            </div>
             {batterId ? (
               <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
                 <Image
@@ -232,18 +248,8 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
                 />
               </div>
             ) : null}
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-                Batter
-              </div>
-              <div className="text-sm font-medium text-white truncate">
-                {batterName ?? `Batter #${batterId ?? "—"}`}
-              </div>
-              <div className="text-[11px] text-white/55 tabular-nums">
-                {first.stand ? `${first.stand}HB` : ""}
-              </div>
-            </div>
           </div>
+
         </div>
 
         {/* Mobile: single tight row — pitcher | vs | batter, headshots
@@ -264,15 +270,24 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-white truncate">
-                {pitcher?.full_name ?? `Pitcher #${pitcherId ?? "—"}`}
-              </div>
-              <div className="text-[10px] text-white/45 tabular-nums">
+              {pitcher ? (
+                <Link
+                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
+                  className="text-xs font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
+                >
+                  {pitcher.full_name}
+                </Link>
+              ) : (
+                <div className="text-xs font-medium text-white truncate">
+                  Pitcher #{pitcherId ?? "—"}
+                </div>
+              )}
+              <div className="text-[10px] text-white/85 tabular-nums">
                 {pitcher?.throws ? `${pitcher.throws}HP` : ""}
               </div>
             </div>
           </div>
-          <span className="text-[10px] uppercase tracking-[0.16em] text-white/35 flex-shrink-0">
+          <span className="text-[10px] uppercase tracking-[0.16em] text-white/55 flex-shrink-0">
             vs
           </span>
           <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
@@ -280,7 +295,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               <div className="text-xs font-medium text-white truncate">
                 {batterName ?? `Batter #${batterId ?? "—"}`}
               </div>
-              <div className="text-[10px] text-white/45 tabular-nums">
+              <div className="text-[10px] text-white/85 tabular-nums">
                 {first.stand ? `${first.stand}HB` : ""}
               </div>
             </div>
@@ -299,14 +314,51 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* Game-state HUD: inning, outs, runners, final outcome */}
+        {/* Prev/next at-bat navigation within the game — visible on both
+            mobile and desktop so users can step through ABs without
+            bouncing back to the game's at-bat list. Hidden direction(s)
+            when no neighbor exists. */}
+        {(prevAb !== null || nextAb !== null) ? (
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.05]">
+            {prevAb !== null ? (
+              <Link
+                href={`/at-bat/${gamePkN}/${prevAb}`}
+                className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.14em] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-white/75 hover:text-white transition-colors"
+              >
+                ← Prev AB
+              </Link>
+            ) : (
+              <span />
+            )}
+            {nextAb !== null ? (
+              <Link
+                href={`/at-bat/${gamePkN}/${nextAb}`}
+                className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.14em] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-white/75 hover:text-white transition-colors"
+              >
+                Next AB →
+              </Link>
+            ) : (
+              <span />
+            )}
+          </div>
+        ) : null}
+
+        {/* Game-state HUD: inning + pitches + outs on a single line,
+            final outcome on the right; baserunner diamond on its own
+            row on desktop only. */}
         <div className="pt-3 border-t border-white/[0.05] space-y-2">
           <div className="flex items-center justify-between text-[11px] tabular-nums">
-            <span className="text-white/55">
-              {first.inning_topbot === "Bot" ? "Bot" : "Top"} {first.inning ?? "—"} ·{" "}
-              {pitches.length} pitch{pitches.length === 1 ? "" : "es"}
-            </span>
             <span className="text-white/85">
+              {first.inning_topbot === "Bot" ? "Bot" : "Top"} {first.inning ?? "—"} ·{" "}
+              {pitches.length} pitch{pitches.length === 1 ? "" : "es"} ·{" "}
+              {first.outs_when_up ?? 0}{" "}
+              {(first.outs_when_up ?? 0) === 1 ? "out" : "outs"}
+            </span>
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full border text-white text-[10px] font-semibold uppercase tracking-[0.08em] shadow-sm ${eventPillColor(
+                finalEvent,
+              )}`}
+            >
               {finalEvent
                 ? finalEvent
                     .split("_")
@@ -315,44 +367,20 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
                 : lastPitch.description ?? "—"}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.14em] text-white/55">
+          {/* Baserunner diamond — desktop only; eats horizontal space
+              on a phone without adding much. */}
+          <div className="hidden sm:flex">
             <BaserunnerDiamond
               on1b={first.on_1b != null}
               on2b={first.on_2b != null}
               on3b={first.on_3b != null}
             />
-            <span className="tabular-nums normal-case text-white/65">
-              {first.outs_when_up ?? 0}{" "}
-              {(first.outs_when_up ?? 0) === 1 ? "out" : "outs"}
-            </span>
           </div>
         </div>
 
-        {/* Outcome legend — every landed pitch in the scene is colored
-            by its outcome category, so users need a key to map dot
-            color → meaning. Wraps gracefully on narrow viewports. */}
-        <div className="pt-3 border-t border-white/[0.05]">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
-            Outcome
-          </div>
-          <ul className="flex flex-wrap gap-x-3 gap-y-1.5">
-            {(["whiff", "called", "ball", "foul", "inplay"] as const).map(
-              (cat: OutcomeCategory) => (
-                <li
-                  key={cat}
-                  className="flex items-center gap-1.5 text-[11px] text-white/85"
-                >
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ background: OUTCOME_COLORS[cat] }}
-                  />
-                  <span>{OUTCOME_LABELS[cat]}</span>
-                </li>
-              ),
-            )}
-          </ul>
-        </div>
       </section>
+
+      <AtBatOutcomeLegend />
     </main>
   );
 }
@@ -363,6 +391,39 @@ interface GameRow {
   home_team_id: number | null;
   away_team_id: number | null;
   season: number;
+}
+
+// Colors the at-bat result pill by event category — green for hits and
+// productive outcomes (single/double/triple/HR/sac fly), red for outs,
+// neutral for everything else. Tailwind classes only so the className
+// stays statically analyzable.
+function eventPillColor(event: string | null): string {
+  if (!event) return "bg-white/[0.18] border-white/30";
+  const e = event.toLowerCase();
+  const greens = new Set([
+    "single",
+    "double",
+    "triple",
+    "home_run",
+    "sac_fly",
+    "sac_bunt",
+  ]);
+  const reds = new Set([
+    "strikeout",
+    "strikeout_double_play",
+    "field_out",
+    "force_out",
+    "grounded_into_double_play",
+    "double_play",
+    "triple_play",
+    "fielders_choice",
+    "fielders_choice_out",
+    "sac_fly_double_play",
+    "other_out",
+  ]);
+  if (greens.has(e)) return "bg-emerald-500/35 border-emerald-400/60";
+  if (reds.has(e)) return "bg-red-500/35 border-red-400/60";
+  return "bg-white/[0.18] border-white/30";
 }
 
 // Compact diamond glyph — three corner dots colored when a runner is on
@@ -427,14 +488,9 @@ function NotCachedState({
   game: GameRow | null;
 }) {
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/", label: "Home" }} title="At-bat replay" />
       <div className="max-w-2xl mx-auto space-y-6">
-        <Link
-          href="/"
-          className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-        >
-          ← pitchtracker
-        </Link>
         <h1 className="text-2xl font-semibold tracking-tight">
           At-bat not available
         </h1>

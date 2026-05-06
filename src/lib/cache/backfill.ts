@@ -4,7 +4,11 @@
 // just waits a beat on first visit instead of seeing an empty state.
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fetchPitcherSeasonPitches } from "@/lib/savant/client";
+import {
+  fetchGamePitches,
+  fetchPitcherSeasonPitches,
+  type SavantPitchRow,
+} from "@/lib/savant/client";
 import type { TablesInsert } from "@/lib/supabase/types";
 
 // Cheap in-process cache so we don't fire the same backfill multiple
@@ -157,6 +161,141 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
   }
 
   // Recompute aggregates so the arsenal panel populates.
+  await supabase.rpc("pitch_recompute_aggregates");
+}
+
+// On-demand cache for a single game. Used by the team+date lookup
+// flow so users can land on any scheduled game and have its pitches
+// pulled from Savant on first visit, rather than dead-ending on a
+// "no pitches" stub.
+export async function ensureGameCache(gamePk: number): Promise<void> {
+  const key = `game:${gamePk}`;
+  const existing = inFlight.get(key);
+  if (existing) return existing;
+  const p = doEnsureGame(gamePk).finally(() => inFlight.delete(key));
+  inFlight.set(key, p);
+  return p;
+}
+
+async function doEnsureGame(gamePk: number): Promise<void> {
+  const supabase = createAdminClient();
+
+  // Already have pitches for this game? bail out cheaply.
+  const { data: existing } = await supabase
+    .from("pitch_pitcher_games")
+    .select("game_pk")
+    .eq("game_pk", gamePk)
+    .limit(1);
+  if ((existing ?? []).length > 0) return;
+
+  let fresh: SavantPitchRow[];
+  try {
+    fresh = await fetchGamePitches(gamePk);
+  } catch {
+    return;
+  }
+  if (fresh.length === 0) return;
+
+  // Make sure the game row exists (FK requirement). The schedule
+  // refresh cron usually populates pitch_games, but be defensive: if
+  // the row is missing, synthesize one from the first pitch's game
+  // metadata. Teams will be filled in by the next schedule refresh.
+  const { data: knownGame } = await supabase
+    .from("pitch_games")
+    .select("game_pk")
+    .eq("game_pk", gamePk)
+    .maybeSingle();
+  if (!knownGame) {
+    const first = fresh[0];
+    const teamRows = await supabase.from("pitch_teams").select("mlb_id, abbreviation");
+    const teamIdByAbbrev = new Map<string, number>(
+      (teamRows.data ?? []).map((t) => [t.abbreviation, t.mlb_id]),
+    );
+    const homeId = first.home_team ? (teamIdByAbbrev.get(first.home_team) ?? null) : null;
+    const awayId = first.away_team ? (teamIdByAbbrev.get(first.away_team) ?? null) : null;
+    await supabase.from("pitch_games").upsert({
+      game_pk: gamePk,
+      game_date: first.game_date.slice(0, 10),
+      season: Number(first.game_date.slice(0, 4)),
+      home_team_id: homeId,
+      away_team_id: awayId,
+      status: "Scheduled",
+      game_type: first.game_type ?? null,
+      venue_name: null,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  // Filter pitcher_id to known pitchers (FK requirement); unknown
+  // batters are stored as their raw mlb_id (no FK on batter_id).
+  const { data: knownPitchers } = await supabase
+    .from("pitch_pitchers")
+    .select("mlb_id");
+  const knownPitcherIds = new Set((knownPitchers ?? []).map((p) => p.mlb_id));
+
+  const rows: TablesInsert<"pitch_game_pitches">[] = fresh.map((p) => ({
+    game_pk: p.game_pk,
+    at_bat_number: p.at_bat_number,
+    pitch_number: p.pitch_number,
+    pitcher_id: knownPitcherIds.has(p.pitcher) ? p.pitcher : null,
+    batter_id: p.batter,
+    pitch_type: p.pitch_type ?? null,
+    pitch_name: p.pitch_name ?? null,
+    description: p.description ?? null,
+    events: p.events ?? null,
+    balls: p.balls,
+    strikes: p.strikes,
+    outs_when_up: p.outs_when_up,
+    inning: p.inning,
+    inning_topbot: p.inning_topbot,
+    stand: (p as unknown as { stand?: string }).stand ?? null,
+    p_throws: (p as unknown as { p_throws?: string }).p_throws ?? null,
+    on_1b: p.on_1b,
+    on_2b: p.on_2b,
+    on_3b: p.on_3b,
+    release_pos_x: p.release_pos_x,
+    release_pos_y: p.release_pos_y,
+    release_pos_z: p.release_pos_z,
+    vx0: p.vx0,
+    vy0: p.vy0,
+    vz0: p.vz0,
+    ax: p.ax,
+    ay: p.ay,
+    az: p.az,
+    plate_x: p.plate_x,
+    plate_z: p.plate_z,
+    release_speed: p.release_speed,
+    release_spin_rate: p.release_spin_rate ?? null,
+    spin_axis: p.spin_axis ?? null,
+    pfx_x: p.pfx_x ?? null,
+    pfx_z: p.pfx_z ?? null,
+    effective_speed: p.effective_speed,
+    release_extension: p.release_extension,
+    delta_run_exp: p.delta_run_exp,
+    delta_home_win_exp: p.delta_home_win_exp,
+  }));
+
+  for (let i = 0; i < rows.length; i += 200) {
+    const chunk = rows.slice(i, i + 200);
+    await supabase.from("pitch_game_pitches").upsert(chunk);
+  }
+
+  // Mirror (pitcher_id, game_pk) into pitch_pitcher_games so the
+  // dropdown logic and the date-filtered listing pick it up.
+  const distinctPairs = new Map<string, TablesInsert<"pitch_pitcher_games">>();
+  for (const r of rows) {
+    if (r.pitcher_id == null) continue;
+    const k = `${r.pitcher_id}:${r.game_pk}`;
+    if (!distinctPairs.has(k)) {
+      distinctPairs.set(k, { pitcher_id: r.pitcher_id, game_pk: r.game_pk });
+    }
+  }
+  const ppgRows = Array.from(distinctPairs.values());
+  for (let i = 0; i < ppgRows.length; i += 200) {
+    const chunk = ppgRows.slice(i, i + 200);
+    await supabase.from("pitch_pitcher_games").upsert(chunk);
+  }
+
   await supabase.rpc("pitch_recompute_aggregates");
 }
 

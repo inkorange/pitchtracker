@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl } from "@/lib/viz/headshot";
+import { TopNav } from "@/components/chrome/TopNav";
 
 const DIVISION_ORDER = [
   "AL East",
@@ -27,15 +28,10 @@ export default async function BrowsePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/", label: "Home" }} title="Browse" />
       <div className="max-w-5xl mx-auto space-y-10">
         <header className="space-y-2">
-          <Link
-            href="/"
-            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-          >
-            ← pitchtracker
-          </Link>
           <h1 className="text-2xl font-semibold tracking-tight">Browse by team</h1>
           <p className="text-sm text-white/50">
             Pick a team, then a season, then a pitcher.

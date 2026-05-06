@@ -15,6 +15,7 @@ import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
 import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
+import { TopNav } from "@/components/chrome/TopNav";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -202,27 +203,25 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
 
       <OutcomeLegend />
 
-      <header className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 z-20 flex items-start justify-between gap-3 sm:gap-6 pointer-events-none">
-        <div className="flex gap-4 items-center pointer-events-auto">
-          <Link
-            href="/"
-            className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
-          >
-            ← pitchtracker
-          </Link>
+      <TopNav
+        back={{ href: "/", label: "Home" }}
+        title="Pitcher"
+        rightSlot={
           <Link
             href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
-            className="px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.14em] bg-black/35 hover:bg-black/50 border border-white/15 text-white transition-colors backdrop-blur-sm"
+            className="text-[10px] uppercase tracking-[0.14em] text-white/70 hover:text-white transition-colors"
           >
             Compare with…
           </Link>
-        </div>
-        <div className="w-80 pointer-events-auto">
-          <PitcherSearch placeholder="Search another pitcher…" />
-        </div>
-      </header>
+        }
+      />
+      {/* Pitcher search docked just below the nav on desktop; hidden
+          on mobile to free vertical space. */}
+      <div className="hidden sm:block absolute top-14 right-6 w-80 z-20 pointer-events-auto">
+        <PitcherSearch placeholder="Search another pitcher…" />
+      </div>
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center gap-3">
           <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
             <Image

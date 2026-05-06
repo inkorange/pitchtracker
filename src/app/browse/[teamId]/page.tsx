@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { TopNav } from "@/components/chrome/TopNav";
 
 interface PageProps {
   params: Promise<{ teamId: string }>;
@@ -51,15 +52,10 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
   const sortedPitchers = (pitchers ?? []).slice().sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/browse", label: "All teams" }} title="Team" />
       <div className="max-w-4xl mx-auto space-y-10">
         <header className="space-y-3">
-          <Link
-            href="/browse"
-            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-          >
-            ← All teams
-          </Link>
           <div className="flex items-center gap-4">
             <div className="relative w-14 h-14 flex-shrink-0">
               <Image

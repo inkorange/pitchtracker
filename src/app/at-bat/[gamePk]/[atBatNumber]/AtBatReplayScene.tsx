@@ -3,17 +3,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
-import { CatmullRomCurve3, Vector3 } from "three";
+import { Html, Sphere, useTexture } from "@react-three/drei";
+import {
+  CatmullRomCurve3,
+  Color,
+  DoubleSide,
+  ShaderMaterial,
+  SRGBColorSpace,
+  Vector3,
+} from "three";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
 import { CameraPad } from "@/components/controls/CameraPad";
-import { Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
-import type { CameraPreset } from "@/lib/viz/camera-presets";
+import type {
+  CameraPosition,
+  CameraPreset,
+} from "@/lib/viz/camera-presets";
 
 export interface ReplayPitch {
   game_pk: number;
@@ -57,7 +66,12 @@ export interface ReplayPitch {
 interface AtBatReplaySceneProps {
   pitches: ReplayPitch[];
   initialCamera: CameraPreset;
-  initialPitchIdx: number | null;
+  // Optional pitch index to highlight (selectedDetailIdx) on mount —
+  // used by the daily-feature / OG deep links. Does NOT skip playback
+  // past prior pitches; playback always starts at idx 0 and animates
+  // through. The highlight just shows the metrics overlay on that
+  // specific pitch once it's landed (or when manually clicked).
+  initialHighlightIdx: number | null;
 }
 
 interface PreparedPitch {
@@ -79,7 +93,7 @@ const FLIGHT_TIME_MULTIPLIER = 2.5;
 export function AtBatReplayScene({
   pitches,
   initialCamera,
-  initialPitchIdx,
+  initialHighlightIdx,
 }: AtBatReplaySceneProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -133,28 +147,38 @@ export function AtBatReplayScene({
     [pitches],
   );
 
-  // The clamped, valid initial pitch index (or 0 if none specified).
-  const startIdx = initialPitchIdx ?? 0;
-
   // currentIdx ∈ [0, pitches.length). Within a pitch, intraProgress
   // climbs 0 → 1 across the flight; once at 1, it sits at 1 during the
-  // post-pitch delay; then advances to the next pitch.
-  const [currentIdx, setCurrentIdx] = useState(startIdx);
+  // post-pitch delay; then advances to the next pitch. Always starts
+  // at 0 — even when ?pitch=N is in the URL — so the user gets a full
+  // pitch-by-pitch playback rather than landing on a pre-populated
+  // scene with all preceding pitches already drawn.
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [intraProgress, setIntraProgress] = useState(0);
   const [phase, setPhase] = useState<"flying" | "settled" | "done">("flying");
   const [playing, setPlaying] = useState(true);
   const [followMode, setFollowMode] = useState(false);
   const settledTimerRef = useRef(0);
 
-  // When the user hard-jumps to a pitch (via the stepper), reset the
-  // animation state cleanly. Sync the URL so paused-at-pitch is the
-  // shareable artifact.
+  // When the user hard-jumps to a pitch, reset animation state.
+  // - autoPlay=true (Restart): start at release and animate.
+  // - autoPlay=false (prev/next/dot click): show the pitch as
+  //   already landed so the cumulative tunnel includes it AND the
+  //   metrics overlay surfaces immediately. Without this, manual
+  //   stepping leaves the new pitch frozen at progress=0 with
+  //   phase=flying, so the user can't tell anything advanced and
+  //   the overlay stays hidden behind the detailLanded gate.
   const jumpTo = useCallback(
     (idx: number, autoPlay = true) => {
       const clamped = Math.max(0, Math.min(idx, prepared.length - 1));
       setCurrentIdx(clamped);
-      setIntraProgress(0);
-      setPhase("flying");
+      if (autoPlay) {
+        setIntraProgress(0);
+        setPhase("flying");
+      } else {
+        setIntraProgress(1);
+        setPhase("settled");
+      }
       settledTimerRef.current = 0;
       setPlaying(autoPlay);
       // Pitch param uses the AB-relative pitch_number (1-based) so the
@@ -164,6 +188,18 @@ export function AtBatReplayScene({
     },
     [prepared, syncUrl],
   );
+
+  // Play/pause toggle. If we're already at the end (phase === "done"),
+  // Play restarts the at-bat from the first pitch — otherwise the
+  // button looks live but does nothing because the driver short-circuits
+  // on the done phase.
+  const handleTogglePlay = useCallback(() => {
+    if (phase === "done") {
+      jumpTo(0, true);
+      return;
+    }
+    setPlaying((p) => !p);
+  }, [phase, jumpTo]);
 
   // Keyboard shortcuts: ←/→ step pitches, space play/pause.
   useEffect(() => {
@@ -179,7 +215,7 @@ export function AtBatReplayScene({
       }
       if (e.key === " ") {
         e.preventDefault();
-        setPlaying((p) => !p);
+        handleTogglePlay();
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         jumpTo(currentIdx + 1, false);
@@ -193,7 +229,7 @@ export function AtBatReplayScene({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [currentIdx, jumpTo]);
+  }, [currentIdx, jumpTo, handleTogglePlay]);
 
   const activePitch = prepared[currentIdx];
   const isLast = currentIdx >= prepared.length - 1;
@@ -207,11 +243,32 @@ export function AtBatReplayScene({
     return null;
   })();
 
+  // Front-preset camera angle depends on batter handedness. Camera
+  // shifts toward the SAME side of the plate as the batter, so when
+  // the camera looks back at the plate the strike zone is offset to
+  // the screen side OPPOSITE the batter (RHB at -x → camera at -x →
+  // plate appears to the right of center; LHB mirrors).
+  const frontPresetOverride: CameraPosition | null = useMemo(() => {
+    if (preset !== "front" || !batterStand) return null;
+    const cameraX = batterStand === "L" ? 0.8 : -0.8;
+    return {
+      position: [cameraX, 3.9, 10],
+      target: [0, 2.8, -20],
+    };
+  }, [preset, batterStand]);
+
   // Manual selection — when the user clicks a ribbon, we jump there
   // and show the shape-metrics overlay. selectedDetailIdx is what the
   // overlay reads; null = use the active pitch (auto-updates with
   // playback). Click empty space (Scene onPointerMissed) to clear.
-  const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(null);
+  //
+  // NOTE: we deliberately don't seed this from the URL's ?pitch=N.
+  // Seeding would lock the overlay to the linked pitch and freeze it
+  // there as playback advances. The deep-link is for "land here and
+  // watch from pitch 1"; the highlight follows playback naturally.
+  const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
+    null,
+  );
   const detailIdx = selectedDetailIdx ?? currentIdx;
   const detailPitch = prepared[detailIdx];
   // Only surface the metrics overlay once the pitch has actually
@@ -235,6 +292,7 @@ export function AtBatReplayScene({
       <Scene
         preset={preset}
         presetTick={presetTick}
+        presetOverride={frontPresetOverride}
         onPointerMissed={() => setSelectedDetailIdx(null)}
       >
         <ReplayDriver
@@ -286,9 +344,13 @@ export function AtBatReplayScene({
         {/* Shape-metrics overlay anchored to the current/selected pitch
             so it auto-updates as playback advances OR locks to a
             user-clicked pitch. Only shown once the pitch has landed —
-            we don't want metrics floating ahead of the ball mid-flight. */}
+            we don't want metrics floating ahead of the ball mid-flight.
+            Keyed by detailIdx so the overlay cleanly re-mounts at the
+            new pitch's position when playback advances; otherwise the
+            <Html> portal can hold onto its prior anchor. */}
         {detailPitch?.platePos && detailLanded ? (
           <PitchDetailsPanel
+            key={detailIdx}
             position={detailPitch.platePos}
             pitch={detailPitch.raw}
           />
@@ -303,7 +365,7 @@ export function AtBatReplayScene({
         className={`absolute bottom-20 right-3 sm:right-6 z-20 px-3 py-1.5 rounded text-[10px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors pointer-events-auto ${
           followMode
             ? "bg-white/15 border-white/25 text-white"
-            : "bg-black/35 border-white/15 text-white/65 hover:text-white hover:bg-black/50"
+            : "bg-black/35 border-white/15 text-white/65 hover:text-white hover:bg-[#081a32]/80"
         }`}
         aria-pressed={followMode}
         title="Camera tracks the active pitch's ball with a cinematic lag."
@@ -316,7 +378,7 @@ export function AtBatReplayScene({
         currentIdx={currentIdx}
         playing={playing}
         onJumpTo={jumpTo}
-        onTogglePlay={() => setPlaying((p) => !p)}
+        onTogglePlay={handleTogglePlay}
         activePitch={activePitch}
       />
     </>
@@ -499,44 +561,67 @@ function ReplayDriver({
   );
 }
 
-// Translucent silhouette of the batter standing in the box, mirrored
-// by handedness. In our coordinate system 1B is +x and 3B is −x; a
-// right-handed batter stands in the third-base box (catcher's right)
-// at −x, a left-handed batter stands first-base side at +x. The
-// shape is intentionally crude — a cylinder body + sphere head — and
-// rendered with low opacity so it reads as a visual anchor for the
-// strike zone without competing with the pitch ribbons.
+// Silhouette of the batter standing in the box, mirrored by
+// handedness. RHB stands at −x (third-base box), LHB at +x (first-base
+// box). Shape comes from public/batter.png — luminance × alpha is the
+// silhouette mask in the shader. Fixed orientation (turned ~110° so the
+// figure faces the pitcher with a slight diagonal toward the camera),
+// with two crossed planes so the figure has visible "thickness" from
+// any horizontal angle and never goes edge-on invisible.
 function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
   const xOffset = stand === "R" ? -2.2 : 2.2;
-  // Slight forward offset toward catcher (negative z = away from
-  // mound) so the silhouette sits in the back of the box rather than
-  // straddling the front of the plate.
-  const zOffset = 0.8;
-  const color = "#101418";
-  const opacity = 0.42;
+  const zOffset = 0.3;
+  const texture = useTexture("/batter.png");
+
+  const material = useMemo(() => {
+    texture.colorSpace = SRGBColorSpace;
+    return new ShaderMaterial({
+      uniforms: {
+        uMap: { value: texture },
+        uColor: { value: new Color("#101418") },
+        uOpacity: { value: 0.55 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D uMap;
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        varying vec2 vUv;
+        void main() {
+          vec4 t = texture2D(uMap, vUv);
+          float lum = max(t.r, max(t.g, t.b));
+          float a = (1.0 - lum) * t.a;
+          if (a < 0.3) discard;
+          gl_FragColor = vec4(uColor, uOpacity);
+        }
+      `,
+      transparent: true,
+      side: DoubleSide,
+      depthWrite: false,
+    });
+  }, [texture]);
+
+  // Source image aspect (1196 × 1920 ≈ 0.62) at MLB-typical batter
+  // height of ~6.2 ft (helmet included).
+  const height = 6.2;
+  const width = height * (1196 / 1920);
+  // LH batter mirrors the texture so the bat ends up on the correct
+  // shoulder, and the rotation flips sign so each handedness opens
+  // toward the pitcher symmetrically.
+  const flipX = stand === "L" ? -1 : 1;
+  const rotationY = (stand === "R" ? -110 : 110) * (Math.PI / 180);
+
   return (
-    <group position={[xOffset, 0, zOffset]}>
-      {/* Torso */}
-      <mesh position={[0, 2.6, 0]}>
-        <cylinderGeometry args={[0.42, 0.42, 4, 18]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.95}
-          metalness={0}
-          transparent
-          opacity={opacity}
-        />
-      </mesh>
-      {/* Head */}
-      <mesh position={[0, 5.1, 0]}>
-        <sphereGeometry args={[0.4, 18, 18]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.95}
-          metalness={0}
-          transparent
-          opacity={opacity}
-        />
+    <group position={[xOffset, height / 2, zOffset]} rotation={[0, rotationY, 0]}>
+      <mesh scale={[flipX, 1, 1]}>
+        <planeGeometry args={[width, height]} />
+        <primitive object={material} attach="material" />
       </mesh>
     </group>
   );
@@ -716,13 +801,14 @@ function PitchStepper({
   const velocity = active?.raw.release_speed ?? null;
 
   return (
-    // Mobile: dock the stepper just below the pitcher/batter panel
-    // (top-20 + ~150px content height + small gap = ~15rem). Keeps the
-    // bottom half of the screen free for the 3D scene so the strike
-    // zone never sits behind chrome.
+    // Mobile: dock the stepper flush to the bottom of the pitcher/
+    // batter panel. Side panel is fixed h-[11rem] starting at
+    // top-16 (4rem) → bottom at 15rem. Stepper at top-[15.5rem]
+    // sits with a 0.5rem breathing gap. Keeps the rest of the
+    // screen free for the 3D scene.
     // sm+: revert to the canonical bottom-center transport bar.
-    <div className="absolute top-[15rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
-      <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
+    <div className="absolute top-[15.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+      <div className="px-3 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
           onClick={() => onJumpTo(0, true)}
@@ -788,7 +874,7 @@ function PitchStepper({
           <span>{balls}-{strikes}</span>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 flex-wrap justify-center max-w-full px-2">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg">
         {prepared.map((p, i) => (
           <button
             key={`dot-${i}`}
@@ -799,7 +885,7 @@ function PitchStepper({
                 ? "bg-white"
                 : i < currentIdx
                   ? dotColorForOutcome(p.raw.description)
-                  : "bg-white/20 hover:bg-white/40"
+                  : "bg-white/30 hover:bg-white/60"
             }`}
             aria-label={`Jump to pitch ${i + 1}`}
           />

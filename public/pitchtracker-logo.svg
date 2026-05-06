@@ -1,0 +1,23 @@
+<svg width="100%" viewBox="0 0 520 160" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- MLB-style gradient -->
+    <linearGradient id="pitchLine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0C2340"></stop> <!-- MLB navy -->
+      <stop offset="100%" stop-color="#BA0C2F"></stop> <!-- MLB red -->
+    </linearGradient>
+  </defs>
+
+  <!-- Short pitch trajectory -->
+  <path d="M60,95 
+           C120,75 170,80 220,92" fill="none" stroke="url(#pitchLine)" stroke-width="4" stroke-linecap="round"></path>
+
+  <!-- Baseball -->
+  <circle cx="230" cy="92" r="6" fill="#ffffff" stroke="#0C2340" stroke-width="2"></circle>
+  <path d="M227,89 Q230,92 227,95" stroke="#BA0C2F" fill="none" stroke-width="1"></path>
+  <path d="M233,89 Q230,92 233,95" stroke="#BA0C2F" fill="none" stroke-width="1"></path>
+
+  <!-- Text -->
+  <text x="60" y="85" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="600" fill="#0C2340">
+    Pitch<tspan fill="#BA0C2F">tracker</tspan>
+  </text>
+</svg>

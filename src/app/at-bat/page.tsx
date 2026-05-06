@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl } from "@/lib/viz/headshot";
+import { TopNav } from "@/components/chrome/TopNav";
 
 export const metadata: Metadata = {
   title: "At-bat replay · pitchtracker",
@@ -113,7 +114,10 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
     if (sp.error === "notfound") {
       const team = teams.find((t) => String(t.mlb_id) === sp.team);
       const teamLabel = team?.name ?? "that team";
-      return `No regular-season game for ${teamLabel} on ${sp.date ?? "that date"}.`;
+      const dateLabel = sp.date ?? "that date";
+      return games.length > 0
+        ? `${teamLabel} didn't play on ${dateLabel}. Other games that day are listed below.`
+        : `No regular-season game for ${teamLabel} on ${dateLabel}.`;
     }
     if (sp.error === "missing") {
       return "Pick a date to find a game.";
@@ -127,15 +131,10 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
     : "No games available yet. Visit a pitcher's page to load their season data.";
 
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
+    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <TopNav back={{ href: "/", label: "Home" }} title="At-bat replays" />
       <div className="max-w-3xl mx-auto space-y-10">
         <div className="space-y-2">
-          <Link
-            href="/"
-            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
-          >
-            ← pitchtracker
-          </Link>
           <h1 className="text-2xl font-semibold tracking-tight">At-bat replays</h1>
           <p className="text-sm text-white/55 max-w-prose">
             Pick a date to see every game that day, or add a team to

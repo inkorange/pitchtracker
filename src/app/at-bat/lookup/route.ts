@@ -50,8 +50,8 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  // Find the regular-season game(s) for this team on this date. PostgREST
-  // .or() filter — comma-separated alternatives, dot-syntax operators.
+  // Find the regular-season game(s) for this team on this date.
+  // PostgREST .or() — comma-separated alternatives.
   const { data: matches } = await supabase
     .from("pitch_games")
     .select("game_pk, game_date")
@@ -69,9 +69,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(back);
   }
 
-  // For doubleheaders we just take the first game; the user can drill
-  // into the AB browser and see both halves grouped by inning. A future
-  // refinement could surface a chooser, but this is the 99% case.
+  // For doubleheaders we just take the first match; the AB browser
+  // groups both halves by inning. The destination page lazy-fetches
+  // from Savant when the game has no cached pitches yet, so it's
+  // safe to redirect to schedule entries without a cache match.
   return NextResponse.redirect(
     new URL(`/at-bat/${games[0].game_pk}`, request.url),
   );

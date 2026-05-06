@@ -4,7 +4,11 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useEffect, useRef, type ComponentRef } from "react";
 import { Vector3 } from "three";
-import { CAMERA_PRESETS, type CameraPreset } from "@/lib/viz/camera-presets";
+import {
+  CAMERA_PRESETS,
+  type CameraPosition,
+  type CameraPreset,
+} from "@/lib/viz/camera-presets";
 
 type OrbitControlsImpl = ComponentRef<typeof OrbitControls>;
 
@@ -14,9 +18,13 @@ interface CameraRigProps {
   // value itself didn't change. Lets the user re-click the active preset
   // to snap back after orbiting away.
   presetTick?: number;
+  // Optional preset override: when present, replaces the preset lookup
+  // with these explicit position/target values. Used by the at-bat
+  // replay to angle the front camera toward the batter side.
+  presetOverride?: CameraPosition | null;
 }
 
-export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
+export function CameraRig({ preset, presetTick = 0, presetOverride }: CameraRigProps) {
   const { camera } = useThree();
   const orbitRef = useRef<OrbitControlsImpl>(null);
   const targetPos = useRef(new Vector3());
@@ -25,7 +33,7 @@ export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
   const firstRenderRef = useRef(true);
 
   useEffect(() => {
-    const p = CAMERA_PRESETS[preset];
+    const p = presetOverride ?? CAMERA_PRESETS[preset];
     targetPos.current.set(p.position[0], p.position[1], p.position[2]);
     targetLook.current.set(p.target[0], p.target[1], p.target[2]);
     if (firstRenderRef.current) {

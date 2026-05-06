@@ -13,14 +13,18 @@ export interface CameraPosition {
 }
 
 export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
-  // Hitter's eye: behind the plate looking toward the mound. Slightly
-  // off-center (toward the 1B side) and slightly elevated so the view
-  // feels less like a centered diagram and more like a real broadcast
-  // camera; pulled in to 11 ft for a tighter framing on the release-to-
-  // plate path.
+  // Hitter's eye: behind the plate looking toward the mound. Camera
+  // sits ~3.5 ft to the 3B side (left of plate from the catcher's POV)
+  // and looks slightly past the plate toward the 1B side, which pushes
+  // the strike zone, plate, and pitch trajectories into the right half
+  // of the frame — keeping them clear of the pitcher info panel that
+  // anchors the screen's left edge.
+  // NOTE: this is the framing for the *pitcher arsenal* view (full
+  // arsenal context). The /at-bat/* replay page applies its own
+  // override (closer in, target near the plate) inside AtBatReplayScene.
   front: {
-    position: [1.2, 4.3, 11],
-    target: [0, 2.5, -55],
+    position: [-3.5, 4.3, 11],
+    target: [1, 2.5, -55],
   },
   // Pitcher's view: behind the mound looking at the plate.
   back: {
