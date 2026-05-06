@@ -12,6 +12,7 @@ import {
 } from "@/lib/viz/colors";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
 import { TopNav } from "@/components/chrome/TopNav";
+import { ensureGameCache } from "@/lib/cache/backfill";
 import { AtBatReplayScene, type ReplayPitch } from "./AtBatReplayScene";
 
 interface PageProps {
@@ -45,6 +46,9 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
   if (!Number.isFinite(gamePkN) || !Number.isFinite(atBatN)) notFound();
 
   const supabase = await createClient();
+
+  // Lazy-fetch from Savant if the game's pitches aren't cached yet.
+  await ensureGameCache(gamePkN);
 
   const { data: pitchesRaw } = await supabase
     .from("pitch_game_pitches")

@@ -241,10 +241,10 @@ export function AtBatReplayScene({
   // the upper portion of view rather than centered.
   const frontPresetOverride: CameraPosition | null = useMemo(() => {
     if (preset !== "front" || !batterStand) return null;
-    const cameraX = batterStand === "L" ? -0.6 : 0.6;
+    const cameraX = batterStand === "L" ? -0.8 : 0.8;
     return {
-      position: [cameraX, 3.6, 4],
-      target: [0, 2.6, -6],
+      position: [cameraX, 3.9, 10],
+      target: [0, 2.8, -20],
     };
   }, [preset, batterStand]);
 

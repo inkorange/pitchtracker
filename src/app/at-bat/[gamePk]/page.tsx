@@ -7,6 +7,7 @@ import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { categorizeDescription, OUTCOME_COLORS } from "@/lib/viz/colors";
 import { TopNav } from "@/components/chrome/TopNav";
+import { ensureGameCache } from "@/lib/cache/backfill";
 
 interface PageProps {
   params: Promise<{ gamePk: string }>;
@@ -53,6 +54,12 @@ export default async function GameAtBatsPage({ params }: PageProps) {
   if (!Number.isFinite(gamePkN)) notFound();
 
   const supabase = await createClient();
+
+  // Lazy-fetch from Savant if we haven't cached this game yet. The
+  // team+date lookup can route here for any scheduled game; we want
+  // every such landing to "just work" rather than dead-end on an
+  // empty stub. ensureGameCache no-ops once data is present.
+  await ensureGameCache(gamePkN);
 
   const [{ data: game }, { data: pitchesRaw }] = await Promise.all([
     supabase
