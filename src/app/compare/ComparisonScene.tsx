@@ -207,12 +207,11 @@ export function ComparisonScene({
             />
             <Html
               position={selectedRibbon.labelPosition}
-              center
-              distanceFactor={10}
+              distanceFactor={6}
               zIndexRange={[100, 0]}
               style={{ pointerEvents: "none" }}
             >
-              <div className="whitespace-nowrap px-2 py-1 rounded bg-black/70 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg -translate-y-6">
+              <div className="whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg translate-x-2 -translate-y-1/2">
                 <span className="font-medium">{selectedRibbon.label}</span>
                 {selectedRibbon.velocity != null && (
                   <span className="text-white/70 ml-1.5">

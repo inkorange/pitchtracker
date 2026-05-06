@@ -59,12 +59,12 @@ export function useCompareHover(): CompareHoverState {
 }
 
 // Returns the opacity to apply to elements belonging to `side`. When some
-// other side is hovered, this side dims to 0.25; when this side is hovered
-// (or nothing is hovered), this side stays at 1.
+// other side is hovered, this side dims to 0.1 — strong enough that the
+// hovered pitcher's pitches are unmistakably their own.
 export function useOpacityForSide(side: CompareSide): number {
   const { hoveredSide } = useCompareHover();
   if (hoveredSide === null || hoveredSide === side) return 1;
-  return 0.25;
+  return 0.1;
 }
 
 interface HoverableSideProps {

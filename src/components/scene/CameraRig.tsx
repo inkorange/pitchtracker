@@ -56,19 +56,28 @@ export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
   }, []);
 
   useFrame((_, delta) => {
-    if (!animatingRef.current) return;
-    const k = Math.min(1, delta * 2.5);
-    camera.position.lerp(targetPos.current, k);
-    if (orbitRef.current) {
-      orbitRef.current.target.lerp(targetLook.current, k);
-      orbitRef.current.update();
+    if (animatingRef.current) {
+      const k = Math.min(1, delta * 2.5);
+      camera.position.lerp(targetPos.current, k);
+      if (orbitRef.current) {
+        orbitRef.current.target.lerp(targetLook.current, k);
+        orbitRef.current.update();
+      }
+      if (
+        camera.position.distanceTo(targetPos.current) < 0.05 &&
+        orbitRef.current &&
+        orbitRef.current.target.distanceTo(targetLook.current) < 0.05
+      ) {
+        animatingRef.current = false;
+      }
     }
-    if (
-      camera.position.distanceTo(targetPos.current) < 0.05 &&
-      orbitRef.current &&
-      orbitRef.current.target.distanceTo(targetLook.current) < 0.05
-    ) {
-      animatingRef.current = false;
+
+    // Hard floor on camera y. maxPolarAngle alone can't guarantee this
+    // when the orbit target sits high (e.g., the strike-zone preset),
+    // because polar slightly past π/2 lets the camera sink below ground
+    // at long distances.
+    if (camera.position.y < 0.3) {
+      camera.position.setY(0.3);
     }
   });
 
@@ -85,10 +94,10 @@ export function CameraRig({ preset, presetTick = 0 }: CameraRigProps) {
       // Dampen the wheel/pinch zoom further so a single scroll only nudges
       // the camera (default zoomSpeed is 1.0).
       zoomSpeed={0.18}
-      // Stop just short of horizontal so the camera never dips below the
-      // ground plane. ~1.15° gap is enough to avoid flipping while still
-      // letting the user get a near-eye-level look at the pitch.
-      maxPolarAngle={Math.PI / 2 - 0.02}
+      // Allow ~0.85° below horizontal so the user can angle slightly up
+      // from a low vantage point. A useFrame clamp on camera.y keeps the
+      // camera from actually sinking under the field plane.
+      maxPolarAngle={Math.PI / 2 + 0.015}
       makeDefault
     />
   );
