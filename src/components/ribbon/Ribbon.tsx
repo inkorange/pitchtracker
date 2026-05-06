@@ -6,10 +6,25 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { statcastToThree } from "@/lib/viz/coords";
 import { type CompareSide, getPitchColor, getPitchColorForSide } from "@/lib/viz/colors";
 
+// Fixed tubular resolution. drawProgress no longer changes the segment
+// count — instead it animates how many of those segments are drawn,
+// so the visible tube *length* grows from release to plate during
+// playback rather than just appearing at full length all at once.
+const TUBULAR_SEGMENTS = 96;
+const RADIAL_SEGMENTS = 8;
+// Each tubular segment contributes (radialSegments) quads × 6 indices
+// per quad. TubeGeometry's index loop emits indices segment-by-segment
+// in order, so setDrawRange(0, n * INDICES_PER_SEGMENT) cleanly draws
+// the first n segments.
+const INDICES_PER_SEGMENT = RADIAL_SEGMENTS * 6;
+
 interface RibbonProps {
   path: Array<[number, number, number]>;
   pitchType: string;
   radius?: number;
+  // 0 → no tube visible (ball is at release). 1 → full-length tube.
+  // Intermediate values render only the first floor(N*progress)
+  // segments, so the ribbon "grows" behind the ball as it flies.
   drawProgress?: number;
   // When set, picks the pitcher A vs B palette variant; otherwise uses
   // the default semantic color.
@@ -31,12 +46,26 @@ export function Ribbon({
   onPointerOut,
   onClick,
 }: RibbonProps) {
+  // Build the geometry once at full resolution. drawProgress is NOT
+  // a dependency — animating it through setDrawRange below is O(1)
+  // and avoids reallocating BufferGeometry on every frame.
   const geometry = useMemo(() => {
     const points = path.map((p) => new Vector3(...statcastToThree(p)));
     const curve = new CatmullRomCurve3(points);
-    const visibleSamples = Math.max(8, Math.floor(points.length * 2 * drawProgress));
-    return new TubeGeometry(curve, visibleSamples, radius, 8, false);
-  }, [path, radius, drawProgress]);
+    return new TubeGeometry(
+      curve,
+      TUBULAR_SEGMENTS,
+      radius,
+      RADIAL_SEGMENTS,
+      false,
+    );
+  }, [path, radius]);
+
+  const visibleSegments = Math.max(
+    0,
+    Math.min(TUBULAR_SEGMENTS, Math.floor(TUBULAR_SEGMENTS * drawProgress)),
+  );
+  geometry.setDrawRange(0, visibleSegments * INDICES_PER_SEGMENT);
 
   const color = side ? getPitchColorForSide(pitchType, side) : getPitchColor(pitchType);
 
