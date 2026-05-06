@@ -197,9 +197,29 @@ export function AtBatReplayScene({
   const activePitch = prepared[currentIdx];
   const isLast = currentIdx >= prepared.length - 1;
 
+  // Manual selection — when the user clicks a ribbon, we jump there
+  // and show the shape-metrics overlay. selectedDetailIdx is what the
+  // overlay reads; null = use the active pitch (auto-updates with
+  // playback). Click empty space (Scene onPointerMissed) to clear.
+  const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(null);
+  const detailIdx = selectedDetailIdx ?? currentIdx;
+  const detailPitch = prepared[detailIdx];
+
+  const handleSelectPitch = useCallback(
+    (idx: number) => {
+      setSelectedDetailIdx(idx);
+      jumpTo(idx, false);
+    },
+    [jumpTo],
+  );
+
   return (
     <>
-      <Scene preset={preset} presetTick={presetTick}>
+      <Scene
+        preset={preset}
+        presetTick={presetTick}
+        onPointerMissed={() => setSelectedDetailIdx(null)}
+      >
         <ReplayDriver
           prepared={prepared}
           currentIdx={currentIdx}
@@ -220,6 +240,8 @@ export function AtBatReplayScene({
           }}
           onSettle={() => setPhase("settled")}
           settledTimerRef={settledTimerRef}
+          onSelectPitch={handleSelectPitch}
+          selectedDetailIdx={selectedDetailIdx}
         />
         <CameraFollower
           enabled={followMode}
@@ -239,9 +261,19 @@ export function AtBatReplayScene({
               position={p.platePos}
               pitchNumber={p.raw.pitch_number}
               description={p.raw.description}
+              onClick={() => handleSelectPitch(i)}
             />
           );
         })}
+        {/* Shape-metrics overlay anchored to the current/selected pitch
+            so it auto-updates as playback advances OR locks to a
+            user-clicked pitch. */}
+        {detailPitch?.platePos ? (
+          <PitchDetailsPanel
+            position={detailPitch.platePos}
+            pitch={detailPitch.raw}
+          />
+        ) : null}
       </Scene>
 
       <CameraPad current={preset} onChange={handlePresetChange} />
@@ -323,6 +355,8 @@ interface ReplayDriverProps {
   onAdvance: () => void;
   onSettle: () => void;
   settledTimerRef: React.MutableRefObject<number>;
+  onSelectPitch: (idx: number) => void;
+  selectedDetailIdx: number | null;
 }
 
 function ReplayDriver({
@@ -335,6 +369,8 @@ function ReplayDriver({
   onAdvance,
   onSettle,
   settledTimerRef,
+  onSelectPitch,
+  selectedDetailIdx,
 }: ReplayDriverProps) {
   useFrame((_, delta) => {
     if (!playing) return;
@@ -371,15 +407,36 @@ function ReplayDriver({
         const drawProgress =
           i < currentIdx ? 1 : phase === "flying" ? intraProgress : 1;
         const isActive = i === currentIdx && phase === "flying";
-        const opacity = i < currentIdx ? 0.55 : 1;
+        const isSelected = selectedDetailIdx === i;
+        // Selected pitch reads bolder; others fade slightly so the
+        // focus is unambiguous. Default opacity for completed pitches
+        // is unchanged when nothing is selected.
+        const baseOpacity = i < currentIdx ? 0.55 : 1;
+        const opacity =
+          selectedDetailIdx == null
+            ? baseOpacity
+            : isSelected
+              ? 1
+              : baseOpacity * 0.4;
+        const radius = isSelected ? 0.13 : isActive ? 0.11 : 0.09;
         return (
           <group key={`pitch-${p.raw.pitch_number}`}>
             <Ribbon
               path={p.path}
               pitchType={p.raw.pitch_type ?? ""}
-              radius={isActive ? 0.11 : 0.09}
+              radius={radius}
               drawProgress={drawProgress}
               opacity={opacity}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                onSelectPitch(i);
+              }}
+              onPointerOver={() => {
+                document.body.style.cursor = "pointer";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "";
+              }}
             />
             {/* Show the ball at its final plate position for past pitches
                 and the settled current pitch (drawProgress=1), and as a
@@ -443,28 +500,101 @@ function PlateChip({
   position,
   pitchNumber,
   description,
+  onClick,
 }: {
   position: [number, number, number];
   pitchNumber: number;
   description: string | null;
+  onClick?: () => void;
 }) {
   const cat = categorizeDescription(description);
   const color = OUTCOME_COLORS[cat];
   return (
-    <Html position={position} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
-      <div
-        className="px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums shadow"
+    <Html position={position} zIndexRange={[10, 0]}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+        className="px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums shadow cursor-pointer pointer-events-auto"
         style={{
           background: color,
           color: "#0a0e14",
           transform: "translate(8px, -50%)",
           whiteSpace: "nowrap",
         }}
+        aria-label={`Show metrics for pitch ${pitchNumber}`}
       >
         #{pitchNumber}
+      </button>
+    </Html>
+  );
+}
+
+// Shape-metrics overlay anchored at the selected pitch's plate
+// position. Mirrors the compare scene's MetricsPanel — pitch label +
+// velo on one floating card, with spin / iVB / HB / axis / extension
+// rows on a second card. zIndexRange[10,0] keeps the overlay behind
+// the side panel + stepper chrome (which use z-20).
+function PitchDetailsPanel({
+  position,
+  pitch,
+}: {
+  position: [number, number, number];
+  pitch: ReplayPitch;
+}) {
+  const label = pitch.pitch_type ? getPitchLabel(pitch.pitch_type) : "—";
+  const velo = pitch.release_speed != null ? `${Number(pitch.release_speed).toFixed(1)} mph` : null;
+  const rows: Array<{ label: string; value: string }> = [];
+  if (pitch.release_spin_rate != null) {
+    rows.push({ label: "Spin", value: `${Math.round(Number(pitch.release_spin_rate))} rpm` });
+  }
+  if (pitch.pfx_z != null) {
+    rows.push({ label: "iVB", value: formatBreakInches(Number(pitch.pfx_z) * 12) });
+  }
+  if (pitch.pfx_x != null) {
+    rows.push({ label: "HB", value: formatBreakInches(Number(pitch.pfx_x) * 12) });
+  }
+  if (pitch.spin_axis != null) {
+    rows.push({ label: "Axis", value: `${Math.round(Number(pitch.spin_axis))}°` });
+  }
+  if (pitch.release_extension != null) {
+    rows.push({ label: "Ext", value: `${Number(pitch.release_extension).toFixed(1)} ft` });
+  }
+  return (
+    <Html position={position} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+      <div style={{ position: "relative", width: 0, height: 0 }}>
+        <div
+          className="absolute whitespace-nowrap px-2 py-1 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg"
+          style={{ left: 0, top: 0, transform: "translate(14px, -120%)" }}
+        >
+          <span className="font-medium">{label}</span>
+          {velo ? <span className="text-white/70 ml-1.5">{velo}</span> : null}
+        </div>
+        {rows.length > 0 ? (
+          <div
+            className="absolute whitespace-nowrap px-2 py-1.5 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg"
+            style={{ left: 0, top: 0, transform: "translate(14px, 8%)" }}
+          >
+            <div className="flex flex-col gap-0.5">
+              {rows.map((r) => (
+                <div key={r.label} className="flex justify-between gap-3">
+                  <span className="text-white/55">{r.label}</span>
+                  <span>{r.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </Html>
   );
+}
+
+function formatBreakInches(inches: number): string {
+  const sign = inches >= 0 ? "+" : "";
+  return `${sign}${inches.toFixed(1)}"`;
 }
 
 // Bottom-center stepper: per-pitch dots, current count, play/pause +
@@ -494,12 +624,12 @@ function PitchStepper({
   const velocity = active?.raw.release_speed ?? null;
 
   return (
-    // bottom-24 on mobile lifts the stepper above CameraPad (bottom-6)
-    // and the follow toggle (bottom-20) so they don't fight for the
-    // same band. sm:bottom-6 reverts to the desktop position. left-3
-    // and right-3 keep the card from running off either edge on a
-    // 320-375px viewport.
-    <div className="absolute bottom-24 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+    // Mobile: dock the stepper just below the pitcher/batter panel
+    // (top-20 + ~150px content height + small gap = ~15rem). Keeps the
+    // bottom half of the screen free for the 3D scene so the strike
+    // zone never sits behind chrome.
+    // sm+: revert to the canonical bottom-center transport bar.
+    <div className="absolute top-[15rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
