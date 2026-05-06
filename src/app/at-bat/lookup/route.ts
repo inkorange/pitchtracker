@@ -50,8 +50,8 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  // Find the regular-season game(s) for this team on this date. PostgREST
-  // .or() filter — comma-separated alternatives, dot-syntax operators.
+  // Find the regular-season game(s) for this team on this date.
+  // PostgREST .or() — comma-separated alternatives.
   const { data: matches } = await supabase
     .from("pitch_games")
     .select("game_pk, game_date")
@@ -69,10 +69,31 @@ export async function GET(request: Request) {
     return NextResponse.redirect(back);
   }
 
-  // For doubleheaders we just take the first game; the user can drill
-  // into the AB browser and see both halves grouped by inning. A future
-  // refinement could surface a chooser, but this is the 99% case.
+  // Restrict to games that have cached pitch data — landing on a game
+  // with no pitches yields a dead-end "no pitches for this game" stub
+  // with no way back to the form.
+  const { data: cachedRows } = await supabase
+    .from("pitch_pitcher_games")
+    .select("game_pk")
+    .in(
+      "game_pk",
+      games.map((g) => g.game_pk),
+    );
+  const cachedGamePks = new Set((cachedRows ?? []).map((r) => r.game_pk));
+  const cachedMatches = games.filter((g) => cachedGamePks.has(g.game_pk));
+
+  if (cachedMatches.length === 0) {
+    const back = new URL("/at-bat", request.url);
+    back.searchParams.set("error", "notfound");
+    back.searchParams.set("team", String(teamId));
+    back.searchParams.set("date", date);
+    return NextResponse.redirect(back);
+  }
+
+  // For doubleheaders we just take the first cached game; the AB
+  // browser groups both halves by inning. A future refinement could
+  // surface a chooser, but this is the 99% case.
   return NextResponse.redirect(
-    new URL(`/at-bat/${games[0].game_pk}`, request.url),
+    new URL(`/at-bat/${cachedMatches[0].game_pk}`, request.url),
   );
 }

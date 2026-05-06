@@ -233,23 +233,18 @@ export function AtBatReplayScene({
 
   // Front-preset camera angle depends on batter handedness so the
   // strike zone projects to the side of the screen opposite the
-  // batter AND a slice of the batter silhouette stays in frame on
-  // mobile portrait. Two adjustments from the static preset:
-  //
-  //   1. Shift x by ±1 ft toward the opposite side of the plate from
-  //      the batter (L → camera at -x, SZ on right; R → mirror).
-  //   2. Pull the camera back from z=11 to z=18. At z=11 mobile
-  //      portrait's narrow horizontal FOV cropped the silhouette
-  //      (~2.2 ft off-axis) entirely; at z=18 the silhouette's
-  //      angular offset from view direction shrinks enough to keep
-  //      its edge in frame on mobile while staying close enough on
-  //      desktop to feel like a hitter's-eye view.
+  // batter and a slice of the silhouette stays in frame on mobile
+  // portrait. Camera shifts ±1 ft toward the opposite side of the
+  // plate from the batter (L → camera at -x, SZ on right; R → mirror).
+  // Pulled in tight — z=4 — so the strike zone and batter's box
+  // dominate the frame, with the pitch trajectory reading out into
+  // the upper portion of view rather than centered.
   const frontPresetOverride: CameraPosition | null = useMemo(() => {
     if (preset !== "front" || !batterStand) return null;
-    const cameraX = batterStand === "L" ? -1 : 1;
+    const cameraX = batterStand === "L" ? -0.6 : 0.6;
     return {
-      position: [cameraX, 4.3, 18],
-      target: [0, 2.5, -55],
+      position: [cameraX, 3.6, 4],
+      target: [0, 2.6, -6],
     };
   }, [preset, batterStand]);
 

@@ -319,7 +319,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               {first.outs_when_up ?? 0}{" "}
               {(first.outs_when_up ?? 0) === 1 ? "out" : "outs"}
             </span>
-            <span className="text-white">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-white/[0.18] border border-white/30 text-white text-[10px] font-semibold uppercase tracking-[0.08em] shadow-sm">
               {finalEvent
                 ? finalEvent
                     .split("_")

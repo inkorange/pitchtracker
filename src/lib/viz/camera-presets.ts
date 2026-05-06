@@ -20,8 +20,8 @@ export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
   // sits just past the plate so the strike zone is the visual anchor
   // while the pitch trajectory still reads in the upper part of frame.
   front: {
-    position: [0.8, 3.8, 7],
-    target: [0, 2.8, -12],
+    position: [0.6, 3.6, 4],
+    target: [0, 2.6, -6],
   },
   // Pitcher's view: behind the mound looking at the plate.
   back: {
