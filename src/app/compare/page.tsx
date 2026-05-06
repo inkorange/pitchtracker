@@ -17,6 +17,7 @@ import { CompareLinkActions } from "./CompareLinkActions";
 import { CompareSlotSearch } from "./CompareSlotSearch";
 import { TunnelingPanel } from "./TunnelingPanel";
 import { CompareHoverProvider, HoverableSide } from "./CompareHoverContext";
+import { OutcomeLegend } from "./OutcomeLegend";
 
 interface PageProps {
   searchParams: Promise<{
@@ -147,6 +148,8 @@ export default async function ComparePage({ searchParams }: PageProps) {
             Compare
           </div>
         </header>
+
+        <OutcomeLegend />
 
         <section className="absolute top-20 left-6 w-[400px] rounded-lg bg-white/[0.06] backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
           <HoverableSide side="a">
