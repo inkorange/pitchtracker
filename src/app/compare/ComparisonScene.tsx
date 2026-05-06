@@ -211,7 +211,11 @@ export function ComparisonScene({
 
   return (
     <>
-      <Scene preset={preset} presetTick={presetTick}>
+      <Scene
+        preset={preset}
+        presetTick={presetTick}
+        onPointerMissed={() => setSelected(null)}
+      >
         <SideLayer
           side="a"
           ribbons={aRibbons}
