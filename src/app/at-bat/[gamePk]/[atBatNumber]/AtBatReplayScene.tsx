@@ -241,11 +241,13 @@ export function AtBatReplayScene({
   // and show the shape-metrics overlay. selectedDetailIdx is what the
   // overlay reads; null = use the active pitch (auto-updates with
   // playback). Click empty space (Scene onPointerMissed) to clear.
-  // Seed from initialHighlightIdx so deep-links (?pitch=N) point the
-  // overlay at the linked pitch — but playback still animates from
-  // pitch 1 through to it, not skipping ahead.
+  //
+  // NOTE: we deliberately don't seed this from the URL's ?pitch=N.
+  // Seeding would lock the overlay to the linked pitch and freeze it
+  // there as playback advances. The deep-link is for "land here and
+  // watch from pitch 1"; the highlight follows playback naturally.
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
-    initialHighlightIdx ?? null,
+    null,
   );
   const detailIdx = selectedDetailIdx ?? currentIdx;
   const detailPitch = prepared[detailIdx];
@@ -322,9 +324,13 @@ export function AtBatReplayScene({
         {/* Shape-metrics overlay anchored to the current/selected pitch
             so it auto-updates as playback advances OR locks to a
             user-clicked pitch. Only shown once the pitch has landed —
-            we don't want metrics floating ahead of the ball mid-flight. */}
+            we don't want metrics floating ahead of the ball mid-flight.
+            Keyed by detailIdx so the overlay cleanly re-mounts at the
+            new pitch's position when playback advances; otherwise the
+            <Html> portal can hold onto its prior anchor. */}
         {detailPitch?.platePos && detailLanded ? (
           <PitchDetailsPanel
+            key={detailIdx}
             position={detailPitch.platePos}
             pitch={detailPitch.raw}
           />

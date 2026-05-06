@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { FeaturedStrip } from "@/components/home/FeaturedStrip";
@@ -11,7 +12,17 @@ export default function Home() {
           <div className="text-[10px] uppercase tracking-[0.2em] text-white/45">
             Phase 4 · At-bat replays
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">pitchtracker</h1>
+          <h1 className="text-3xl font-semibold tracking-tight inline-flex items-center justify-center gap-3">
+            <Image
+              src="/Major_League_Baseball_logo.svg"
+              alt=""
+              width={67}
+              height={36}
+              className="h-9 w-auto"
+              priority
+            />
+            pitchtracker
+          </h1>
           <p className="text-sm text-white/55 leading-relaxed">
             MLB pitch trajectories in 3D. Search a pitcher, browse by team, or
             replay any at-bat pitch-by-pitch.

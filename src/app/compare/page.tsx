@@ -144,9 +144,17 @@ export default async function ComparePage({ searchParams }: PageProps) {
           <div className="flex gap-3 items-center pointer-events-auto">
             <Link
               href="/"
-              className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
             >
-              ← pitchtracker
+              <span>←</span>
+              <Image
+                src="/Major_League_Baseball_logo.svg"
+                alt=""
+                width={26}
+                height={14}
+                className="h-3.5 w-auto"
+              />
+              <span>pitchtracker</span>
             </Link>
             <CompareLinkActions />
           </div>
@@ -585,9 +593,17 @@ async function EmptyState({ aId, bId }: { aId: number | null; bId: number | null
         <div className="space-y-2">
           <Link
             href="/"
-            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
+            className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
           >
-            ← pitchtracker
+            <span>←</span>
+            <Image
+              src="/Major_League_Baseball_logo.svg"
+              alt=""
+              width={26}
+              height={14}
+              className="h-3.5 w-auto"
+            />
+            <span>pitchtracker</span>
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">Compare two pitchers</h1>
           <p className="text-sm text-white/55">

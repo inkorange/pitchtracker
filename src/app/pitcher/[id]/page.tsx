@@ -206,9 +206,17 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         <div className="flex gap-4 items-center pointer-events-auto">
           <Link
             href="/"
-            className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
           >
-            ← pitchtracker
+            <span>←</span>
+            <Image
+              src="/Major_League_Baseball_logo.svg"
+              alt=""
+              width={26}
+              height={14}
+              className="h-3.5 w-auto"
+            />
+            <span>pitchtracker</span>
           </Link>
           <Link
             href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
