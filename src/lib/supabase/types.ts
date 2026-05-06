@@ -397,6 +397,57 @@ export type Database = {
         }
         Relationships: []
       }
+      pitch_daily_features: {
+        Row: {
+          at_bat_number: number
+          batter_id: number | null
+          computed_at: string
+          feature_date: string
+          feature_kind: string
+          game_pk: number
+          pitch_number: number
+          pitcher_id: number | null
+          reason: string | null
+        }
+        Insert: {
+          at_bat_number: number
+          batter_id?: number | null
+          computed_at?: string
+          feature_date: string
+          feature_kind: string
+          game_pk: number
+          pitch_number: number
+          pitcher_id?: number | null
+          reason?: string | null
+        }
+        Update: {
+          at_bat_number?: number
+          batter_id?: number | null
+          computed_at?: string
+          feature_date?: string
+          feature_kind?: string
+          game_pk?: number
+          pitch_number?: number
+          pitcher_id?: number | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_daily_features_game_pk_fkey"
+            columns: ["game_pk"]
+            isOneToOne: false
+            referencedRelation: "pitch_games"
+            referencedColumns: ["game_pk"]
+          },
+          {
+            foreignKeyName: "pitch_daily_features_pitcher_id_fkey"
+            columns: ["pitcher_id"]
+            isOneToOne: false
+            referencedRelation: "pitch_pitchers"
+            referencedColumns: ["mlb_id"]
+          },
+        ]
+      }
       pitch_game_pitches: {
         Row: {
           at_bat_number: number
@@ -585,6 +636,63 @@ export type Database = {
             columns: ["home_team_id"]
             isOneToOne: false
             referencedRelation: "pitch_teams"
+            referencedColumns: ["mlb_id"]
+          },
+        ]
+      }
+      pitch_notable_at_bats: {
+        Row: {
+          at_bat_number: number
+          batter_id: number | null
+          computed_at: string
+          game_date: string
+          game_pk: number
+          is_strikeout: boolean
+          max_abs_delta_run_exp: number | null
+          pitch_count: number
+          pitcher_id: number | null
+          score: number
+          whiff_count: number
+        }
+        Insert: {
+          at_bat_number: number
+          batter_id?: number | null
+          computed_at?: string
+          game_date: string
+          game_pk: number
+          is_strikeout?: boolean
+          max_abs_delta_run_exp?: number | null
+          pitch_count: number
+          pitcher_id?: number | null
+          score: number
+          whiff_count?: number
+        }
+        Update: {
+          at_bat_number?: number
+          batter_id?: number | null
+          computed_at?: string
+          game_date?: string
+          game_pk?: number
+          is_strikeout?: boolean
+          max_abs_delta_run_exp?: number | null
+          pitch_count?: number
+          pitcher_id?: number | null
+          score?: number
+          whiff_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_notable_at_bats_game_pk_fkey"
+            columns: ["game_pk"]
+            isOneToOne: false
+            referencedRelation: "pitch_games"
+            referencedColumns: ["game_pk"]
+          },
+          {
+            foreignKeyName: "pitch_notable_at_bats_pitcher_id_fkey"
+            columns: ["pitcher_id"]
+            isOneToOne: false
+            referencedRelation: "pitch_pitchers"
             referencedColumns: ["mlb_id"]
           },
         ]
