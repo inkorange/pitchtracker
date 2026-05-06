@@ -5,7 +5,6 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchPitcherSeasonPitches } from "@/lib/savant/client";
-import { fetchSchedule } from "@/lib/statsapi/client";
 import type { TablesInsert } from "@/lib/supabase/types";
 
 // Cheap in-process cache so we don't fire the same backfill multiple
@@ -27,22 +26,10 @@ export async function ensurePitcherSeasonCache(
 async function doEnsure(pitcherId: number, season: number): Promise<void> {
   const supabase = createAdminClient();
 
-  // Make sure we have games for this season at all. Without them, every
-  // pitch insert would fail the FK on game_pk.
-  const { count: seasonGameCount } = await supabase
-    .from("pitch_games")
-    .select("*", { count: "exact", head: true })
-    .eq("season", season);
-  if (!seasonGameCount || seasonGameCount === 0) {
-    await backfillSeasonSchedule(season);
-  }
-
   // "Already cached?" check, done via the pitcher's own (small) set of
-  // game_pks rather than the season's full game list. Pulling all
-  // pitch_games rows for a season blows past Postgrest's default 1000-row
-  // cap (a full MLB schedule is ~2400 games), which silently truncated
-  // the membership set and made the rest of this function think a
-  // pitcher had no pitches in the missing-tail games.
+  // game_pks. Never query "all games in season X" — a full MLB
+  // schedule is ~2400 rows and Postgrest defaults to 1000, which used
+  // to silently truncate the membership set.
   const { data: pitcherGameRows } = await supabase
     .from("pitch_game_pitches")
     .select("game_pk")
@@ -58,7 +45,7 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
     const cachedSeasonGames = (pitcherGameMeta ?? []).filter(
       (g) => g.season === season,
     );
-    if (cachedSeasonGames.length > 0) return; // pitcher already has cached pitches in this season
+    if (cachedSeasonGames.length > 0) return; // pitcher already cached for this season
   }
 
   // Pull from Savant.
@@ -70,26 +57,41 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
   }
   if (fresh.length === 0) return;
 
-  // FK requirement: every game_pk on a pitch row must exist in
-  // pitch_games. Look up just the game_pks Savant returned (small set,
-  // so no pagination problem) instead of materializing the whole season.
-  const savantGamePks = Array.from(new Set(fresh.map((p) => p.game_pk)));
-  const { data: existingGameRows } =
-    savantGamePks.length > 0
-      ? await supabase
-          .from("pitch_games")
-          .select("game_pk")
-          .in("game_pk", savantGamePks)
-      : { data: [] };
-  const knownGamePks = new Set(
-    (existingGameRows ?? []).map((g) => g.game_pk),
+  // Pitches FK to pitch_games. Insert only the games this pitcher
+  // actually appeared in, building rows from Savant's own response so we
+  // never have to load the full season schedule. Game metadata lives on
+  // every pitch row in the CSV (game_date, home_team, away_team), so
+  // we just dedupe by game_pk.
+  const { data: teamRows } = await supabase
+    .from("pitch_teams")
+    .select("mlb_id, abbreviation");
+  const teamIdByAbbrev = new Map<string, number>(
+    (teamRows ?? []).map((t) => [t.abbreviation, t.mlb_id]),
   );
-  if (knownGamePks.size === 0) {
-    // Every Savant game is unknown to us. The most likely cause is that
-    // the schedule backfill produced nothing or didn't include these
-    // pks. Bail rather than insert orphan rows that would fail the FK.
-    return;
+
+  type GameInsert = TablesInsert<"pitch_games">;
+  const gameByPk = new Map<number, GameInsert>();
+  for (const p of fresh) {
+    if (gameByPk.has(p.game_pk)) continue;
+    const homeId = p.home_team ? (teamIdByAbbrev.get(p.home_team) ?? null) : null;
+    const awayId = p.away_team ? (teamIdByAbbrev.get(p.away_team) ?? null) : null;
+    gameByPk.set(p.game_pk, {
+      game_pk: p.game_pk,
+      game_date: p.game_date.slice(0, 10),
+      season,
+      home_team_id: homeId,
+      away_team_id: awayId,
+      status: "Scheduled",
+      venue_name: null,
+      updated_at: new Date().toISOString(),
+    });
   }
+  const gameRows = Array.from(gameByPk.values());
+  for (let i = 0; i < gameRows.length; i += 200) {
+    const chunk = gameRows.slice(i, i + 200);
+    await supabase.from("pitch_games").upsert(chunk);
+  }
+  const knownGamePks = new Set(gameRows.map((g) => g.game_pk));
 
   // Filter to game_pks we have in pitch_games (FK requirement) and to
   // pitcher_id == this pitcher (Savant returns related-pitch context too,
@@ -155,37 +157,3 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
   await supabase.rpc("pitch_recompute_aggregates");
 }
 
-// Pull the regular-season + spring-training MLB schedule for the given
-// season into pitch_games. Same logic as the refresh-games cron, but
-// scoped to one season and inline so the page can call it without a
-// network round-trip.
-async function backfillSeasonSchedule(season: number): Promise<void> {
-  const supabase = createAdminClient();
-  const games = await fetchSchedule(`${season}-02-15`, `${season}-11-15`);
-
-  const { data: teamRows } = await supabase.from("pitch_teams").select("mlb_id");
-  const validTeamIds = new Set((teamRows ?? []).map((t) => t.mlb_id));
-
-  const byPk = new Map<number, (typeof games)[number]>();
-  for (const g of games) {
-    if (!validTeamIds.has(g.teams.home.team.id) || !validTeamIds.has(g.teams.away.team.id)) {
-      continue;
-    }
-    byPk.set(g.gamePk, g);
-  }
-
-  const rows = Array.from(byPk.values()).map((g) => ({
-    game_pk: g.gamePk,
-    game_date: g.gameDate.slice(0, 10),
-    season: Number(g.gameDate.slice(0, 4)),
-    home_team_id: g.teams.home.team.id,
-    away_team_id: g.teams.away.team.id,
-    status: g.status.detailedState ?? g.status.abstractGameState ?? "Unknown",
-    venue_name: g.venue?.name ?? null,
-    updated_at: new Date().toISOString(),
-  }));
-  for (let i = 0; i < rows.length; i += 200) {
-    const chunk = rows.slice(i, i + 200);
-    await supabase.from("pitch_games").upsert(chunk);
-  }
-}

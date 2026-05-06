@@ -43,77 +43,44 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   if (!pitcher) notFound();
 
   const currentYear = new Date().getFullYear();
-
-  // Pitchers can pick any of the last few years even if we haven't cached
-  // anything for them yet — selecting a fresh year triggers backfill
-  // (ensurePitcherSeasonCache below). Aggregate/pitches lookups still
-  // contribute so debut years older than the rolling window stay
-  // selectable.
-  const FALLBACK_YEARS = 6;
-  const fallbackSeasons = Array.from(
-    { length: FALLBACK_YEARS + 1 },
-    (_, i) => currentYear - i,
-  );
-  const { data: aggSeasonRows } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select("season")
-    .eq("pitcher_id", pitcherId);
-  const { data: pitcherGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk")
-    .eq("pitcher_id", pitcherId);
-  const pitcherGamePks = Array.from(
-    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
-  );
-  const { data: pitcherGameSeasons } =
-    pitcherGamePks.length > 0
-      ? await supabase.from("pitch_games").select("season").in("game_pk", pitcherGamePks)
-      : { data: [] };
-  const seasonsWithData = new Set<number>(fallbackSeasons);
-  for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
-  for (const r of pitcherGameSeasons ?? []) seasonsWithData.add(r.season);
-  const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
-
   const season = sp.season ? Number(sp.season) : currentYear;
+
+  // Season picker offers a fixed window: from current year back to the
+  // pitcher's debut (or 6 years if debut isn't known). We never query
+  // cross-season aggregates or game lists just to populate this list —
+  // the user picks one year at a time and we only ever load that year's
+  // pitches.
+  const FALLBACK_YEARS = 6;
+  const earliestSelectableYear = pitcher.debut_year
+    ? Math.max(pitcher.debut_year, currentYear - FALLBACK_YEARS - 6)
+    : currentYear - FALLBACK_YEARS;
+  const availableSeasons: number[] = [];
+  for (let y = currentYear; y >= earliestSelectableYear; y--) {
+    availableSeasons.push(y);
+  }
 
   // First-visit lazy backfill: if no pitches are cached for this pitcher
   // × season yet, pull from Savant on demand. No-op once cached.
   await ensurePitcherSeasonCache(pitcherId, season);
 
-  // Look up game metadata for just the game_pks this pitcher actually has
-  // pitches for. Going via the pitcher's game_pks (always ≤30 games) avoids
-  // the 1000-row default cap on a "select * from pitch_games where season"
-  // — a full MLB schedule has ~2400 games and was getting silently
-  // truncated, sometimes excluding the very games this pitcher appeared in.
-  const { data: pitcherGamesMeta } =
-    pitcherGamePks.length > 0
-      ? await supabase
-          .from("pitch_games")
-          .select("game_pk, game_date, season, home_team_id, away_team_id")
-          .in("game_pk", pitcherGamePks)
-      : { data: [] };
-  const seasonGameMetas = (pitcherGamesMeta ?? []).filter(
-    (g) => g.season === season,
-  );
-  const seasonGamePks = new Set(seasonGameMetas.map((g) => g.game_pk));
-
-  // Cached pitches for this pitcher × season. Pitch-type filter is
-  // applied in JS so the arsenal table reflects season+game+hand filters
-  // but not the pitch-type chips themselves (those would otherwise blank
-  // the arsenal whenever a chip is active).
+  // Single query scoped to active season: a Postgrest inner-join filter
+  // on pitch_games.season returns only this pitcher's pitches in this
+  // year, with the per-game metadata embedded for the dropdown. No
+  // cross-season fetch, no full-schedule materialization.
+  type EmbeddedGame = {
+    season: number;
+    game_date: string;
+    home_team_id: number | null;
+    away_team_id: number | null;
+  };
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
+      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id)",
     )
     .eq("pitcher_id", pitcherId)
-    .limit(1500);
-  if (seasonGamePks.size > 0) {
-    pitchQuery = pitchQuery.in("game_pk", Array.from(seasonGamePks));
-  } else {
-    // No games for this season → no pitches.
-    pitchQuery = pitchQuery.eq("game_pk", -1);
-  }
+    .eq("pitch_games.season", season)
+    .range(0, 4999);
   if (sp.hand === "L" || sp.hand === "R") {
     pitchQuery = pitchQuery.eq("stand", sp.hand);
   }
@@ -121,7 +88,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     pitchQuery = pitchQuery.eq("game_pk", Number(sp.game));
   }
 
-  const { data: cachedPitches } = await pitchQuery;
+  const { data: cachedPitchesRaw } = await pitchQuery;
+  const cachedPitches = cachedPitchesRaw as
+    | (NonNullable<typeof cachedPitchesRaw>[number] & { pitch_games?: EmbeddedGame })[]
+    | null;
 
   // Arsenal totals come from the filter-but-no-pitch-type set so the chips
   // remain functional when one is selected. Outcomes filter applies in JS
@@ -171,20 +141,43 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     }))
     .sort((a, b) => b.pitch_count - a.pitch_count);
 
-  const gameMetaRows = seasonGameMetas;
+  // Game dropdown comes from the same one-shot query — embedded
+  // pitch_games metadata, deduped by game_pk.
+  type GameMeta = {
+    game_pk: number;
+    game_date: string;
+    home_team_id: number | null;
+    away_team_id: number | null;
+  };
+  const gameByPk = new Map<number, GameMeta>();
+  for (const p of cachedPitches ?? []) {
+    if (gameByPk.has(p.game_pk)) continue;
+    const meta = p.pitch_games;
+    if (!meta) continue;
+    gameByPk.set(p.game_pk, {
+      game_pk: p.game_pk,
+      game_date: meta.game_date,
+      home_team_id: meta.home_team_id,
+      away_team_id: meta.away_team_id,
+    });
+  }
+  const gameMetaRows = Array.from(gameByPk.values());
   const teamIds = new Set<number>();
-  for (const g of gameMetaRows ?? []) {
+  for (const g of gameMetaRows) {
     if (g.home_team_id) teamIds.add(g.home_team_id);
     if (g.away_team_id) teamIds.add(g.away_team_id);
   }
-  const { data: teamRows } = await supabase
-    .from("pitch_teams")
-    .select("mlb_id, abbreviation")
-    .in("mlb_id", Array.from(teamIds));
+  const { data: teamRows } =
+    teamIds.size > 0
+      ? await supabase
+          .from("pitch_teams")
+          .select("mlb_id, abbreviation")
+          .in("mlb_id", Array.from(teamIds))
+      : { data: [] };
   const teamAbbr = new Map<number, string>(
     (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
   );
-  const games = (gameMetaRows ?? [])
+  const games = gameMetaRows
     .map((g) => ({
       game_pk: g.game_pk,
       game_date: g.game_date,

@@ -30,6 +30,8 @@ export interface SavantPitchRow extends StatcastRow {
   effective_speed: number | null;
   delta_run_exp: number | null;
   delta_home_win_exp: number | null;
+  home_team: string | null;
+  away_team: string | null;
 }
 
 const NUMERIC_FIELDS = [
