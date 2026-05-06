@@ -42,6 +42,33 @@ function isValid(p: CachedPitchSubset): boolean {
   return REQUIRED.every((k) => p[k] != null);
 }
 
+// Build a single Pitch from one cached row. Returns null if any required
+// kinematic field is missing.
+export function pitchFromRow(row: CachedPitchSubset): Pitch | null {
+  if (!row.pitch_type) return null;
+  if (!isValid(row)) return null;
+  const statcast: StatcastRow = {
+    release_pos_x: row.release_pos_x as number,
+    release_pos_y: row.release_pos_y as number,
+    release_pos_z: row.release_pos_z as number,
+    vx0: row.vx0 as number,
+    vy0: row.vy0 as number,
+    vz0: row.vz0 as number,
+    ax: row.ax as number,
+    ay: row.ay as number,
+    az: row.az as number,
+    plate_x: row.plate_x ?? 0,
+    plate_z: row.plate_z ?? 0,
+    release_speed: row.release_speed ?? 0,
+    pitch_type: row.pitch_type,
+  };
+  try {
+    return new Pitch(statcast);
+  } catch {
+    return null;
+  }
+}
+
 export function averagePitchesByType(
   pitches: CachedPitchSubset[],
 ): Map<string, Pitch> {

@@ -15,6 +15,10 @@ interface PitchPoint {
 interface OutcomeMarkersProps {
   pitches: PitchPoint[];
   opacity?: number;
+  selectedIndex?: number | null;
+  // When something is selected, non-selected dots dim further.
+  hasSelection?: boolean;
+  onSelect?: (index: number) => void;
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
 }
@@ -27,46 +31,73 @@ interface OutcomeMarkersProps {
 export function OutcomeMarkers({
   pitches,
   opacity = 1,
+  selectedIndex = null,
+  hasSelection = false,
+  onSelect,
   onPointerOver,
   onPointerOut,
 }: OutcomeMarkersProps) {
   const markers = useMemo(
     () =>
       pitches
-        .filter((p) => p.plate_x != null && p.plate_z != null)
         .map((p, i) => {
-          const tw = statcastToThree([p.plate_x ?? 0, 0, p.plate_z ?? 0]);
+          if (p.plate_x == null || p.plate_z == null) return null;
+          const tw = statcastToThree([p.plate_x, 0, p.plate_z]);
           return {
             id: i,
             position: tw,
             color: getOutcomeColor(p.description),
           };
-        }),
+        })
+        .filter((m): m is { id: number; position: [number, number, number]; color: string } => m !== null),
     [pitches],
   );
 
-  const transparent = opacity < 1;
-
   return (
     <>
-      {markers.map((m) => (
-        <Sphere
-          key={m.id}
-          args={[0.12, 12, 12]}
-          position={m.position}
-          onPointerOver={onPointerOver}
-          onPointerOut={onPointerOut}
-        >
-          <meshStandardMaterial
-            color={m.color}
-            roughness={0.4}
-            metalness={0.05}
-            transparent={transparent}
-            opacity={opacity}
-            depthWrite={!transparent}
-          />
-        </Sphere>
-      ))}
+      {markers.map((m) => {
+        const isSelected = selectedIndex === m.id;
+        // Dimming layers: side-hover opacity × per-dot focus when something
+        // is selected. Selected dot stays at full strength regardless.
+        const focusOpacity = !hasSelection || isSelected ? 1 : 0.25;
+        const finalOpacity = opacity * focusOpacity;
+        const transparent = finalOpacity < 1;
+        const radius = isSelected ? 0.18 : 0.12;
+        return (
+          <Sphere
+            key={m.id}
+            args={[radius, 16, 16]}
+            position={m.position}
+            onPointerOver={(e) => {
+              if (onSelect) {
+                e.stopPropagation();
+                document.body.style.cursor = "pointer";
+              }
+              onPointerOver?.(e);
+            }}
+            onPointerOut={(e) => {
+              if (onSelect) document.body.style.cursor = "";
+              onPointerOut?.(e);
+            }}
+            onClick={(e) => {
+              if (!onSelect) return;
+              e.stopPropagation();
+              onSelect(m.id);
+            }}
+          >
+            <meshStandardMaterial
+              color={m.color}
+              roughness={0.4}
+              metalness={0.05}
+              transparent={transparent}
+              opacity={finalOpacity}
+              depthWrite={!transparent}
+              emissive={isSelected ? m.color : "#000000"}
+              emissiveIntensity={isSelected ? 0.6 : 0}
+            />
+          </Sphere>
+        );
+      })}
     </>
   );
 }
