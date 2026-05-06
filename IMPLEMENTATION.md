@@ -606,6 +606,41 @@ The data layer requirements are minor: a polling hook on top of the existing liv
 
 Massive engagement multiplier during the season — the kind of feature that makes the site a live-game habit, not a once-a-week curiosity.
 
+## Phase 8 — Pitcher × batter matchup history (post-MVP)
+
+**Branch**: `phase-8-matchup` → PR to `main`. Sequenced after Phase 7, or interleaved if audience signal favors it.
+
+A specialized walkthrough of every at-bat between a specific pitcher and a specific batter — Skenes vs Soto, Cole vs Judge, Skubal vs Riley. Each meeting renders as a Phase 4 at-bat replay, with prev/next navigation across the entire series. Reuses every primitive from Phases 1–4; the new piece is the matchup index and inter-at-bat navigation state.
+
+### Tasks
+
+1. Page at `/matchup/[pitcherId]/[batterId]`:
+   - Lists every cached at-bat between the two players, sorted newest first.
+   - Each row: date, game (away @ home), count progression as a compact glyph strip, final outcome (K, BB, single, HR, etc.), and a thumbnail (reused OG image).
+   - Aggregated header: total PAs, K, BB, hits, batting line, weighted-by-pitch-type velocity / break / whiff rate.
+2. Replay mode with matchup nav:
+   - Click any row → existing Phase 4 replay at `/at-bat/[gamePk]/[atBatNumber]?from=matchup&p={pitcherId}&b={batterId}`.
+   - Prev / next buttons in the replay HUD jump to the previous / next at-bat in the series, preserving camera preset and pacing.
+3. Deep links into the matchup view:
+   - From `/pitcher/[id]`: a "Notable matchups" rail surfacing the most-frequent batters faced this season.
+   - From any at-bat replay: a "View full series" affordance that drops into the matchup index pre-filtered to this pitcher × batter.
+4. Series visualization mode (stretch within phase):
+   - Optional "all at-bats overlaid" view rendering every meeting in shared 3D space, color-coded by outcome (whiff vs hit, etc.). Reuses the Phase 5 outcome-cluster comparison logic.
+5. OG image for matchup URLs: a 2×2 tile of the cumulative tunnel from each of the four most recent at-bats, with the batting-line summary overlaid.
+
+### Data dependencies
+
+- Already cached: `pitch_game_pitches` keyed by `pitcher_id` × `batter_id` × `game_pk` × `at_bat_number`. The matchup query is just a grouped read.
+- New: a `pitch_batters` table mirroring `pitch_pitchers` (mlb_id, full_name, bats, current_team_id, headshot URL pattern). Phase 4 introduces lazy batter-name lookup; promoting it to a table here makes the matchup index queryable directly without N MLB Stats API calls.
+- New cron: `refresh-batters`, weekly during season — pulls active hitters from MLB Stats API, upserts `pitch_batters`. Same shape as `refresh-pitchers`.
+
+### Exit criteria
+
+- `/matchup/[pitcherId]/[batterId]` works for any cached pitcher × batter pairing.
+- Prev / next navigation in replay mode preserves camera + pacing across at-bat boundaries.
+- Aggregated stats reconcile with the equivalent FanGraphs split within ±1 PA on a sample of 5 high-volume matchups.
+- The series visualization (if shipped) makes a real "this is why this hitter owns this pitcher" or "this is why this pitcher owns this hitter" pattern visible.
+
 ## Vercel-specific configuration
 
 - **Crons** declared in [`vercel.ts`](vercel.ts):
