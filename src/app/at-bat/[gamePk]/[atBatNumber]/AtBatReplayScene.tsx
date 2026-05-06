@@ -204,6 +204,13 @@ export function AtBatReplayScene({
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(null);
   const detailIdx = selectedDetailIdx ?? currentIdx;
   const detailPitch = prepared[detailIdx];
+  // Only surface the metrics overlay once the pitch has actually
+  // landed at the plate. While the active pitch is mid-flight, the
+  // overlay sits at a position the ball hasn't reached yet, which
+  // reads as a spoiler floating in front of the action. Past pitches
+  // (idx < currentIdx) are always landed.
+  const detailLanded =
+    detailIdx < currentIdx || (detailIdx === currentIdx && phase !== "flying");
 
   const handleSelectPitch = useCallback(
     (idx: number) => {
@@ -267,8 +274,9 @@ export function AtBatReplayScene({
         })}
         {/* Shape-metrics overlay anchored to the current/selected pitch
             so it auto-updates as playback advances OR locks to a
-            user-clicked pitch. */}
-        {detailPitch?.platePos ? (
+            user-clicked pitch. Only shown once the pitch has landed —
+            we don't want metrics floating ahead of the ball mid-flight. */}
+        {detailPitch?.platePos && detailLanded ? (
           <PitchDetailsPanel
             position={detailPitch.platePos}
             pitch={detailPitch.raw}
