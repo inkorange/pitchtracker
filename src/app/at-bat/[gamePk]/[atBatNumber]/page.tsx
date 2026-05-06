@@ -159,8 +159,8 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         title="At-bat replay"
       />
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto h-[11rem] sm:h-auto sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
-        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/45">
+      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto h-[11rem] sm:h-auto sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/75">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
           </span>
@@ -185,7 +185,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-white/70">
                 Pitcher
               </div>
               {pitcher ? (
@@ -200,7 +200,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
                   Pitcher #{pitcherId ?? "—"}
                 </div>
               )}
-              <div className="text-[11px] text-white/55 tabular-nums">
+              <div className="text-[11px] text-white/85 tabular-nums">
                 {pitcher?.throws ? `${pitcher.throws}HP` : ""}
               </div>
             </div>
@@ -233,13 +233,13 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               </div>
             ) : null}
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-white/70">
                 Batter
               </div>
               <div className="text-sm font-medium text-white truncate">
                 {batterName ?? `Batter #${batterId ?? "—"}`}
               </div>
-              <div className="text-[11px] text-white/55 tabular-nums">
+              <div className="text-[11px] text-white/85 tabular-nums">
                 {first.stand ? `${first.stand}HB` : ""}
               </div>
             </div>
@@ -276,12 +276,12 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
                   Pitcher #{pitcherId ?? "—"}
                 </div>
               )}
-              <div className="text-[10px] text-white/45 tabular-nums">
+              <div className="text-[10px] text-white/85 tabular-nums">
                 {pitcher?.throws ? `${pitcher.throws}HP` : ""}
               </div>
             </div>
           </div>
-          <span className="text-[10px] uppercase tracking-[0.16em] text-white/35 flex-shrink-0">
+          <span className="text-[10px] uppercase tracking-[0.16em] text-white/55 flex-shrink-0">
             vs
           </span>
           <div className="flex items-center gap-1.5 min-w-0 flex-1 justify-end">
@@ -289,7 +289,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               <div className="text-xs font-medium text-white truncate">
                 {batterName ?? `Batter #${batterId ?? "—"}`}
               </div>
-              <div className="text-[10px] text-white/45 tabular-nums">
+              <div className="text-[10px] text-white/85 tabular-nums">
                 {first.stand ? `${first.stand}HB` : ""}
               </div>
             </div>
@@ -308,14 +308,18 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
           </div>
         </div>
 
-        {/* Game-state HUD: inning, outs, runners, final outcome */}
+        {/* Game-state HUD: inning + pitches + outs on a single line,
+            final outcome on the right; baserunner diamond on its own
+            row on desktop only. */}
         <div className="pt-3 border-t border-white/[0.05] space-y-2">
           <div className="flex items-center justify-between text-[11px] tabular-nums">
-            <span className="text-white/55">
-              {first.inning_topbot === "Bot" ? "Bot" : "Top"} {first.inning ?? "—"} ·{" "}
-              {pitches.length} pitch{pitches.length === 1 ? "" : "es"}
-            </span>
             <span className="text-white/85">
+              {first.inning_topbot === "Bot" ? "Bot" : "Top"} {first.inning ?? "—"} ·{" "}
+              {pitches.length} pitch{pitches.length === 1 ? "" : "es"} ·{" "}
+              {first.outs_when_up ?? 0}{" "}
+              {(first.outs_when_up ?? 0) === 1 ? "out" : "outs"}
+            </span>
+            <span className="text-white">
               {finalEvent
                 ? finalEvent
                     .split("_")
@@ -324,21 +328,14 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
                 : lastPitch.description ?? "—"}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.14em] text-white/55">
-            {/* Baserunner diamond eats horizontal space without adding
-                much value on a phone — hide it on mobile, keep it on
-                sm+ where there's room. */}
-            <div className="hidden sm:flex">
-              <BaserunnerDiamond
-                on1b={first.on_1b != null}
-                on2b={first.on_2b != null}
-                on3b={first.on_3b != null}
-              />
-            </div>
-            <span className="tabular-nums normal-case text-white/65">
-              {first.outs_when_up ?? 0}{" "}
-              {(first.outs_when_up ?? 0) === 1 ? "out" : "outs"}
-            </span>
+          {/* Baserunner diamond — desktop only; eats horizontal space
+              on a phone without adding much. */}
+          <div className="hidden sm:flex">
+            <BaserunnerDiamond
+              on1b={first.on_1b != null}
+              on2b={first.on_2b != null}
+              on3b={first.on_3b != null}
+            />
           </div>
         </div>
 
@@ -346,7 +343,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
             by its outcome category, so users need a key to map dot
             color → meaning. Wraps gracefully on narrow viewports. */}
         <div className="pt-3 border-t border-white/[0.05]">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-white/70 mb-1.5">
             Outcome
           </div>
           <ul className="flex flex-wrap gap-x-3 gap-y-1.5">

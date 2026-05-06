@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Billboard, Html, Sphere, useTexture } from "@react-three/drei";
+import { Html, Sphere, useTexture } from "@react-three/drei";
 import {
   CatmullRomCurve3,
   Color,
+  DoubleSide,
   ShaderMaterial,
   SRGBColorSpace,
   Vector3,
@@ -548,10 +549,11 @@ function ReplayDriver({
 
 // Silhouette of the batter standing in the box, mirrored by
 // handedness. RHB stands at −x (third-base box), LHB at +x (first-base
-// box). The shape comes from public/batter.png — its luminance is
-// inverted into alpha at draw time so the black silhouette reads as
-// the opaque pixels. Wrapped in a <Billboard> so the figure always
-// faces the camera, keeping the silhouette readable from any preset.
+// box). Shape comes from public/batter.png — luminance × alpha is the
+// silhouette mask in the shader. Fixed orientation (turned ~110° so the
+// figure faces the pitcher with a slight diagonal toward the camera),
+// with two crossed planes so the figure has visible "thickness" from
+// any horizontal angle and never goes edge-on invisible.
 function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
   const xOffset = stand === "R" ? -2.2 : 2.2;
   const zOffset = 0.3;
@@ -579,11 +581,6 @@ function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
         varying vec2 vUv;
         void main() {
           vec4 t = texture2D(uMap, vUv);
-          // Robust silhouette extraction across PNG variants:
-          //  - Transparent-background PNG: t.a is 0 outside the figure
-          //    (regardless of RGB), so multiplying by t.a clips the bg.
-          //  - Solid white-background PNG: t.a is 1 everywhere, so the
-          //    (1 − luminance) term clips the bright pixels.
           float lum = max(t.r, max(t.g, t.b));
           float a = (1.0 - lum) * t.a;
           if (a < 0.3) discard;
@@ -591,6 +588,7 @@ function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
         }
       `,
       transparent: true,
+      side: DoubleSide,
       depthWrite: false,
     });
   }, [texture]);
@@ -599,17 +597,19 @@ function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
   // height of ~6.2 ft (helmet included).
   const height = 6.2;
   const width = height * (1196 / 1920);
-  // Mirror so each handedness ends up with the bat on the correct
-  // shoulder relative to the camera.
+  // LH batter mirrors the texture so the bat ends up on the correct
+  // shoulder, and the rotation flips sign so each handedness opens
+  // toward the pitcher symmetrically.
   const flipX = stand === "L" ? -1 : 1;
+  const rotationY = (stand === "R" ? -110 : 110) * (Math.PI / 180);
 
   return (
-    <Billboard position={[xOffset, height / 2, zOffset]} lockX lockZ>
+    <group position={[xOffset, height / 2, zOffset]} rotation={[0, rotationY, 0]}>
       <mesh scale={[flipX, 1, 1]}>
         <planeGeometry args={[width, height]} />
         <primitive object={material} attach="material" />
       </mesh>
-    </Billboard>
+    </group>
   );
 }
 
@@ -788,12 +788,12 @@ function PitchStepper({
 
   return (
     // Mobile: dock the stepper flush to the bottom of the pitcher/
-    // batter panel. Side panel is now a fixed h-[11rem] starting at
-    // top-20 (5rem) → bottom at 16rem. Stepper at top-[16.5rem] sits
-    // with a 0.5rem breathing gap. Keeps the rest of the screen
-    // free for the 3D scene.
+    // batter panel. Side panel is fixed h-[11rem] starting at
+    // top-16 (4rem) → bottom at 15rem. Stepper at top-[15.5rem]
+    // sits with a 0.5rem breathing gap. Keeps the rest of the
+    // screen free for the 3D scene.
     // sm+: revert to the canonical bottom-center transport bar.
-    <div className="absolute top-[16.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute top-[15.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
