@@ -221,7 +221,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         <PitcherSearch placeholder="Search another pitcher…" />
       </div>
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center gap-3">
           <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
             <Image

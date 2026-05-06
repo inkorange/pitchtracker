@@ -189,6 +189,18 @@ export function AtBatReplayScene({
     [prepared, syncUrl],
   );
 
+  // Play/pause toggle. If we're already at the end (phase === "done"),
+  // Play restarts the at-bat from the first pitch — otherwise the
+  // button looks live but does nothing because the driver short-circuits
+  // on the done phase.
+  const handleTogglePlay = useCallback(() => {
+    if (phase === "done") {
+      jumpTo(0, true);
+      return;
+    }
+    setPlaying((p) => !p);
+  }, [phase, jumpTo]);
+
   // Keyboard shortcuts: ←/→ step pitches, space play/pause.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -203,7 +215,7 @@ export function AtBatReplayScene({
       }
       if (e.key === " ") {
         e.preventDefault();
-        setPlaying((p) => !p);
+        handleTogglePlay();
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         jumpTo(currentIdx + 1, false);
@@ -217,7 +229,7 @@ export function AtBatReplayScene({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [currentIdx, jumpTo]);
+  }, [currentIdx, jumpTo, handleTogglePlay]);
 
   const activePitch = prepared[currentIdx];
   const isLast = currentIdx >= prepared.length - 1;
@@ -231,17 +243,14 @@ export function AtBatReplayScene({
     return null;
   })();
 
-  // Front-preset camera angle depends on batter handedness so the
-  // strike zone projects to the side of the screen opposite the
-  // batter and a slice of the silhouette stays in frame on mobile
-  // portrait. Camera shifts ±1 ft toward the opposite side of the
-  // plate from the batter (L → camera at -x, SZ on right; R → mirror).
-  // Pulled in tight — z=4 — so the strike zone and batter's box
-  // dominate the frame, with the pitch trajectory reading out into
-  // the upper portion of view rather than centered.
+  // Front-preset camera angle depends on batter handedness. Camera
+  // shifts toward the SAME side of the plate as the batter, so when
+  // the camera looks back at the plate the strike zone is offset to
+  // the screen side OPPOSITE the batter (RHB at -x → camera at -x →
+  // plate appears to the right of center; LHB mirrors).
   const frontPresetOverride: CameraPosition | null = useMemo(() => {
     if (preset !== "front" || !batterStand) return null;
-    const cameraX = batterStand === "L" ? -0.8 : 0.8;
+    const cameraX = batterStand === "L" ? 0.8 : -0.8;
     return {
       position: [cameraX, 3.9, 10],
       target: [0, 2.8, -20],
@@ -356,7 +365,7 @@ export function AtBatReplayScene({
         className={`absolute bottom-20 right-3 sm:right-6 z-20 px-3 py-1.5 rounded text-[10px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors pointer-events-auto ${
           followMode
             ? "bg-white/15 border-white/25 text-white"
-            : "bg-black/35 border-white/15 text-white/65 hover:text-white hover:bg-black/50"
+            : "bg-black/35 border-white/15 text-white/65 hover:text-white hover:bg-[#081a32]/80"
         }`}
         aria-pressed={followMode}
         title="Camera tracks the active pitch's ball with a cinematic lag."
@@ -369,7 +378,7 @@ export function AtBatReplayScene({
         currentIdx={currentIdx}
         playing={playing}
         onJumpTo={jumpTo}
-        onTogglePlay={() => setPlaying((p) => !p)}
+        onTogglePlay={handleTogglePlay}
         activePitch={activePitch}
       />
     </>
@@ -799,7 +808,7 @@ function PitchStepper({
     // screen free for the 3D scene.
     // sm+: revert to the canonical bottom-center transport bar.
     <div className="absolute top-[15.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
-      <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
+      <div className="px-3 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
           onClick={() => onJumpTo(0, true)}
@@ -865,7 +874,7 @@ function PitchStepper({
           <span>{balls}-{strikes}</span>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 flex-wrap justify-center max-w-full px-2">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg">
         {prepared.map((p, i) => (
           <button
             key={`dot-${i}`}
@@ -876,7 +885,7 @@ function PitchStepper({
                 ? "bg-white"
                 : i < currentIdx
                   ? dotColorForOutcome(p.raw.description)
-                  : "bg-white/20 hover:bg-white/40"
+                  : "bg-white/30 hover:bg-white/60"
             }`}
             aria-label={`Jump to pitch ${i + 1}`}
           />

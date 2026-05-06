@@ -271,45 +271,62 @@ function AtBatRow({
     <li>
       <Link
         href={`/at-bat/${gamePk}/${ab.at_bat_number}`}
-        className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors"
+        className="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          {ab.batter_id ? (
-            <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-              <Image
-                src={pitcherHeadshotUrl(ab.batter_id, 60)}
-                alt=""
-                fill
-                sizes="32px"
-                className="object-cover"
-                unoptimized
-              />
+        {ab.pitcher_id ? (
+          <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+            <Image
+              src={pitcherHeadshotUrl(ab.pitcher_id, 60)}
+              alt=""
+              fill
+              sizes="32px"
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+        ) : null}
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <div className="text-sm text-white/95 flex items-center gap-1.5 min-w-0">
+            <span className="truncate">{pitcherName}</span>
+            <span className="text-white/40 flex-shrink-0">vs</span>
+            <span className="truncate flex-1 text-right">{batterName}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[11px] text-white/55 tabular-nums truncate">
+              AB #{ab.at_bat_number} · {ab.pitch_count} pitch
+              {ab.pitch_count === 1 ? "" : "es"} · final{" "}
+              {ab.final_balls}-{ab.final_strikes} · {ab.outs_when_up}{" "}
+              {ab.outs_when_up === 1 ? "out" : "outs"}
             </div>
-          ) : null}
-        </div>
-        <div className="min-w-0">
-          <div className="text-sm text-white/95 truncate">
-            {pitcherName}{" "}
-            <span className="text-white/40">vs</span> {batterName}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ background: dotColor }}
+                  aria-hidden
+                />
+                <span className="text-white/85 truncate max-w-[10rem]">
+                  {outcome}
+                </span>
+              </div>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-white/35">
+                Replay →
+              </span>
+            </div>
           </div>
-          <div className="text-[11px] text-white/55 tabular-nums">
-            AB #{ab.at_bat_number} · {ab.pitch_count} pitch
-            {ab.pitch_count === 1 ? "" : "es"} · final{" "}
-            {ab.final_balls}-{ab.final_strikes} · {ab.outs_when_up}{" "}
-            {ab.outs_when_up === 1 ? "out" : "outs"}
+        </div>
+        {ab.batter_id ? (
+          <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+            <Image
+              src={pitcherHeadshotUrl(ab.batter_id, 60)}
+              alt=""
+              fill
+              sizes="32px"
+              className="object-cover"
+              unoptimized
+            />
           </div>
-        </div>
-        <div className="flex items-center gap-1.5 text-[11px]">
-          <span
-            className="w-2 h-2 rounded-full"
-            style={{ background: dotColor }}
-            aria-hidden
-          />
-          <span className="text-white/85 truncate max-w-[10rem]">{outcome}</span>
-        </div>
-        <span className="text-[10px] uppercase tracking-[0.14em] text-white/35">
-          Replay →
-        </span>
+        ) : null}
       </Link>
     </li>
   );

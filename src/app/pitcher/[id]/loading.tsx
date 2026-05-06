@@ -22,7 +22,7 @@ export default function Loading() {
           />
         </div>
       </div>
-      <div className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto sm:w-[340px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-3">
+      <div className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-3">
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 rounded-full bg-white/[0.08] animate-pulse" />
           <div className="flex-1 space-y-2">

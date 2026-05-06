@@ -114,7 +114,10 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
     if (sp.error === "notfound") {
       const team = teams.find((t) => String(t.mlb_id) === sp.team);
       const teamLabel = team?.name ?? "that team";
-      return `No regular-season game for ${teamLabel} on ${sp.date ?? "that date"}.`;
+      const dateLabel = sp.date ?? "that date";
+      return games.length > 0
+        ? `${teamLabel} didn't play on ${dateLabel}. Other games that day are listed below.`
+        : `No regular-season game for ${teamLabel} on ${dateLabel}.`;
     }
     if (sp.error === "missing") {
       return "Pick a date to find a game.";

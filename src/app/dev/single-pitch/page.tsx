@@ -48,7 +48,7 @@ export default function SinglePitchDev() {
         <Ribbon path={path} pitchType={SKUBAL_FASTBALL.pitch_type} />
         <BallTracer path={path} progress={progress} />
       </Scene>
-      <div className="absolute top-6 left-6 px-4 py-3 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg">
+      <div className="absolute top-6 left-6 px-4 py-3 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg">
         <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Dev fixture</div>
         <div className="text-sm text-white/95 font-medium mt-0.5">
           Skubal · {getPitchLabel(SKUBAL_FASTBALL.pitch_type)}
