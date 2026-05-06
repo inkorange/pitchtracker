@@ -9,6 +9,7 @@ import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
 import { CameraPad } from "@/components/controls/CameraPad";
+import { Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
@@ -414,7 +415,7 @@ function ReplayDriver({
         if (i > currentIdx) return null;
         const drawProgress =
           i < currentIdx ? 1 : phase === "flying" ? intraProgress : 1;
-        const isActive = i === currentIdx && phase === "flying";
+        const isFlying = i === currentIdx && phase === "flying";
         const isSelected = selectedDetailIdx === i;
         // Selected pitch reads bolder; others fade slightly so the
         // focus is unambiguous. Default opacity for completed pitches
@@ -426,7 +427,9 @@ function ReplayDriver({
             : isSelected
               ? 1
               : baseOpacity * 0.4;
-        const radius = isSelected ? 0.13 : isActive ? 0.11 : 0.09;
+        const radius = isSelected ? 0.13 : isFlying ? 0.11 : 0.09;
+        const outcomeColor =
+          OUTCOME_COLORS[categorizeDescription(p.raw.description)];
         return (
           <group key={`pitch-${p.raw.pitch_number}`}>
             <Ribbon
@@ -446,11 +449,39 @@ function ReplayDriver({
                 document.body.style.cursor = "";
               }}
             />
-            {/* Show the ball at its final plate position for past pitches
-                and the settled current pitch (drawProgress=1), and as a
-                live tracer while flying. Balls accumulate across the
-                at-bat instead of disappearing on landing. */}
-            <BallTracer path={p.path} progress={drawProgress} />
+            {/* While flying: white BallTracer animates along the curve.
+                After landing: a sphere parked at the plate, colored by
+                the pitch's outcome category so the at-bat reads as a
+                tunnel pattern with outcome dots at each strand's end. */}
+            {isFlying ? (
+              <BallTracer path={p.path} progress={drawProgress} />
+            ) : p.platePos ? (
+              <Sphere
+                args={[isSelected ? 0.16 : 0.13, 18, 18]}
+                position={p.platePos}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onSelectPitch(i);
+                }}
+                onPointerOver={(ev) => {
+                  ev.stopPropagation();
+                  document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "";
+                }}
+              >
+                <meshStandardMaterial
+                  color={outcomeColor}
+                  roughness={0.4}
+                  metalness={0.05}
+                  transparent
+                  opacity={opacity}
+                  emissive={isSelected ? outcomeColor : "#000000"}
+                  emissiveIntensity={isSelected ? 0.6 : 0}
+                />
+              </Sphere>
+            ) : null}
           </group>
         );
       })}

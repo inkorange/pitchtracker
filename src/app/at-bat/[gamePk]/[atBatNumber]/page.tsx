@@ -5,6 +5,11 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPerson } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
+import {
+  OUTCOME_COLORS,
+  OUTCOME_LABELS,
+  type OutcomeCategory,
+} from "@/lib/viz/colors";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
 import { AtBatReplayScene, type ReplayPitch } from "./AtBatReplayScene";
 
@@ -321,6 +326,31 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               {(first.outs_when_up ?? 0) === 1 ? "out" : "outs"}
             </span>
           </div>
+        </div>
+
+        {/* Outcome legend — every landed pitch in the scene is colored
+            by its outcome category, so users need a key to map dot
+            color → meaning. Wraps gracefully on narrow viewports. */}
+        <div className="pt-3 border-t border-white/[0.05]">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
+            Outcome
+          </div>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1.5">
+            {(["whiff", "called", "ball", "foul", "inplay"] as const).map(
+              (cat: OutcomeCategory) => (
+                <li
+                  key={cat}
+                  className="flex items-center gap-1.5 text-[11px] text-white/85"
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: OUTCOME_COLORS[cat] }}
+                  />
+                  <span>{OUTCOME_LABELS[cat]}</span>
+                </li>
+              ),
+            )}
+          </ul>
         </div>
       </section>
     </main>
