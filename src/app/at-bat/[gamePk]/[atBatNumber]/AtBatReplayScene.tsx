@@ -218,14 +218,14 @@ export function AtBatReplayScene({
   // Front-preset camera angle depends on batter handedness so the
   // strike zone projects to the side of the screen opposite the
   // batter (per request: L → SZ on right, R → SZ on left). Camera
-  // shifts to the OPPOSITE side of the plate from where the batter
-  // stands, so the camera looks across the plate toward the box and
-  // the SZ ends up off-axis on that side.
+  // shifts slightly to the OPPOSITE side of the plate from where the
+  // batter stands; ±1 ft is enough to push the SZ visibly off-center
+  // without warping the framing.
   const frontPresetOverride: CameraPosition | null = useMemo(() => {
     if (preset !== "front" || !batterStand) return null;
     // L batter is at +x (1B side); shifting camera to -x makes SZ
     // project right-of-center. R batter mirrors.
-    const cameraX = batterStand === "L" ? -2.4 : 2.4;
+    const cameraX = batterStand === "L" ? -1 : 1;
     return {
       position: [cameraX, 4.3, 11],
       target: [0, 2.5, -55],
@@ -539,10 +539,12 @@ function ReplayDriver({
 // strike zone without competing with the pitch ribbons.
 function BatterSilhouette({ stand }: { stand: "L" | "R" }) {
   const xOffset = stand === "R" ? -2.2 : 2.2;
-  // Slight forward offset toward catcher (negative z = away from
-  // mound) so the silhouette sits in the back of the box rather than
-  // straddling the front of the plate.
-  const zOffset = 0.8;
+  // Sit close to the front of the plate. The batter's box starts
+  // ~6 inches off the plate; a small forward offset (z=0.3) places
+  // the silhouette near the front of the box where batters actually
+  // stand to reach pitches, rather than parked at the back of the
+  // box.
+  const zOffset = 0.3;
   const color = "#101418";
   const opacity = 0.42;
   return (
