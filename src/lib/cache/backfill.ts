@@ -37,24 +37,29 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
     await backfillSeasonSchedule(season);
   }
 
-  // Now check whether we already have any pitches for this pitcher in
-  // this season's games.
-  const { data: seasonGameRows } = await supabase
-    .from("pitch_games")
-    .select("game_pk")
-    .eq("season", season);
-  const seasonGamePks = new Set((seasonGameRows ?? []).map((g) => g.game_pk));
-  if (seasonGamePks.size === 0) {
-    // Schedule backfill produced nothing — give up silently.
-    return;
-  }
-
-  const { count: pitchCount } = await supabase
+  // "Already cached?" check, done via the pitcher's own (small) set of
+  // game_pks rather than the season's full game list. Pulling all
+  // pitch_games rows for a season blows past Postgrest's default 1000-row
+  // cap (a full MLB schedule is ~2400 games), which silently truncated
+  // the membership set and made the rest of this function think a
+  // pitcher had no pitches in the missing-tail games.
+  const { data: pitcherGameRows } = await supabase
     .from("pitch_game_pitches")
-    .select("*", { count: "exact", head: true })
-    .eq("pitcher_id", pitcherId)
-    .in("game_pk", Array.from(seasonGamePks));
-  if ((pitchCount ?? 0) > 0) return; // already cached
+    .select("game_pk")
+    .eq("pitcher_id", pitcherId);
+  const pitcherGamePks = Array.from(
+    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
+  );
+  if (pitcherGamePks.length > 0) {
+    const { data: pitcherGameMeta } = await supabase
+      .from("pitch_games")
+      .select("game_pk, season")
+      .in("game_pk", pitcherGamePks);
+    const cachedSeasonGames = (pitcherGameMeta ?? []).filter(
+      (g) => g.season === season,
+    );
+    if (cachedSeasonGames.length > 0) return; // pitcher already has cached pitches in this season
+  }
 
   // Pull from Savant.
   let fresh;
@@ -65,6 +70,27 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
   }
   if (fresh.length === 0) return;
 
+  // FK requirement: every game_pk on a pitch row must exist in
+  // pitch_games. Look up just the game_pks Savant returned (small set,
+  // so no pagination problem) instead of materializing the whole season.
+  const savantGamePks = Array.from(new Set(fresh.map((p) => p.game_pk)));
+  const { data: existingGameRows } =
+    savantGamePks.length > 0
+      ? await supabase
+          .from("pitch_games")
+          .select("game_pk")
+          .in("game_pk", savantGamePks)
+      : { data: [] };
+  const knownGamePks = new Set(
+    (existingGameRows ?? []).map((g) => g.game_pk),
+  );
+  if (knownGamePks.size === 0) {
+    // Every Savant game is unknown to us. The most likely cause is that
+    // the schedule backfill produced nothing or didn't include these
+    // pks. Bail rather than insert orphan rows that would fail the FK.
+    return;
+  }
+
   // Filter to game_pks we have in pitch_games (FK requirement) and to
   // pitcher_id == this pitcher (Savant returns related-pitch context too,
   // but we stay scoped). Also null out any unknown opposing pitcher_ids.
@@ -74,7 +100,7 @@ async function doEnsure(pitcherId: number, season: number): Promise<void> {
   const knownPitcherIds = new Set((knownPitchers ?? []).map((p) => p.mlb_id));
 
   const rows: TablesInsert<"pitch_game_pitches">[] = fresh
-    .filter((p) => seasonGamePks.has(p.game_pk))
+    .filter((p) => knownGamePks.has(p.game_pk))
     .map((p) => ({
       game_pk: p.game_pk,
       at_bat_number: p.at_bat_number,
