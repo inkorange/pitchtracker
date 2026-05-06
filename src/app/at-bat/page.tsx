@@ -30,51 +30,62 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
   const sp = await searchParams;
   const supabase = await createClient();
 
-  // Pull the most recently fetched (pitcher, game) pairs and dedupe to
-  // distinct games. Bounded by how aggressively we've been backfilling,
-  // not by the schedule.
-  const [{ data: ppgRows }, { data: teamsRaw }] = await Promise.all([
-    supabase
+  // All 30 MLB teams — used for the lookup form and to resolve
+  // abbreviations on the games list below.
+  const { data: teamsRaw } = await supabase
+    .from("pitch_teams")
+    .select("mlb_id, abbreviation, name")
+    .order("name");
+  const teams = (teamsRaw ?? []) as TeamRow[];
+  const teamById = new Map(teams.map((t) => [t.mlb_id, t]));
+
+  // Two modes for the games list below:
+  //   - sp.date set (date-only search): every regular-season game on
+  //     that date, schedule-driven (independent of cache state).
+  //   - default: most-recently-cached games derived from
+  //     pitch_pitcher_games.
+  let games: GameRow[] = [];
+  if (sp.date) {
+    const { data: gamesRaw } = await supabase
+      .from("pitch_games")
+      .select("game_pk, game_date, home_team_id, away_team_id, season")
+      .eq("game_type", "R")
+      .eq("game_date", sp.date)
+      .order("game_pk", { ascending: true });
+    games = (gamesRaw ?? []) as GameRow[];
+  } else {
+    const { data: ppgRows } = await supabase
       .from("pitch_pitcher_games")
       .select("game_pk, fetched_at")
       .order("fetched_at", { ascending: false })
-      .limit(500),
-    // All 30 MLB teams. Used for both the team-date lookup form and
-    // resolving abbreviations on the recent games list.
-    supabase
-      .from("pitch_teams")
-      .select("mlb_id, abbreviation, name")
-      .order("name"),
-  ]);
+      .limit(500);
 
-  const seenGamePks = new Set<number>();
-  const orderedGamePks: number[] = [];
-  for (const row of ppgRows ?? []) {
-    if (seenGamePks.has(row.game_pk)) continue;
-    seenGamePks.add(row.game_pk);
-    orderedGamePks.push(row.game_pk);
-    if (orderedGamePks.length >= 30) break;
+    const seenGamePks = new Set<number>();
+    const orderedGamePks: number[] = [];
+    for (const row of ppgRows ?? []) {
+      if (seenGamePks.has(row.game_pk)) continue;
+      seenGamePks.add(row.game_pk);
+      orderedGamePks.push(row.game_pk);
+      if (orderedGamePks.length >= 30) break;
+    }
+
+    const { data: gamesRaw } =
+      orderedGamePks.length > 0
+        ? await supabase
+            .from("pitch_games")
+            .select("game_pk, game_date, home_team_id, away_team_id, season")
+            .in("game_pk", orderedGamePks)
+            .eq("game_type", "R")
+        : { data: [] };
+
+    const gameByPk = new Map<number, GameRow>();
+    for (const g of (gamesRaw ?? []) as GameRow[]) gameByPk.set(g.game_pk, g);
+
+    games = orderedGamePks
+      .map((pk) => gameByPk.get(pk))
+      .filter((g): g is GameRow => g !== undefined)
+      .sort((a, b) => b.game_date.localeCompare(a.game_date));
   }
-
-  const { data: gamesRaw } =
-    orderedGamePks.length > 0
-      ? await supabase
-          .from("pitch_games")
-          .select("game_pk, game_date, home_team_id, away_team_id, season")
-          .in("game_pk", orderedGamePks)
-          .eq("game_type", "R")
-      : { data: [] };
-
-  const gameByPk = new Map<number, GameRow>();
-  for (const g of (gamesRaw ?? []) as GameRow[]) gameByPk.set(g.game_pk, g);
-
-  const games: GameRow[] = orderedGamePks
-    .map((pk) => gameByPk.get(pk))
-    .filter((g): g is GameRow => g !== undefined)
-    .sort((a, b) => b.game_date.localeCompare(a.game_date));
-
-  const teams = (teamsRaw ?? []) as TeamRow[];
-  const teamById = new Map(teams.map((t) => [t.mlb_id, t]));
 
   // Default the date input to yesterday in America/New_York — the
   // canonical "baseball day" boundary regardless of where the user is.
@@ -92,10 +103,15 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
       return `No regular-season game for ${teamLabel} on ${sp.date ?? "that date"}.`;
     }
     if (sp.error === "missing") {
-      return "Pick a team and a date to find a game.";
+      return "Pick a date to find a game.";
     }
     return null;
   })();
+
+  const listHeading = sp.date ? `Games on ${sp.date}` : "Recent games";
+  const emptyMessage = sp.date
+    ? `No regular-season games on ${sp.date}.`
+    : "No games available yet. Visit a pitcher's page to load their season data.";
 
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
@@ -109,8 +125,8 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">At-bat replays</h1>
           <p className="text-sm text-white/55 max-w-prose">
-            Pick a team and a date to jump to that day&apos;s game, or
-            browse a recent game below.
+            Pick a date to see every game that day, or add a team to
+            jump straight to one matchup.
           </p>
         </div>
 
@@ -126,13 +142,10 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
 
         <section className="space-y-3">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-white/55">
-            Recent games
+            {listHeading}
           </h2>
           {games.length === 0 ? (
-            <p className="text-sm text-white/55">
-              No games available yet. Visit a pitcher&apos;s page to load
-              their season data.
-            </p>
+            <p className="text-sm text-white/55">{emptyMessage}</p>
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {games.map((g) => {
@@ -219,18 +232,15 @@ function TeamDateLookupForm({
           htmlFor="team"
           className="text-[10px] uppercase tracking-[0.14em] text-white/45"
         >
-          Team
+          Team <span className="text-white/30 normal-case">(optional)</span>
         </label>
         <select
           id="team"
           name="team"
-          required
           defaultValue={initialTeam ?? ""}
           className="px-3 py-1.5 rounded bg-black/40 border border-white/10 text-white text-sm focus:outline-none focus:border-white/25"
         >
-          <option value="" disabled>
-            Pick a team…
-          </option>
+          <option value="">All teams</option>
           {teams.map((t) => (
             <option key={t.mlb_id} value={t.mlb_id}>
               {t.name}

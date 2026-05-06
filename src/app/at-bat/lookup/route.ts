@@ -24,10 +24,25 @@ export async function GET(request: Request) {
   }
 
   // New team+date flow.
-  const teamId = Number(url.searchParams.get("team"));
+  const teamRaw = url.searchParams.get("team");
   const date = url.searchParams.get("date");
 
-  if (!Number.isFinite(teamId) || !date) {
+  if (!date) {
+    return NextResponse.redirect(
+      new URL("/at-bat?error=missing", request.url),
+    );
+  }
+
+  // Date-only: bounce to the index with ?date= so it lists every game
+  // on that date. The team is intentionally optional now.
+  if (!teamRaw) {
+    const back = new URL("/at-bat", request.url);
+    back.searchParams.set("date", date);
+    return NextResponse.redirect(back);
+  }
+
+  const teamId = Number(teamRaw);
+  if (!Number.isFinite(teamId)) {
     return NextResponse.redirect(
       new URL("/at-bat?error=missing", request.url),
     );
