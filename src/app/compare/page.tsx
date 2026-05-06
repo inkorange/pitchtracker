@@ -243,11 +243,15 @@ async function loadSideContext(
   seasonsWithData.add(currentYear);
   const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
 
-  const { data: seasonGames } = await supabase
-    .from("pitch_games")
-    .select("game_pk")
-    .eq("season", season);
-  const seasonGamePks = new Set((seasonGames ?? []).map((g) => g.game_pk));
+  // Derive the active-season game_pks from this pitcher's already-loaded
+  // game metadata. Querying pitch_games by season directly hits Supabase's
+  // default 1000-row cap on a full MLB season (~2430 games), which would
+  // silently drop any cached games beyond that window.
+  const seasonGamePks = new Set(
+    (pitcherGameSeasons ?? [])
+      .filter((g) => g.season === season)
+      .map((g) => g.game_pk),
+  );
 
   // Pitch-type filtering is now done in JS so the arsenal display can
   // ignore it (the type chips are how the user toggles types — they
@@ -309,9 +313,8 @@ async function loadSideContext(
     .sort((a, b) => b.pitch_count - a.pitch_count);
 
   // Game dropdown options (cached games for this pitcher in this season).
-  const cachedGamePksForSeason = distinctPitcherGamePks.filter((pk) => seasonGamePks.has(pk));
-  const seasonGameMeta = (pitcherGameSeasons ?? []).filter((g) =>
-    cachedGamePksForSeason.includes(g.game_pk),
+  const seasonGameMeta = (pitcherGameSeasons ?? []).filter(
+    (g) => g.season === season,
   );
   const teamIds = new Set<number>();
   for (const g of seasonGameMeta) {
