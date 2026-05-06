@@ -17,6 +17,7 @@ interface RibbonProps {
   opacity?: number;
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
+  onClick?: (e: ThreeEvent<MouseEvent>) => void;
 }
 
 export function Ribbon({
@@ -28,6 +29,7 @@ export function Ribbon({
   opacity = 1,
   onPointerOver,
   onPointerOut,
+  onClick,
 }: RibbonProps) {
   const geometry = useMemo(() => {
     const points = path.map((p) => new Vector3(...statcastToThree(p)));
@@ -42,7 +44,12 @@ export function Ribbon({
   // without needing material.needsUpdate. depthWrite stays on so opaque
   // ribbons still occlude correctly when opacity is 1.
   return (
-    <mesh geometry={geometry} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
+    <mesh
+      geometry={geometry}
+      onPointerOver={onPointerOver}
+      onPointerOut={onPointerOut}
+      onClick={onClick}
+    >
       <meshStandardMaterial
         color={color}
         roughness={0.55}

@@ -249,6 +249,9 @@ async function loadSideContext(
     .eq("season", season);
   const seasonGamePks = new Set((seasonGames ?? []).map((g) => g.game_pk));
 
+  // Pitch-type filtering is now done in JS so the arsenal display can
+  // ignore it (the type chips are how the user toggles types — they
+  // can't disappear from the arsenal when one is selected).
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
@@ -261,29 +264,49 @@ async function loadSideContext(
   } else {
     pitchQuery = pitchQuery.eq("game_pk", -1); // empty
   }
-  if (pitchTypes.length > 0) pitchQuery = pitchQuery.in("pitch_type", pitchTypes);
   if (hand) pitchQuery = pitchQuery.eq("stand", hand);
   if (gamePk) pitchQuery = pitchQuery.eq("game_pk", gamePk);
 
-  const { data: pitches } = await pitchQuery;
+  const { data: pitchesRaw } = await pitchQuery;
 
-  // Outcome filtering happens in JS rather than SQL — Statcast description
-  // strings map onto our 5-bucket categorization with too many edge cases
-  // (e.g. "swinging_strike_blocked") to translate cleanly into a SQL filter.
+  // Outcome and pitch-type filtering happen in JS. Outcomes because
+  // Statcast description strings don't map cleanly onto our 5-bucket
+  // categorization in SQL; pitch-types because we want the arsenal
+  // table/chips to reflect game+hand+outcome filters but NOT the
+  // currently-selected pitch types.
   const outcomeSet = new Set(outcomes);
+  const arsenalPitches = (pitchesRaw ?? []).filter(
+    (p) => outcomeSet.size === 0 || outcomeSet.has(categorizeDescription(p.description)),
+  );
+  const pitchTypeSet = new Set(pitchTypes);
   const filteredPitches =
-    outcomeSet.size > 0
-      ? (pitches ?? []).filter((p) => outcomeSet.has(categorizeDescription(p.description)))
-      : (pitches ?? []);
+    pitchTypeSet.size === 0
+      ? arsenalPitches
+      : arsenalPitches.filter((p) => p.pitch_type != null && pitchTypeSet.has(p.pitch_type));
 
-  const { data: aggregates } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select("pitch_type, pitch_count, usage_pct, avg_velocity")
-    .eq("pitcher_id", pitcherId)
-    .eq("season", season)
-    .eq("batter_hand", "*")
-    .gt("pitch_count", 0) // skip empty/stale pitch types
-    .order("usage_pct", { ascending: false, nullsFirst: false });
+  // Build arsenal stats directly from the filtered pitches so counts +
+  // percentages always match what's actually rendered.
+  type Bucket = { count: number; sumVel: number; nVel: number };
+  const buckets = new Map<string, Bucket>();
+  for (const p of arsenalPitches) {
+    if (!p.pitch_type) continue;
+    const b = buckets.get(p.pitch_type) ?? { count: 0, sumVel: 0, nVel: 0 };
+    b.count += 1;
+    if (p.release_speed != null) {
+      b.sumVel += p.release_speed;
+      b.nVel += 1;
+    }
+    buckets.set(p.pitch_type, b);
+  }
+  const totalArsenalPitches = arsenalPitches.length;
+  const aggregates: AggRow[] = Array.from(buckets.entries())
+    .map(([pitch_type, b]) => ({
+      pitch_type,
+      pitch_count: b.count,
+      usage_pct: totalArsenalPitches > 0 ? (b.count / totalArsenalPitches) * 100 : 0,
+      avg_velocity: b.nVel > 0 ? b.sumVel / b.nVel : null,
+    }))
+    .sort((a, b) => b.pitch_count - a.pitch_count);
 
   // Game dropdown options (cached games for this pitcher in this season).
   const cachedGamePksForSeason = distinctPitcherGamePks.filter((pk) => seasonGamePks.has(pk));
@@ -317,7 +340,7 @@ async function loadSideContext(
   return {
     season,
     availableSeasons,
-    aggregates: (aggregates ?? []) as AggRow[],
+    aggregates,
     pitches: filteredPitches as PitchRow[],
     gameOptions,
   };

@@ -14,6 +14,7 @@ import {
 } from "@/lib/pitch/averages";
 import { computeTunnelStats } from "@/lib/pitch/tunneling";
 import type { Pitch } from "@/lib/pitch/Pitch";
+import { statcastToThree } from "@/lib/viz/coords";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
 import { TunnelMarker } from "./TunnelMarker";
 import { OutcomeMarkers } from "./OutcomeMarkers";
@@ -38,7 +39,12 @@ interface ComparisonSceneProps {
 interface RibbonData {
   pitchType: string;
   path: Array<[number, number, number]>;
+  releaseSpeed: number | null;
 }
+
+type Selection =
+  | { kind: "pitch"; side: CompareSide; index: number }
+  | { kind: "average"; side: CompareSide; pitchType: string };
 
 interface MatchedTunnel {
   pitchType: string;
@@ -61,7 +67,7 @@ export function ComparisonScene({
   };
 
   const [progress, setProgress] = useState(0);
-  const [selected, setSelected] = useState<{ side: CompareSide; index: number } | null>(null);
+  const [selected, setSelected] = useState<Selection | null>(null);
 
   const { aRibbons, bRibbons, tunnels, flightDuration, releaseOffset } = useMemo(() => {
     const aByType = averagePitchesByType(aPitches);
@@ -123,56 +129,85 @@ export function ComparisonScene({
     return { aRibbons: aRaw, bRibbons, tunnels, flightDuration, releaseOffset };
   }, [aPitches, bPitches, normalizeRelease]);
 
-  // Build the selected pitch's actual trajectory. Side B's path gets
-  // the same release-point offset that the averaged B ribbons received,
-  // so a selected B pitch lines up with its averaged ribbon when
-  // normalizeRelease is on.
+  // Build the selected ribbon's path + label. Two kinds:
+  //   "pitch":   one specific cached pitch — build its path from kinematics
+  //   "average": one averaged-by-type ribbon — reuse its already-built path
+  // Side B paths in both cases inherit the release-point offset that the
+  // averaged B ribbons received, so the selection lines up with its
+  // averaged ribbon when normalizeRelease is on.
   const selectedRibbon = useMemo(() => {
     if (!selected) return null;
-    const list = selected.side === "a" ? aPitches : bPitches;
-    const row = list[selected.index];
-    if (!row) return null;
-    const pitch = pitchFromRow(row);
-    if (!pitch) return null;
-    let path: Array<[number, number, number]>;
-    try {
-      path = pitch.path(48);
-    } catch {
-      return null;
-    }
-    if (selected.side === "b") {
-      path = path.map(
-        (p) =>
-          [
-            p[0] + releaseOffset[0],
-            p[1] + releaseOffset[1],
-            p[2] + releaseOffset[2],
-          ] as [number, number, number],
-      );
-    }
-    const labelPosition: [number, number, number] = path[path.length - 1];
+    const sideRibbons = selected.side === "a" ? aRibbons : bRibbons;
     const label = selected.side === "a" ? aLabel : bLabel;
+
+    if (selected.kind === "pitch") {
+      const list = selected.side === "a" ? aPitches : bPitches;
+      const row = list[selected.index];
+      if (!row) return null;
+      const pitch = pitchFromRow(row);
+      if (!pitch) return null;
+      let path: Array<[number, number, number]>;
+      try {
+        path = pitch.path(48);
+      } catch {
+        return null;
+      }
+      if (selected.side === "b") {
+        path = path.map(
+          (p) =>
+            [
+              p[0] + releaseOffset[0],
+              p[1] + releaseOffset[1],
+              p[2] + releaseOffset[2],
+            ] as [number, number, number],
+        );
+      }
+      return {
+        pitchType: row.pitch_type ?? "",
+        path,
+        side: selected.side,
+        labelPosition: statcastToThree(path[path.length - 1]),
+        label,
+        velocity: row.release_speed,
+      };
+    }
+
+    // kind === "average"
+    // Side B's averaged ribbon already has releaseOffset baked in, so
+    // path comes through correctly without additional translation.
+    const r = sideRibbons.find((x) => x.pitchType === selected.pitchType);
+    if (!r) return null;
     return {
-      pitchType: row.pitch_type ?? "",
-      path,
+      pitchType: r.pitchType,
+      path: r.path,
       side: selected.side,
-      labelPosition,
+      labelPosition: statcastToThree(r.path[r.path.length - 1]),
       label,
-      velocity: row.release_speed,
+      velocity: r.releaseSpeed,
     };
-  }, [selected, aPitches, bPitches, releaseOffset, aLabel, bLabel]);
+  }, [selected, aPitches, bPitches, aRibbons, bRibbons, releaseOffset, aLabel, bLabel]);
 
   const showTracers = aRibbons.length + bRibbons.length > 0;
   const hasSelection = selected !== null;
 
-  const selectPitch = useCallback(
-    (side: CompareSide, index: number) => {
-      setSelected((prev) =>
-        prev && prev.side === side && prev.index === index ? null : { side, index },
-      );
-    },
-    [],
-  );
+  const selectPitch = useCallback((side: CompareSide, index: number) => {
+    setSelected((prev) =>
+      prev && prev.kind === "pitch" && prev.side === side && prev.index === index
+        ? null
+        : { kind: "pitch", side, index },
+    );
+  }, []);
+
+  const selectAverage = useCallback((side: CompareSide, pitchType: string) => {
+    setSelected((prev) =>
+      prev &&
+      prev.kind === "average" &&
+      prev.side === side &&
+      prev.pitchType === pitchType
+        ? null
+        : { kind: "average", side, pitchType },
+    );
+  }, []);
 
   return (
     <>
@@ -183,9 +218,15 @@ export function ComparisonScene({
           pitches={aPitches}
           progress={progress}
           showTracers={showTracers}
-          selectedIndex={selected?.side === "a" ? selected.index : null}
+          selectedPitchIndex={
+            selected?.kind === "pitch" && selected.side === "a" ? selected.index : null
+          }
+          selectedAveragePitchType={
+            selected?.kind === "average" && selected.side === "a" ? selected.pitchType : null
+          }
           hasSelection={hasSelection}
-          onSelect={(idx) => selectPitch("a", idx)}
+          onSelectPitch={(idx) => selectPitch("a", idx)}
+          onSelectAverage={(pt) => selectAverage("a", pt)}
         />
         <SideLayer
           side="b"
@@ -193,25 +234,36 @@ export function ComparisonScene({
           pitches={bPitches}
           progress={progress}
           showTracers={showTracers}
-          selectedIndex={selected?.side === "b" ? selected.index : null}
+          selectedPitchIndex={
+            selected?.kind === "pitch" && selected.side === "b" ? selected.index : null
+          }
+          selectedAveragePitchType={
+            selected?.kind === "average" && selected.side === "b" ? selected.pitchType : null
+          }
           hasSelection={hasSelection}
-          onSelect={(idx) => selectPitch("b", idx)}
+          onSelectPitch={(idx) => selectPitch("b", idx)}
+          onSelectAverage={(pt) => selectAverage("b", pt)}
         />
         {selectedRibbon && (
           <>
-            <Ribbon
-              path={selectedRibbon.path}
-              pitchType={selectedRibbon.pitchType}
-              radius={0.13}
-              side={selectedRibbon.side}
-            />
+            {/* For pitch selections we draw a fresh, thicker ribbon for that
+                specific pitch's actual kinematics. For average selections
+                the SideLayer already renders the matching averaged ribbon at
+                a thicker radius, so no extra ribbon is needed here. */}
+            {selected?.kind === "pitch" && (
+              <Ribbon
+                path={selectedRibbon.path}
+                pitchType={selectedRibbon.pitchType}
+                radius={0.13}
+                side={selectedRibbon.side}
+              />
+            )}
             <Html
               position={selectedRibbon.labelPosition}
-              distanceFactor={6}
               zIndexRange={[100, 0]}
               style={{ pointerEvents: "none" }}
             >
-              <div className="whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg translate-x-2 -translate-y-1/2">
+              <div className="whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg translate-x-3 -translate-y-1/2">
                 <span className="font-medium">{selectedRibbon.label}</span>
                 {selectedRibbon.velocity != null && (
                   <span className="text-white/70 ml-1.5">
@@ -253,9 +305,11 @@ interface SideLayerProps {
   pitches: PitchWithOutcome[];
   progress: number;
   showTracers: boolean;
-  selectedIndex: number | null;
+  selectedPitchIndex: number | null;
+  selectedAveragePitchType: string | null;
   hasSelection: boolean;
-  onSelect: (index: number) => void;
+  onSelectPitch: (index: number) => void;
+  onSelectAverage: (pitchType: string) => void;
 }
 
 function SideLayer({
@@ -264,9 +318,11 @@ function SideLayer({
   pitches,
   progress,
   showTracers,
-  selectedIndex,
+  selectedPitchIndex,
+  selectedAveragePitchType,
   hasSelection,
-  onSelect,
+  onSelectPitch,
+  onSelectAverage,
 }: SideLayerProps) {
   const hoverOpacity = useOpacityForSide(side);
   const { setHoveredSide } = useCompareHover();
@@ -277,30 +333,38 @@ function SideLayer({
   const onOver = useCallback(() => setHoveredSide(side), [setHoveredSide, side]);
   const onOut = useCallback(() => setHoveredSide(null), [setHoveredSide]);
 
-  // When a single pitch is selected, fade the averaged ribbons so the
-  // selected pitch's own trajectory reads clearly.
-  const ribbonOpacity = hoverOpacity * (hasSelection ? 0.18 : 1);
-
   return (
     <>
-      {ribbons.map((r) => (
-        <Ribbon
-          key={`${side}-${r.pitchType}`}
-          path={r.path}
-          pitchType={r.pitchType}
-          radius={0.1}
-          side={side}
-          opacity={ribbonOpacity}
-          onPointerOver={onOver}
-          onPointerOut={onOut}
-        />
-      ))}
+      {ribbons.map((r) => {
+        const isSelectedAverage = selectedAveragePitchType === r.pitchType;
+        // When something is selected, non-selected averaged ribbons fade
+        // out so the focused pitch reads clearly. The selected average
+        // (if any) stays full strength and gets a thicker tube.
+        const ribbonOpacity =
+          hoverOpacity * (hasSelection && !isSelectedAverage ? 0.18 : 1);
+        return (
+          <Ribbon
+            key={`${side}-${r.pitchType}`}
+            path={r.path}
+            pitchType={r.pitchType}
+            radius={isSelectedAverage ? 0.13 : 0.1}
+            side={side}
+            opacity={ribbonOpacity}
+            onPointerOver={onOver}
+            onPointerOut={onOut}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectAverage(r.pitchType);
+            }}
+          />
+        );
+      })}
       <OutcomeMarkers
         pitches={pitches}
         opacity={hoverOpacity}
-        selectedIndex={selectedIndex}
+        selectedIndex={selectedPitchIndex}
         hasSelection={hasSelection}
-        onSelect={onSelect}
+        onSelect={onSelectPitch}
         onPointerOver={onOver}
         onPointerOut={onOut}
       />
@@ -321,7 +385,11 @@ function ribbonsFromMap(byType: Map<string, Pitch>): RibbonData[] {
   const out: RibbonData[] = [];
   for (const [pitchType, pitch] of byType) {
     try {
-      out.push({ pitchType, path: pitch.path(48) });
+      out.push({
+        pitchType,
+        path: pitch.path(48),
+        releaseSpeed: pitch.row.release_speed ?? null,
+      });
     } catch {
       // skip malformed math
     }
