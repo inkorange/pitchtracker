@@ -18,12 +18,15 @@ interface PitcherSearchProps {
   initialQuery?: string;
   autoFocus?: boolean;
   placeholder?: string;
+  // Custom destination for a result click. Default: /pitcher/[id].
+  resultHref?: (pitcherId: number) => string;
 }
 
 export function PitcherSearch({
   initialQuery = "",
   autoFocus = false,
   placeholder = "Search a pitcher…",
+  resultHref,
 }: PitcherSearchProps) {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<PitcherResult[]>([]);
@@ -86,7 +89,7 @@ export function PitcherSearch({
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => visibleResults.length > 0 && setOpen(true)}
         placeholder={placeholder}
-        className="w-full px-4 py-3 rounded-md bg-white/[0.06] backdrop-blur-md border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/25 transition-colors"
+        className="w-full px-4 py-3 rounded-md bg-black/50 backdrop-blur-md border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/25 transition-colors"
         aria-label="Search pitchers"
         aria-expanded={showDropdown}
         aria-controls="pitcher-search-listbox"
@@ -111,7 +114,7 @@ export function PitcherSearch({
           {visibleResults.map((p) => (
             <li key={p.mlb_id} role="option" aria-selected={false}>
               <Link
-                href={`/pitcher/${p.mlb_id}`}
+                href={resultHref ? resultHref(p.mlb_id) : `/pitcher/${p.mlb_id}`}
                 className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.04] transition-colors"
                 onClick={() => setOpen(false)}
               >

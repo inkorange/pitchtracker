@@ -27,15 +27,17 @@ export function SeasonPicker({ pitcherId, season, available }: SeasonPickerProps
   return (
     <div className="flex items-center gap-1.5">
       <TransitionOverlay isPending={isPending} />
-      <span className="text-[10px] uppercase tracking-[0.14em] text-white/45">Season</span>
-      <div className="flex gap-1">
+      <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 flex-shrink-0">
+        Season
+      </span>
+      <div className="flex gap-1 overflow-x-auto flex-1 min-w-0 scrollbar-thin">
         {available.map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => goto(s)}
             disabled={isPending}
-            className={`px-2 py-0.5 text-[11px] tabular-nums rounded transition-colors ${
+            className={`flex-shrink-0 px-2 py-0.5 text-[11px] tabular-nums rounded transition-colors ${
               s === season
                 ? "bg-white/12 text-white"
                 : "text-white/55 hover:text-white hover:bg-white/[0.04]"

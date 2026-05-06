@@ -89,6 +89,12 @@ export class Pitch {
     return this._solveTimeAtY(plateY) - this._solveTimeAtY(this.row.release_pos_y);
   }
 
+  // Position at a given y (distance from plate). Throws NaN out if the
+  // pitch never passes through that y.
+  positionAtY(y: number): [number, number, number] {
+    return this.positionAtTime(this._solveTimeAtY(y));
+  }
+
   // Break-onset distance: y-position (feet from the plate) at which `threshold`
   // fraction of the pitch's total break has occurred. Smaller value = later /
   // sharper break. Default threshold is 0.5 — the convention a pitching coach

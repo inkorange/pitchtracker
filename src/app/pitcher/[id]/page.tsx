@@ -2,12 +2,19 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
-import { getPitchLabel, getPitchColor } from "@/lib/viz/colors";
+import {
+  categorizeDescription,
+  getPitchLabel,
+  getPitchColor,
+  type OutcomeCategory,
+} from "@/lib/viz/colors";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
+import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -16,6 +23,7 @@ interface PageProps {
     pitch?: string;
     hand?: string;
     game?: string;
+    outcome?: string;
   }>;
 }
 
@@ -35,68 +43,44 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   if (!pitcher) notFound();
 
   const currentYear = new Date().getFullYear();
-
-  // All seasons we have data for this pitcher — aggregates OR cached pitches —
-  // plus the current year (always selectable).
-  const { data: aggSeasonRows } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select("season")
-    .eq("pitcher_id", pitcherId);
-  const { data: pitcherGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk")
-    .eq("pitcher_id", pitcherId);
-  const pitcherGamePks = Array.from(
-    new Set((pitcherGameRows ?? []).map((r) => r.game_pk)),
-  );
-  const { data: pitcherGameSeasons } =
-    pitcherGamePks.length > 0
-      ? await supabase.from("pitch_games").select("season").in("game_pk", pitcherGamePks)
-      : { data: [] };
-  const seasonsWithData = new Set<number>();
-  for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
-  for (const r of pitcherGameSeasons ?? []) seasonsWithData.add(r.season);
-  seasonsWithData.add(currentYear);
-  const availableSeasons = Array.from(seasonsWithData).sort((a, b) => b - a);
-
   const season = sp.season ? Number(sp.season) : currentYear;
 
-  const { data: aggregates } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select("*")
-    .eq("pitcher_id", pitcherId)
-    .eq("season", season)
-    .eq("batter_hand", "*")
-    .order("usage_pct", { ascending: false, nullsFirst: false });
+  // Season picker offers a fixed window: from current year back to the
+  // pitcher's debut (or 6 years if debut isn't known). We never query
+  // cross-season aggregates or game lists just to populate this list —
+  // the user picks one year at a time and we only ever load that year's
+  // pitches.
+  const FALLBACK_YEARS = 6;
+  const earliestSelectableYear = pitcher.debut_year
+    ? Math.max(pitcher.debut_year, currentYear - FALLBACK_YEARS - 6)
+    : currentYear - FALLBACK_YEARS;
+  const availableSeasons: number[] = [];
+  for (let y = currentYear; y >= earliestSelectableYear; y--) {
+    availableSeasons.push(y);
+  }
 
-  // Get the set of game_pks for this pitcher in the active season — used for
-  // both the cached-pitch query and the game dropdown so neither leaks games
-  // from other years.
-  const { data: seasonGamesRows } = await supabase
-    .from("pitch_games")
-    .select("game_pk")
-    .eq("season", season);
-  const seasonGamePks = new Set((seasonGamesRows ?? []).map((g) => g.game_pk));
+  // First-visit lazy backfill: if no pitches are cached for this pitcher
+  // × season yet, pull from Savant on demand. No-op once cached.
+  await ensurePitcherSeasonCache(pitcherId, season);
 
-  // Cached pitches for this pitcher × season.
+  // Single query scoped to active season: a Postgrest inner-join filter
+  // on pitch_games.season returns only this pitcher's pitches in this
+  // year, with the per-game metadata embedded for the dropdown. No
+  // cross-season fetch, no full-schedule materialization.
+  type EmbeddedGame = {
+    season: number;
+    game_date: string;
+    home_team_id: number | null;
+    away_team_id: number | null;
+  };
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z",
+      "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id)",
     )
     .eq("pitcher_id", pitcherId)
-    .limit(1500);
-  if (seasonGamePks.size > 0) {
-    pitchQuery = pitchQuery.in("game_pk", Array.from(seasonGamePks));
-  } else {
-    // No games for this season → no pitches.
-    pitchQuery = pitchQuery.eq("game_pk", -1);
-  }
-
-  const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
-  if (pitchTypes.length > 0) {
-    pitchQuery = pitchQuery.in("pitch_type", pitchTypes);
-  }
+    .eq("pitch_games.season", season)
+    .range(0, 4999);
   if (sp.hand === "L" || sp.hand === "R") {
     pitchQuery = pitchQuery.eq("stand", sp.hand);
   }
@@ -104,40 +88,96 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     pitchQuery = pitchQuery.eq("game_pk", Number(sp.game));
   }
 
-  const { data: cachedPitches } = await pitchQuery;
-  const renderable = (cachedPitches ?? []).filter(
+  const { data: cachedPitchesRaw } = await pitchQuery;
+  const cachedPitches = cachedPitchesRaw as
+    | (NonNullable<typeof cachedPitchesRaw>[number] & { pitch_games?: EmbeddedGame })[]
+    | null;
+
+  // Arsenal totals come from the filter-but-no-pitch-type set so the chips
+  // remain functional when one is selected. Outcomes filter applies in JS
+  // — Statcast description strings have too many edge cases to express
+  // cleanly in SQL.
+  const outcomes = (sp.outcome ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is OutcomeCategory =>
+      ["whiff", "called", "ball", "foul", "inplay", "other"].includes(s),
+    );
+  const outcomeSet = new Set(outcomes);
+  const arsenalPitches = (cachedPitches ?? []).filter(
+    (p) => outcomeSet.size === 0 || outcomeSet.has(categorizeDescription(p.description)),
+  );
+  const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
+  const pitchTypeSet = new Set(pitchTypes);
+  const filteredPitches =
+    pitchTypeSet.size === 0
+      ? arsenalPitches
+      : arsenalPitches.filter(
+          (p) => p.pitch_type != null && pitchTypeSet.has(p.pitch_type),
+        );
+  const renderable = filteredPitches.filter(
     (p) => p.vx0 != null && p.vy0 != null && p.vz0 != null,
   );
 
-  // Distinct cached games for the game dropdown — restricted to the active
-  // season so we don't list 2025 games when the user is viewing 2026.
-  const { data: distinctGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk")
-    .eq("pitcher_id", pitcherId);
-  const distinctGamePks = Array.from(
-    new Set((distinctGameRows ?? []).map((r) => r.game_pk)),
-  ).filter((pk) => seasonGamePks.has(pk));
-  const { data: gameMetaRows } =
-    distinctGamePks.length > 0
-      ? await supabase
-          .from("pitch_games")
-          .select("game_pk, game_date, home_team_id, away_team_id")
-          .in("game_pk", distinctGamePks)
-      : { data: [] };
+  type AggBucket = { count: number; sumVel: number; nVel: number };
+  const aggBuckets = new Map<string, AggBucket>();
+  for (const p of arsenalPitches) {
+    if (!p.pitch_type) continue;
+    const b = aggBuckets.get(p.pitch_type) ?? { count: 0, sumVel: 0, nVel: 0 };
+    b.count += 1;
+    if (p.release_speed != null) {
+      b.sumVel += p.release_speed;
+      b.nVel += 1;
+    }
+    aggBuckets.set(p.pitch_type, b);
+  }
+  const totalArsenal = arsenalPitches.length;
+  const aggregates = Array.from(aggBuckets.entries())
+    .map(([pitch_type, b]) => ({
+      pitch_type,
+      pitch_count: b.count,
+      usage_pct: totalArsenal > 0 ? (b.count / totalArsenal) * 100 : 0,
+      avg_velocity: b.nVel > 0 ? b.sumVel / b.nVel : null,
+    }))
+    .sort((a, b) => b.pitch_count - a.pitch_count);
+
+  // Game dropdown comes from the same one-shot query — embedded
+  // pitch_games metadata, deduped by game_pk.
+  type GameMeta = {
+    game_pk: number;
+    game_date: string;
+    home_team_id: number | null;
+    away_team_id: number | null;
+  };
+  const gameByPk = new Map<number, GameMeta>();
+  for (const p of cachedPitches ?? []) {
+    if (gameByPk.has(p.game_pk)) continue;
+    const meta = p.pitch_games;
+    if (!meta) continue;
+    gameByPk.set(p.game_pk, {
+      game_pk: p.game_pk,
+      game_date: meta.game_date,
+      home_team_id: meta.home_team_id,
+      away_team_id: meta.away_team_id,
+    });
+  }
+  const gameMetaRows = Array.from(gameByPk.values());
   const teamIds = new Set<number>();
-  for (const g of gameMetaRows ?? []) {
+  for (const g of gameMetaRows) {
     if (g.home_team_id) teamIds.add(g.home_team_id);
     if (g.away_team_id) teamIds.add(g.away_team_id);
   }
-  const { data: teamRows } = await supabase
-    .from("pitch_teams")
-    .select("mlb_id, abbreviation")
-    .in("mlb_id", Array.from(teamIds));
+  const { data: teamRows } =
+    teamIds.size > 0
+      ? await supabase
+          .from("pitch_teams")
+          .select("mlb_id, abbreviation")
+          .in("mlb_id", Array.from(teamIds))
+      : { data: [] };
   const teamAbbr = new Map<number, string>(
     (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
   );
-  const games = (gameMetaRows ?? [])
+  const games = gameMetaRows
     .map((g) => ({
       game_pk: g.game_pk,
       game_date: g.game_date,
@@ -157,15 +197,23 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
 
   return (
     <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
-      <PitcherArsenalScene pitches={renderable} />
+      <PitcherArsenalScene pitches={renderable} pitcherLabel={pitcherLastName(pitcher)} />
+
+      <OutcomeLegend />
 
       <header className="absolute top-6 left-6 right-6 flex items-start justify-between gap-6 pointer-events-none">
         <div className="flex gap-4 items-center pointer-events-auto">
           <Link
             href="/"
-            className="text-[10px] uppercase tracking-[0.16em] text-white/45 hover:text-white/80 transition-colors"
+            className="px-2.5 py-1 rounded bg-black/35 hover:bg-black/50 border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.16em] transition-colors backdrop-blur-sm"
           >
             ← pitchtracker
+          </Link>
+          <Link
+            href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
+            className="px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.14em] bg-black/35 hover:bg-black/50 border border-white/15 text-white transition-colors backdrop-blur-sm"
+          >
+            Compare with…
           </Link>
         </div>
         <div className="w-80 pointer-events-auto">
@@ -173,7 +221,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         </div>
       </header>
 
-      <section className="absolute top-20 left-6 w-[340px] rounded-lg bg-white/[0.06] backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-20 left-6 w-[340px] rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
         <div className="flex items-center gap-3">
           <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
             <Image
@@ -237,15 +285,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                     <span className="text-white/55">
                       {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
                     </span>
-                    <span className="text-white/45 w-10 text-right">
-                      {a.usage_pct != null ? `${Number(a.usage_pct).toFixed(0)}%` : "—"}
+                    <span className="text-white/45 w-16 text-right">
+                      {a.usage_pct != null
+                        ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
+                        : "—"}
                     </span>
                   </div>
-                  {a.avg_break_onset_ft != null && (
-                    <div className="pl-4 text-[10px] tabular-nums text-white/40">
-                      break onset · {Number(a.avg_break_onset_ft).toFixed(1)} ft
-                    </div>
-                  )}
                 </li>
               ))}
             </ul>
@@ -275,5 +320,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       </section>
     </main>
   );
+}
+
+function pitcherLastName(p: { full_name: string; last_name?: string | null }): string {
+  if (p.last_name && p.last_name.trim().length > 0) return p.last_name;
+  const parts = p.full_name.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? p.full_name;
 }
 

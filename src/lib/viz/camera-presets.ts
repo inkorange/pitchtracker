@@ -32,8 +32,11 @@ export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
   // view. Camera at y=100 over the midpoint between home and mound
   // (z=-30) so the visible area spans roughly z=-71 to z=+11 — enough
   // for home plate area, mound, and a slice past it.
+  // Camera is nudged 1 ft toward the plate (z=-29) so the view isn't
+  // exactly gimbal-locked above the target — that locks screen-up to
+  // world -z, putting the mound at the top and home plate at the bottom.
   top: {
-    position: [0, 100, -30],
+    position: [0, 100, -29],
     target: [0, 0, -30],
   },
   // Third-base side profile: pulled back so the entire pitch path is visible

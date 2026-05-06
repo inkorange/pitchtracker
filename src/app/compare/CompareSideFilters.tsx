@@ -2,37 +2,51 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
+import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
 import {
-  getPitchColor,
+  getPitchColorForSide,
   getPitchLabel,
   OUTCOME_COLORS,
   OUTCOME_LABELS,
+  type CompareSide,
   type OutcomeCategory,
 } from "@/lib/viz/colors";
-import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
 
 interface ArsenalEntry {
   pitch_type: string;
   pitch_count: number | null;
 }
 
-interface GameEntry {
+interface GameOption {
   game_pk: number;
   game_date: string;
   away: string;
   home: string;
 }
 
-interface PitcherFiltersProps {
+interface CompareSideFiltersProps {
+  side: CompareSide;
+  availableSeasons: number[];
   arsenal: ArsenalEntry[];
-  games: GameEntry[];
+  games: GameOption[];
 }
 
-export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
+export function CompareSideFilters({
+  side,
+  availableSeasons,
+  arsenal,
+  games,
+}: CompareSideFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
+
+  const seasonKey = `${side}Season`;
+  const pitchKey = `${side}Pitch`;
+  const handKey = `${side}Hand`;
+  const gameKey = `${side}Game`;
+  const outcomeKey = `${side}Outcome`;
 
   const update = useCallback(
     (next: Record<string, string | null>) => {
@@ -49,32 +63,58 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
     [params, pathname, router],
   );
 
-  const activePitchTypes = (params.get("pitch") ?? "").split(",").filter(Boolean);
-  const activeHand = params.get("hand") ?? "";
-  const activeGame = params.get("game") ?? "";
-  const activeOutcomes = (params.get("outcome") ?? "").split(",").filter(Boolean);
-
-  const togglePitch = (type: string) => {
-    const current = new Set(activePitchTypes);
-    if (current.has(type)) current.delete(type);
-    else current.add(type);
-    update({ pitch: current.size > 0 ? Array.from(current).join(",") : null });
-  };
+  const currentSeason = Number(params.get(seasonKey)) || availableSeasons[0] || new Date().getFullYear();
+  const activePitchTypes = (params.get(pitchKey) ?? "").split(",").filter(Boolean);
+  const activeHand = params.get(handKey) ?? "";
+  const activeGame = params.get(gameKey) ?? "";
+  const activeOutcomes = (params.get(outcomeKey) ?? "").split(",").filter(Boolean);
 
   const toggleOutcome = (cat: OutcomeCategory) => {
-    const current = new Set(activeOutcomes);
-    if (current.has(cat)) current.delete(cat);
-    else current.add(cat);
-    update({ outcome: current.size > 0 ? Array.from(current).join(",") : null });
+    const cur = new Set(activeOutcomes);
+    if (cur.has(cat)) cur.delete(cat);
+    else cur.add(cat);
+    update({ [outcomeKey]: cur.size > 0 ? Array.from(cur).join(",") : null });
   };
 
-  const setHand = (hand: string) => {
-    update({ hand: hand === activeHand ? null : hand });
+  const togglePitch = (type: string) => {
+    const cur = new Set(activePitchTypes);
+    if (cur.has(type)) cur.delete(type);
+    else cur.add(type);
+    update({ [pitchKey]: cur.size > 0 ? Array.from(cur).join(",") : null });
   };
 
   return (
     <div className="space-y-3">
       <TransitionOverlay isPending={isPending} />
+
+      {availableSeasons.length > 0 && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-[0.14em] text-white/45">Season</span>
+          <div className="flex gap-1 flex-wrap">
+            {availableSeasons.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() =>
+                  update({
+                    [seasonKey]: String(s),
+                    [gameKey]: null, // games are season-scoped
+                  })
+                }
+                disabled={isPending}
+                className={`px-2 py-0.5 text-[11px] tabular-nums rounded transition-colors ${
+                  s === currentSeason
+                    ? "bg-white/12 text-white"
+                    : "text-white/55 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {arsenal.length > 0 && (
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
@@ -97,7 +137,10 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
                 >
                   <span
                     className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: getPitchColor(a.pitch_type), opacity: dim ? 0.3 : 1 }}
+                    style={{
+                      background: getPitchColorForSide(a.pitch_type, side),
+                      opacity: dim ? 0.3 : 1,
+                    }}
                   />
                   {getPitchLabel(a.pitch_type)}
                 </button>
@@ -106,6 +149,31 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
           </div>
         </div>
       )}
+
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
+          Batter side
+        </div>
+        <div className="flex gap-1">
+          {[
+            { key: "", label: "Both" },
+            { key: "L", label: "vs LHB" },
+            { key: "R", label: "vs RHB" },
+          ].map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => update({ [handKey]: opt.key === activeHand ? null : opt.key })}
+              className={`px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.1em] transition-colors ${
+                activeHand === opt.key
+                  ? "bg-white/12 text-white"
+                  : "bg-white/[0.04] text-white/55 hover:text-white hover:bg-white/[0.08]"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
@@ -137,37 +205,12 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
         </div>
       </div>
 
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
-          Batter side
-        </div>
-        <div className="flex gap-1">
-          {[
-            { key: "", label: "Both" },
-            { key: "L", label: "vs LHB" },
-            { key: "R", label: "vs RHB" },
-          ].map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setHand(opt.key)}
-              className={`px-2.5 py-1 rounded text-[11px] uppercase tracking-[0.1em] transition-colors ${
-                activeHand === opt.key
-                  ? "bg-white/12 text-white"
-                  : "bg-white/[0.04] text-white/55 hover:text-white hover:bg-white/[0.08]"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {games.length > 0 && (
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">Game</div>
           <select
             value={activeGame}
-            onChange={(e) => update({ game: e.target.value || null })}
+            onChange={(e) => update({ [gameKey]: e.target.value || null })}
             className="w-full bg-white/[0.04] border border-white/10 rounded px-2 py-1.5 text-[11px] text-white/85 tabular-nums focus:outline-none focus:border-white/25"
           >
             <option value="">All cached games ({games.length})</option>
@@ -180,13 +223,10 @@ export function PitcherFilters({ arsenal, games }: PitcherFiltersProps) {
         </div>
       )}
 
-      {(activePitchTypes.length > 0 ||
-        activeHand ||
-        activeGame ||
-        activeOutcomes.length > 0) && (
+      {(activePitchTypes.length > 0 || activeHand || activeGame) && (
         <button
           onClick={() =>
-            update({ pitch: null, hand: null, game: null, outcome: null })
+            update({ [pitchKey]: null, [handKey]: null, [gameKey]: null })
           }
           className="text-[10px] uppercase tracking-[0.14em] text-white/40 hover:text-white/80 transition-colors"
         >
