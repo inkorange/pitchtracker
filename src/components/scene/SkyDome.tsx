@@ -30,13 +30,15 @@ export function SkyDome() {
     <>
       <Sky
         distance={450000}
-        // sunPosition controls warmth. A late-afternoon sun sitting 40°
-        // up and to the right paints the field in slightly warm tones
-        // without going full sunset.
-        sunPosition={[80, 90, 60]}
-        turbidity={6}
-        rayleigh={2.2}
-        mieCoefficient={0.005}
+        // Tuned for a clearly blue daytime sky. Lower turbidity =
+        // less haze, higher rayleigh = stronger blue scattering. Sun
+        // sits behind the camera (positive z) so the visible field of
+        // view is on the cool side of the sky, not the white "sun
+        // halo" side.
+        sunPosition={[40, 80, 200]}
+        turbidity={2}
+        rayleigh={4}
+        mieCoefficient={0.003}
         mieDirectionalG={0.7}
       />
       <Clouds material={THREE.MeshBasicMaterial}>

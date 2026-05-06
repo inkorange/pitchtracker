@@ -4,7 +4,7 @@ const ORDER: OutcomeCategory[] = ["whiff", "called", "ball", "foul", "inplay"];
 
 export function OutcomeLegend() {
   return (
-    <aside className="absolute top-20 right-6 rounded-lg bg-white/[0.06] backdrop-blur-md border border-white/10 shadow-lg p-3 pointer-events-auto">
+    <aside className="absolute top-20 right-6 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 shadow-lg p-3 pointer-events-auto">
       <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">
         Outcome
       </div>

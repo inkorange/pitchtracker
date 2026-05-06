@@ -89,7 +89,7 @@ export function PitcherSearch({
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => visibleResults.length > 0 && setOpen(true)}
         placeholder={placeholder}
-        className="w-full px-4 py-3 rounded-md bg-white/[0.06] backdrop-blur-md border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/25 transition-colors"
+        className="w-full px-4 py-3 rounded-md bg-black/50 backdrop-blur-md border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/25 transition-colors"
         aria-label="Search pitchers"
         aria-expanded={showDropdown}
         aria-controls="pitcher-search-listbox"
