@@ -27,20 +27,32 @@ export async function GET(request: Request) {
   cutoff.setDate(cutoff.getDate() - lookbackDays);
   const cutoffIso = cutoff.toISOString().slice(0, 10);
 
-  // Pull recent games from pitch_games. Bounded by the lookback window;
-  // 7 days × ~15 games/day ≈ 100 games, well under the 1000-row cap.
-  const { data: gamesRaw, error: gamesErr } = await supabase
-    .from("pitch_games")
-    .select("game_pk, game_date")
-    .gte("game_date", cutoffIso)
-    .order("game_date", { ascending: false });
-  if (gamesErr) {
-    return NextResponse.json({ error: gamesErr.message }, { status: 500 });
+  // Source the iteration from pitch_pitcher_games rather than from
+  // pitch_games directly — pitch_games holds the full schedule
+  // (current + future + historical) and gte(game_date, cutoff) can
+  // easily exceed PostgREST's 1000-row cap with thousands of
+  // upcoming-schedule rows. pitch_pitcher_games is bounded to
+  // *actually-cached* games and stays well under any cap.
+  const { data: ppgRows, error: ppgErr } = await supabase
+    .from("pitch_pitcher_games")
+    .select("game_pk, pitch_games!inner(game_date)")
+    .gte("pitch_games.game_date", cutoffIso);
+  if (ppgErr) {
+    return NextResponse.json({ error: ppgErr.message }, { status: 500 });
   }
-  const games = gamesRaw ?? [];
-  const gameDateByPk = new Map<number, string>(
-    games.map((g) => [g.game_pk, g.game_date]),
-  );
+  type PpgJoinRow = {
+    game_pk: number;
+    pitch_games: { game_date: string };
+  };
+  const ppgJoined = (ppgRows ?? []) as unknown as PpgJoinRow[];
+  const gameDateByPk = new Map<number, string>();
+  for (const r of ppgJoined) {
+    gameDateByPk.set(r.game_pk, r.pitch_games.game_date);
+  }
+  const games = Array.from(gameDateByPk, ([game_pk, game_date]) => ({
+    game_pk,
+    game_date,
+  })).sort((a, b) => b.game_date.localeCompare(a.game_date));
 
   // For each game, pull every pitch and bucket by at_bat_number.
   // Per-game queries stay small (~280 pitches per game), well under the
@@ -72,9 +84,11 @@ export async function GET(request: Request) {
   let whiffOfWeek: FeaturePick | null = null;
 
   const todayIso = today.toISOString().slice(0, 10);
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayIso = yesterday.toISOString().slice(0, 10);
+  // Pitch of the Day picks from the most recent cached game date
+  // rather than strict "today" — if our cache is a day or two behind
+  // (offseason, scheduled refresh hasn't run, etc.), the surface
+  // should still populate with the freshest pitches we have.
+  const latestCachedDate = games[0]?.game_date ?? todayIso;
 
   for (const g of games) {
     const { data: pitchesRaw } = await supabase
@@ -119,11 +133,11 @@ export async function GET(request: Request) {
       const dre = p.delta_run_exp != null ? Math.abs(Number(p.delta_run_exp)) : 0;
       if (dre > ab.max_abs_delta_run_exp) ab.max_abs_delta_run_exp = dre;
 
-      // Pitch-of-day candidate: any whiff in the last 24h, ranked by
-      // velocity. Picks a single defining pitch (not the AB).
+      // Pitch-of-day candidate: best-velocity whiff from the most
+      // recent cached game date. Picks a single defining pitch.
       if (
         cat === "whiff" &&
-        (g.game_date === todayIso || g.game_date === yesterdayIso) &&
+        g.game_date === latestCachedDate &&
         p.release_speed != null
       ) {
         const score = Number(p.release_speed);
