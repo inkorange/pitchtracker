@@ -160,15 +160,25 @@ export function AtBatReplayScene({
   const [followMode, setFollowMode] = useState(false);
   const settledTimerRef = useRef(0);
 
-  // When the user hard-jumps to a pitch (via the stepper), reset the
-  // animation state cleanly. Sync the URL so paused-at-pitch is the
-  // shareable artifact.
+  // When the user hard-jumps to a pitch, reset animation state.
+  // - autoPlay=true (Restart): start at release and animate.
+  // - autoPlay=false (prev/next/dot click): show the pitch as
+  //   already landed so the cumulative tunnel includes it AND the
+  //   metrics overlay surfaces immediately. Without this, manual
+  //   stepping leaves the new pitch frozen at progress=0 with
+  //   phase=flying, so the user can't tell anything advanced and
+  //   the overlay stays hidden behind the detailLanded gate.
   const jumpTo = useCallback(
     (idx: number, autoPlay = true) => {
       const clamped = Math.max(0, Math.min(idx, prepared.length - 1));
       setCurrentIdx(clamped);
-      setIntraProgress(0);
-      setPhase("flying");
+      if (autoPlay) {
+        setIntraProgress(0);
+        setPhase("flying");
+      } else {
+        setIntraProgress(1);
+        setPhase("settled");
+      }
       settledTimerRef.current = 0;
       setPlaying(autoPlay);
       // Pitch param uses the AB-relative pitch_number (1-based) so the

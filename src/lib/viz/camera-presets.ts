@@ -16,11 +16,12 @@ export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
   // Hitter's eye: behind the plate looking toward the mound. Slightly
   // off-center (toward the 1B side) and slightly elevated so the view
   // feels less like a centered diagram and more like a real broadcast
-  // camera; pulled in to 11 ft for a tighter framing on the release-to-
-  // plate path.
+  // camera. Pulled tight on the batter's box and strike zone — target
+  // sits just past the plate so the strike zone is the visual anchor
+  // while the pitch trajectory still reads in the upper part of frame.
   front: {
-    position: [1.2, 4.3, 11],
-    target: [0, 2.5, -55],
+    position: [0.8, 3.8, 7],
+    target: [0, 2.8, -12],
   },
   // Pitcher's view: behind the mound looking at the plate.
   back: {
