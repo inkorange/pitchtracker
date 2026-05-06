@@ -13,7 +13,10 @@ import { Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
-import type { CameraPreset } from "@/lib/viz/camera-presets";
+import type {
+  CameraPosition,
+  CameraPreset,
+} from "@/lib/viz/camera-presets";
 
 export interface ReplayPitch {
   game_pk: number;
@@ -212,6 +215,23 @@ export function AtBatReplayScene({
     return null;
   })();
 
+  // Front-preset camera angle depends on batter handedness so the
+  // strike zone projects to the side of the screen opposite the
+  // batter (per request: L → SZ on right, R → SZ on left). Camera
+  // shifts to the OPPOSITE side of the plate from where the batter
+  // stands, so the camera looks across the plate toward the box and
+  // the SZ ends up off-axis on that side.
+  const frontPresetOverride: CameraPosition | null = useMemo(() => {
+    if (preset !== "front" || !batterStand) return null;
+    // L batter is at +x (1B side); shifting camera to -x makes SZ
+    // project right-of-center. R batter mirrors.
+    const cameraX = batterStand === "L" ? -2.4 : 2.4;
+    return {
+      position: [cameraX, 4.3, 11],
+      target: [0, 2.5, -55],
+    };
+  }, [preset, batterStand]);
+
   // Manual selection — when the user clicks a ribbon, we jump there
   // and show the shape-metrics overlay. selectedDetailIdx is what the
   // overlay reads; null = use the active pitch (auto-updates with
@@ -245,6 +265,7 @@ export function AtBatReplayScene({
       <Scene
         preset={preset}
         presetTick={presetTick}
+        presetOverride={frontPresetOverride}
         onPointerMissed={() => setSelectedDetailIdx(null)}
       >
         <ReplayDriver
@@ -726,14 +747,13 @@ function PitchStepper({
   const velocity = active?.raw.release_speed ?? null;
 
   return (
-    // Mobile: dock the stepper just below the pitcher/batter panel.
-    // Side panel is capped at max-h-[18rem] starting at top-20 (5rem)
-    // — so it ends at 23rem at most. Stepper at top-[24rem] gives a
-    // 1rem gap and stays clear of the panel even when the panel hits
-    // its cap. Keeps the bottom half of the screen free for the 3D
-    // scene so the strike zone never sits behind chrome.
+    // Mobile: dock the stepper tight against the bottom of the
+    // pitcher/batter panel. Side panel is capped at max-h-[14rem]
+    // starting at top-20 (5rem) → ends at 19rem at most. Stepper at
+    // top-[19.5rem] sits flush with a 0.5rem breathing gap. Keeps
+    // the rest of the screen free for the 3D scene.
     // sm+: revert to the canonical bottom-center transport bar.
-    <div className="absolute top-[24rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute top-[19.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-black/55 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
