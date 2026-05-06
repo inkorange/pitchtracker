@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFrame } from "@react-three/fiber";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
+import { CatmullRomCurve3, Vector3 } from "three";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
@@ -78,11 +80,34 @@ export function AtBatReplayScene({
   initialCamera,
   initialPitchIdx,
 }: AtBatReplaySceneProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+
   const [preset, setPreset] = useState<CameraPreset>(initialCamera);
   const [presetTick, setPresetTick] = useState(0);
+
+  // Update URL params without forcing a scroll or history entry. The
+  // page is fully driven by these params on first load, so keeping
+  // them in sync makes every moment shareable.
+  const syncUrl = useCallback(
+    (next: { camera?: CameraPreset; pitch?: number | null }) => {
+      const sp = new URLSearchParams(params.toString());
+      if (next.camera !== undefined) sp.set("camera", next.camera);
+      if (next.pitch !== undefined) {
+        if (next.pitch === null) sp.delete("pitch");
+        else sp.set("pitch", String(next.pitch));
+      }
+      const qs = sp.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [params, pathname, router],
+  );
+
   const handlePresetChange = (next: CameraPreset) => {
     setPreset(next);
     setPresetTick((t) => t + 1);
+    syncUrl({ camera: next });
   };
 
   const prepared = useMemo<PreparedPitch[]>(
@@ -117,18 +142,27 @@ export function AtBatReplayScene({
   const [intraProgress, setIntraProgress] = useState(0);
   const [phase, setPhase] = useState<"flying" | "settled" | "done">("flying");
   const [playing, setPlaying] = useState(true);
+  const [followMode, setFollowMode] = useState(false);
   const settledTimerRef = useRef(0);
 
   // When the user hard-jumps to a pitch (via the stepper), reset the
-  // animation state cleanly.
-  const jumpTo = useCallback((idx: number, autoPlay = true) => {
-    const clamped = Math.max(0, Math.min(idx, prepared.length - 1));
-    setCurrentIdx(clamped);
-    setIntraProgress(0);
-    setPhase("flying");
-    settledTimerRef.current = 0;
-    setPlaying(autoPlay);
-  }, [prepared.length]);
+  // animation state cleanly. Sync the URL so paused-at-pitch is the
+  // shareable artifact.
+  const jumpTo = useCallback(
+    (idx: number, autoPlay = true) => {
+      const clamped = Math.max(0, Math.min(idx, prepared.length - 1));
+      setCurrentIdx(clamped);
+      setIntraProgress(0);
+      setPhase("flying");
+      settledTimerRef.current = 0;
+      setPlaying(autoPlay);
+      // Pitch param uses the AB-relative pitch_number (1-based) so the
+      // URL reads as "pitch 3 of this at-bat" not an opaque index.
+      const target = prepared[clamped]?.raw.pitch_number;
+      syncUrl({ pitch: target ?? null });
+    },
+    [prepared, syncUrl],
+  );
 
   // Keyboard shortcuts: ←/→ step pitches, space play/pause.
   useEffect(() => {
@@ -187,6 +221,12 @@ export function AtBatReplayScene({
           onSettle={() => setPhase("settled")}
           settledTimerRef={settledTimerRef}
         />
+        <CameraFollower
+          enabled={followMode}
+          activePath={activePitch?.path ?? null}
+          progress={intraProgress}
+          phase={phase}
+        />
         {/* Outcome chip on every pitch that has already landed (idx <
             currentIdx, plus the active pitch once it's settled). */}
         {prepared.map((p, i) => {
@@ -205,6 +245,20 @@ export function AtBatReplayScene({
       </Scene>
 
       <CameraPad current={preset} onChange={handlePresetChange} />
+
+      <button
+        type="button"
+        onClick={() => setFollowMode((f) => !f)}
+        className={`absolute bottom-20 right-6 px-3 py-1.5 rounded text-[10px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors pointer-events-auto ${
+          followMode
+            ? "bg-white/15 border-white/25 text-white"
+            : "bg-black/35 border-white/15 text-white/65 hover:text-white hover:bg-black/50"
+        }`}
+        aria-pressed={followMode}
+        title="Camera tracks the active pitch's ball with a cinematic lag."
+      >
+        Follow {followMode ? "on" : "off"}
+      </button>
 
       <PitchStepper
         prepared={prepared}
@@ -335,6 +389,49 @@ function ReplayDriver({
       })}
     </>
   );
+}
+
+// Camera follow mode: when enabled and a pitch is flying, lerp the
+// OrbitControls target toward the current ball position with damping.
+// The damping creates the cinematic "lag" the plan calls out — the
+// camera doesn't snap to the ball, it eases toward it. Stays out of
+// the way once the pitch has landed; the next jump or auto-advance
+// resumes the chase.
+interface CameraFollowerProps {
+  enabled: boolean;
+  activePath: Array<[number, number, number]> | null;
+  progress: number;
+  phase: "flying" | "settled" | "done";
+}
+
+// Minimal duck-typed interface for the OrbitControls instance — only
+// the surface area the follower touches. Avoids pulling three-stdlib
+// types just for two property reads.
+interface OrbitTarget {
+  target: Vector3;
+  update(): void;
+}
+
+function CameraFollower({ enabled, activePath, progress, phase }: CameraFollowerProps) {
+  const controls = useThree((s) => s.controls) as OrbitTarget | null | undefined;
+  const curve = useMemo(() => {
+    if (!activePath || activePath.length < 2) return null;
+    const points = activePath.map((p) => new Vector3(...statcastToThree(p)));
+    return new CatmullRomCurve3(points);
+  }, [activePath]);
+  const ballPos = useRef(new Vector3());
+
+  useFrame((_, delta) => {
+    if (!enabled || !controls || !curve) return;
+    if (phase !== "flying") return;
+    const t = Math.max(0, Math.min(1, progress));
+    curve.getPoint(t, ballPos.current);
+    const k = Math.min(1, delta * 1.6);
+    controls.target.lerp(ballPos.current, k);
+    controls.update();
+  });
+
+  return null;
 }
 
 // Small floating chip rendered at each landed pitch's plate position.

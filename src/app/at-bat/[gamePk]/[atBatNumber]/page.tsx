@@ -15,11 +15,17 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { gamePk, atBatNumber } = await params;
+  const ogUrl = `/api/og/at-bat?gamePk=${gamePk}&atBatNumber=${atBatNumber}`;
   return {
     title: `At-bat replay · pitchtracker`,
     openGraph: {
       title: `At-bat replay · ${gamePk}/${atBatNumber}`,
       description: "Pitch-by-pitch 3D replay of a single at-bat.",
+      images: [{ url: ogUrl, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [ogUrl],
     },
   };
 }
@@ -118,11 +124,13 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
     sp.camera === "side"
       ? sp.camera
       : "side";
+  // ?pitch=N matches the AB-relative pitch_number, not an array index.
+  // Resolves correctly even if Statcast records gaps in pitch_number.
   const initialPitchIdx = (() => {
     const n = Number(sp.pitch);
     if (!Number.isFinite(n)) return null;
-    if (n < 1 || n > pitches.length) return null;
-    return n - 1;
+    const idx = pitches.findIndex((p) => p.pitch_number === n);
+    return idx === -1 ? null : idx;
   })();
 
   return (
