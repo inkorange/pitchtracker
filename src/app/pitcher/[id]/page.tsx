@@ -18,6 +18,7 @@ import { TopNav } from "@/components/chrome/TopNav";
 import { FiltersGate } from "./FiltersGate";
 import { MatchupsPanel } from "./MatchupsPanel";
 import { PitcherCardCollapse } from "./PitcherCardCollapse";
+import { AtBatHeader } from "./AtBatHeader";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -366,6 +367,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
             </>
           }
         />
+
+        {/* At-bat info card: lives outside the collapsing body so it
+            stays on screen on mobile after the auto-collapse. Shows
+            the active matchup's batter, outcome, and game context.
+            Renders nothing when not in at-bat mode. */}
+        <AtBatHeader season={season} />
       </section>
     </>
   );
