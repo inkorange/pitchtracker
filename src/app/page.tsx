@@ -59,15 +59,6 @@ export default function Home() {
         <DailyPickStrip />
 
         <FeaturedStrip />
-
-        <div className="text-center pt-8">
-          <Link
-            href="/dev/single-pitch"
-            className="text-[11px] uppercase tracking-[0.16em] text-white/35 hover:text-white/70 transition-colors"
-          >
-            Open the dev pitch viewer
-          </Link>
-        </div>
       </div>
     </main>
   );
