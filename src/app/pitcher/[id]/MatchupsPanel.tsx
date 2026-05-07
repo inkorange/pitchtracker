@@ -571,7 +571,7 @@ function MatchupRow({
           <div className="w-10 h-10 rounded-full bg-white/5" />
         )}
         {ab.batter_team_id != null ? (
-          <div className="absolute -bottom-0.5 -right-1 w-5 h-5 rounded-full bg-[#081a32] border border-white/15 flex items-center justify-center overflow-hidden">
+          <div className="absolute -bottom-0.5 -right-1 w-5 h-5 rounded-full bg-white border border-white/30 shadow flex items-center justify-center overflow-hidden">
             <Image
               src={teamLogoUrl(ab.batter_team_id)}
               alt=""
