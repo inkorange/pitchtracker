@@ -2,11 +2,16 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
 import { statcastToThree } from "@/lib/viz/coords";
-import { categorizeDescription, getPitchLabel } from "@/lib/viz/colors";
+import {
+  categorizeDescription,
+  getPitchLabel,
+  OUTCOME_COLORS,
+} from "@/lib/viz/colors";
 import type { ReplayPitch } from "@/app/at-bat/[gamePk]/[atBatNumber]/AtBatReplayScene";
 
 // In-page at-bat playback for the pitcher view. Mirrors the
@@ -229,29 +234,179 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
     }
   });
 
+  // Active pitch's platePos when landed — anchors the floating
+  // metrics card. Only show once the pitch has actually arrived at
+  // the plate so the card doesn't run ahead of the ball.
+  const activePitch = prepared[currentIdx];
+  const detailLanded = phase !== "flying";
+
   return (
     <>
       {prepared.map((p, i) => {
         if (i > currentIdx) return null;
         const drawProgress =
           i < currentIdx ? 1 : phase === "flying" ? intraProgress : 1;
-        const isActive = i === currentIdx && phase === "flying";
+        const isFlying = i === currentIdx && phase === "flying";
+        const landed = !isFlying;
         const opacity = i < currentIdx ? 0.55 : 1;
+        const outcomeColor =
+          OUTCOME_COLORS[categorizeDescription(p.raw.description)];
         return (
           <group key={`${p.raw.game_pk}-${p.raw.at_bat_number}-${p.raw.pitch_number}`}>
             <Ribbon
               path={p.path}
               pitchType={p.raw.pitch_type ?? ""}
-              radius={isActive ? 0.11 : 0.09}
+              radius={isFlying ? 0.11 : 0.09}
               drawProgress={drawProgress}
               opacity={opacity}
             />
-            <BallTracer path={p.path} progress={drawProgress} />
+            {/* While flying: white BallTracer animates along the curve.
+                Once landed: a sphere parked at the plate, colored by
+                outcome (red = whiff, amber = called, blue = ball,
+                neutral = foul, emerald = in-play). Mirrors the
+                dedicated at-bat replay scene. */}
+            {isFlying ? (
+              <BallTracer path={p.path} progress={drawProgress} />
+            ) : (
+              <Sphere args={[0.13, 18, 18]} position={p.platePos}>
+                <meshStandardMaterial
+                  color={outcomeColor}
+                  roughness={0.4}
+                  metalness={0.05}
+                  transparent
+                  opacity={opacity}
+                />
+              </Sphere>
+            )}
+            {landed ? (
+              <PlateChip
+                position={p.platePos}
+                pitchNumber={p.raw.pitch_number}
+                description={p.raw.description}
+              />
+            ) : null}
           </group>
         );
       })}
+      {/* Metrics overlay anchored to the most-recently-landed pitch.
+          Re-keyed on currentIdx so the <Html> portal cleanly
+          re-anchors when playback advances. */}
+      {activePitch && detailLanded ? (
+        <PitchDetailsPanel
+          key={currentIdx}
+          position={activePitch.platePos}
+          pitch={activePitch.raw}
+        />
+      ) : null}
     </>
   );
+}
+
+// Small floating chip at each landed pitch's plate position. Pulls the
+// outcome color so a finished at-bat reads as a tunnel of strands
+// each ending in its own outcome dot.
+function PlateChip({
+  position,
+  pitchNumber,
+  description,
+}: {
+  position: [number, number, number];
+  pitchNumber: number;
+  description: string | null;
+}) {
+  const cat = categorizeDescription(description);
+  const color = OUTCOME_COLORS[cat];
+  return (
+    <Html position={position} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+      <div
+        className="px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums shadow"
+        style={{
+          background: color,
+          color: "#0a0e14",
+          transform: "translate(8px, -50%)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        #{pitchNumber}
+      </div>
+    </Html>
+  );
+}
+
+// Pitch label + velo on top, spin / iVB / HB / axis / extension below
+// — same shape as the dedicated replay scene's PitchDetailsPanel. Only
+// rendered once the active pitch has landed so the card doesn't run
+// ahead of the ball mid-flight.
+function PitchDetailsPanel({
+  position,
+  pitch,
+}: {
+  position: [number, number, number];
+  pitch: ReplayPitch;
+}) {
+  const label = pitch.pitch_type ? getPitchLabel(pitch.pitch_type) : "—";
+  const velo =
+    pitch.release_speed != null
+      ? `${Number(pitch.release_speed).toFixed(1)} mph`
+      : null;
+  const rows: Array<{ label: string; value: string }> = [];
+  if (pitch.release_spin_rate != null) {
+    rows.push({
+      label: "Spin",
+      value: `${Math.round(Number(pitch.release_spin_rate))} rpm`,
+    });
+  }
+  if (pitch.pfx_z != null) {
+    rows.push({ label: "iVB", value: formatBreakInches(Number(pitch.pfx_z) * 12) });
+  }
+  if (pitch.pfx_x != null) {
+    rows.push({ label: "HB", value: formatBreakInches(Number(pitch.pfx_x) * 12) });
+  }
+  if (pitch.spin_axis != null) {
+    rows.push({
+      label: "Axis",
+      value: `${Math.round(Number(pitch.spin_axis))}°`,
+    });
+  }
+  if (pitch.release_extension != null) {
+    rows.push({
+      label: "Ext",
+      value: `${Number(pitch.release_extension).toFixed(1)} ft`,
+    });
+  }
+  return (
+    <Html position={position} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
+      <div style={{ position: "relative", width: 0, height: 0 }}>
+        <div
+          className="absolute whitespace-nowrap px-2 py-1 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg"
+          style={{ left: 0, top: 0, transform: "translate(14px, -120%)" }}
+        >
+          <span className="font-medium">{label}</span>
+          {velo ? <span className="text-white/70 ml-1.5">{velo}</span> : null}
+        </div>
+        {rows.length > 0 ? (
+          <div
+            className="absolute whitespace-nowrap px-2 py-1.5 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg"
+            style={{ left: 0, top: 0, transform: "translate(14px, 8%)" }}
+          >
+            <div className="flex flex-col gap-0.5">
+              {rows.map((r) => (
+                <div key={r.label} className="flex justify-between gap-3">
+                  <span className="text-white/55">{r.label}</span>
+                  <span>{r.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </Html>
+  );
+}
+
+function formatBreakInches(inches: number): string {
+  const sign = inches >= 0 ? "+" : "";
+  return `${sign}${inches.toFixed(1)}"`;
 }
 
 // ─── Transport bar ───────────────────────────────────────────────
