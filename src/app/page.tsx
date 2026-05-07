@@ -38,7 +38,7 @@ export default function Home() {
             extends the backdrop to the container edges so scrolled
             content underneath doesn't bleed through. */}
         <div className="sticky top-2 z-20 -mx-6 px-6 py-3 bg-[#0a0e14]/95 backdrop-blur-md">
-          <PitcherSearch autoFocus />
+          <PitcherSearch />
         </div>
 
         <div className="flex flex-wrap justify-center gap-4">
