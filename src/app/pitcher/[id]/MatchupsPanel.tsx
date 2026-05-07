@@ -585,27 +585,12 @@ function MatchupRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 truncate">
-          <span
-            className={
-              "inline-flex items-center px-2 py-0.5 rounded-full border text-white text-[9.5px] font-semibold uppercase tracking-[0.08em] shadow-sm flex-shrink-0 " +
-              eventPillColor(ab.outcome)
-            }
-          >
-            {humanizeOutcome(ab.outcome)}
-          </span>
-          <span
-            className={
-              "text-[11px] tabular-nums " +
-              (current ? "text-white/65" : "text-white/45")
-            }
-          >
-            {ab.pitch_count}p
-          </span>
+        <div className="text-[11px] tabular-nums truncate text-white/95">
+          {ab.pitch_count} pitch{ab.pitch_count === 1 ? "" : "es"}
         </div>
         <div
           className={
-            "text-[10.5px] tabular-nums truncate mt-1 " +
+            "text-[10.5px] tabular-nums truncate mt-0.5 " +
             (current ? "text-white/70" : "text-white/45")
           }
         >
@@ -624,6 +609,15 @@ function MatchupRow({
           ) : null}
         </div>
       </div>
+
+      <span
+        className={
+          "inline-flex items-center px-2 py-0.5 rounded-full border text-white text-[9.5px] font-semibold uppercase tracking-[0.08em] shadow-sm flex-shrink-0 ml-2 " +
+          eventPillColor(ab.outcome)
+        }
+      >
+        {humanizeOutcome(ab.outcome)}
+      </span>
     </button>
   );
 }
