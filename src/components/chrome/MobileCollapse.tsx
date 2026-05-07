@@ -73,13 +73,13 @@ export function MobileCollapse({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className={`transition-transform duration-500 ${open ? "rotate-180" : ""}`}
+          className={`transition-transform duration-[250ms] ${open ? "rotate-180" : ""}`}
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
       <div
-        className="grid transition-[grid-template-rows] duration-500 ease-out sm:block"
+        className="grid transition-[grid-template-rows] duration-[250ms] ease-out sm:block"
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden min-h-0 sm:overflow-visible">
