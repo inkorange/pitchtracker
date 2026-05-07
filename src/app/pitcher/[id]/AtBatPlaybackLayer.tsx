@@ -6,6 +6,7 @@ import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
+import { BaseballGlyph } from "@/components/icons/BaseballGlyph";
 import { statcastToThree } from "@/lib/viz/coords";
 import {
   categorizeDescription,
@@ -430,7 +431,7 @@ export function AtBatPlaybackBar({ state, handlers }: AtBatPlaybackBarProps) {
   return (
     // Mobile: pin above the CameraPad (bottom-6 right-3) so the two
     // don't overlap. Desktop: classic bottom-center transport.
-    <div className="absolute bottom-24 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute bottom-20 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
@@ -479,10 +480,11 @@ export function AtBatPlaybackBar({ state, handlers }: AtBatPlaybackBarProps) {
         {prepared.map((p, i) => {
           const landed =
             i < currentIdx || (i === currentIdx && phase !== "flying");
+          const isActiveFlying = i === currentIdx && !landed;
           const cls = landed
             ? dotColorForOutcome(p.raw.description)
-            : i === currentIdx
-              ? "bg-white"
+            : isActiveFlying
+              ? "bg-transparent"
               : "bg-white/30 hover:bg-white/60";
           const symbol = landed ? outcomeSymbol(p.raw.description) : null;
           return (
@@ -490,10 +492,12 @@ export function AtBatPlaybackBar({ state, handlers }: AtBatPlaybackBarProps) {
               key={`dot-${i}`}
               type="button"
               onClick={() => jumpTo(i, false)}
-              className={`w-5 h-5 rounded-full transition-colors flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls}`}
+              className={`w-5 h-5 rounded-full overflow-hidden transition-colors flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls}`}
               aria-label={`Jump to pitch ${i + 1}`}
             >
-              {symbol ? (
+              {isActiveFlying ? (
+                <BaseballGlyph />
+              ) : symbol ? (
                 <span
                   aria-hidden
                   style={
