@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -330,12 +330,32 @@ function BatterSearchBody({
 }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BatterResult[]>([]);
+  const [suggestions, setSuggestions] = useState<BatterResult[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Pre-load the most-faced batters so the user has something to
+  // click before they start typing. Same endpoint, no `q` param.
+  useEffect(() => {
+    if (pitcherId == null) return;
+    const ctrl = new AbortController();
+    fetch(`/api/pitcher/${pitcherId}/batters?season=${season}`, {
+      signal: ctrl.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const body = (await res.json()) as { batters: BatterResult[] };
+        setSuggestions(body.batters ?? []);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return () => ctrl.abort();
+  }, [pitcherId, season]);
 
   useEffect(() => {
     if (pitcherId == null) return;
@@ -369,12 +389,10 @@ function BatterSearchBody({
     };
   }, [query, pitcherId, season]);
 
-  const visibleResults = useMemo(
-    () => (query.trim().length >= 2 ? results : []),
-    [query, results],
-  );
-  const showHint = query.trim().length < 2;
-  const showEmpty = !loading && !showHint && visibleResults.length === 0;
+  const trimmed = query.trim();
+  const mode: "suggestions" | "hint" | "results" =
+    trimmed.length === 0 ? "suggestions" : trimmed.length === 1 ? "hint" : "results";
+  const showEmpty = mode === "results" && !loading && results.length === 0;
 
   return (
     <div className="p-4 space-y-3">
@@ -387,32 +405,56 @@ function BatterSearchBody({
         aria-label="Search a batter"
         className="w-full px-3 py-2 rounded bg-white/[0.04] border border-white/10 focus:border-white/30 focus:outline-none text-sm text-white/95 placeholder:text-white/35"
       />
-      {showHint ? (
+
+      {mode === "suggestions" && suggestions.length > 0 ? (
+        <>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+            Most faced this season
+          </div>
+          <BatterPickList batters={suggestions} onPick={onPick} />
+        </>
+      ) : null}
+
+      {mode === "hint" ? (
         <div className="text-[11px] text-white/45">
           Type at least 2 letters to search batters this pitcher faced in {season}.
         </div>
       ) : null}
+
       {showEmpty ? (
         <div className="text-[11px] text-white/55">
           No batters match. Try a different name or check the season filter.
         </div>
       ) : null}
-      {visibleResults.length > 0 ? (
-        <ul className="max-h-72 overflow-y-auto scrollbar-thin -mx-1">
-          {visibleResults.map((b) => (
-            <li key={b.id}>
-              <button
-                type="button"
-                onClick={() => onPick(b)}
-                className="w-full text-left px-3 py-2 rounded hover:bg-white/[0.06] transition-colors text-sm text-white/95"
-              >
-                {b.fullName}
-              </button>
-            </li>
-          ))}
-        </ul>
+
+      {mode === "results" && results.length > 0 ? (
+        <BatterPickList batters={results} onPick={onPick} />
       ) : null}
     </div>
+  );
+}
+
+function BatterPickList({
+  batters,
+  onPick,
+}: {
+  batters: BatterResult[];
+  onPick: (b: BatterResult) => void;
+}) {
+  return (
+    <ul className="max-h-72 overflow-y-auto scrollbar-thin -mx-1">
+      {batters.map((b) => (
+        <li key={b.id}>
+          <button
+            type="button"
+            onClick={() => onPick(b)}
+            className="w-full text-left px-3 py-2 rounded hover:bg-white/[0.06] transition-colors text-sm text-white/95"
+          >
+            {b.fullName}
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

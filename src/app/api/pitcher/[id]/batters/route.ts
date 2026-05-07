@@ -11,12 +11,18 @@ import { fetchPersonsCached } from "@/lib/statsapi/client";
 // come from the MLB Stats API (cached by fetchPersonsCached).
 //
 //   GET /api/pitcher/[id]/batters?season=Y&q=trout
-// Returns: { batters: [{ id, fullName }] }, sorted by name, capped
-// at 12 results.
+//     Substring match on batter name; up to 12 results sorted by name.
+//   GET /api/pitcher/[id]/batters?season=Y          (no q)
+//     Returns the 10 most-faced batters this season — used as
+//     suggestions before the user types in the dialog.
+// Both shapes return: { batters: [{ id, fullName }] }.
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+const SUGGESTION_LIMIT = 10;
+const SEARCH_LIMIT = 12;
 
 export async function GET(request: Request, { params }: RouteParams) {
   const { id } = await params;
@@ -27,7 +33,10 @@ export async function GET(request: Request, { params }: RouteParams) {
   const url = new URL(request.url);
   const season = Number(url.searchParams.get("season")) || new Date().getFullYear();
   const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
-  if (q.length < 2) {
+  // Single-letter queries are noisy and rarely useful; reserve the
+  // empty-q path for "give me suggestions" and require ≥2 chars for
+  // an actual search.
+  if (q.length === 1) {
     return NextResponse.json({ batters: [] });
   }
 
@@ -35,8 +44,9 @@ export async function GET(request: Request, { params }: RouteParams) {
   // First-visit lazy backfill so the batter universe is complete.
   await ensurePitcherSeasonCache(pitcherId, season);
 
-  // Distinct batter ids this pitcher faced in this season. Restricted
-  // to regular-season games to match the rest of the pitcher view.
+  // All pitches this pitcher threw in this season's regular-season
+  // games. We need every row (not distinct) so we can rank batters by
+  // pitches-faced for the suggestion mode below.
   const { data: rows, error } = await supabase
     .from("pitch_game_pitches")
     .select("batter_id, pitch_games!inner(season, game_type)")
@@ -48,28 +58,51 @@ export async function GET(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const batterIds = Array.from(
-    new Set(
-      (rows ?? [])
-        .map((r) => r.batter_id)
-        .filter((id): id is number => typeof id === "number"),
-    ),
-  );
+  // Pitch counts per batter — used both to enumerate the universe
+  // (for the search path) and to rank suggestions (for the empty-q
+  // path). Pitches-faced is a fine proxy for at-bats-faced for
+  // ordering purposes.
+  const counts = new Map<number, number>();
+  for (const r of rows ?? []) {
+    const bid = r.batter_id;
+    if (typeof bid !== "number") continue;
+    counts.set(bid, (counts.get(bid) ?? 0) + 1);
+  }
 
-  // Resolve names. fetchPersonsCached batches in chunks of 50 with
-  // force-cache, so the second hit on the same season is free.
+  if (q.length === 0) {
+    // Suggestion mode: top-N most-faced. Ranking has natural ties; a
+    // secondary sort by id keeps the order stable across requests.
+    const topIds = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+      .slice(0, SUGGESTION_LIMIT)
+      .map(([bid]) => bid);
+    const personMap = await fetchPersonsCached(topIds);
+    const batters: Array<{ id: number; fullName: string }> = [];
+    for (const bid of topIds) {
+      const p = personMap.get(bid);
+      if (!p) continue;
+      batters.push({ id: bid, fullName: p.fullName });
+    }
+    return NextResponse.json(
+      { batters },
+      { headers: { "cache-control": "public, max-age=120" } },
+    );
+  }
+
+  // Search mode: substring match against the resolved name set.
+  const batterIds = Array.from(counts.keys());
   const personMap = await fetchPersonsCached(batterIds);
-  const batters: Array<{ id: number; fullName: string }> = [];
-  for (const id of batterIds) {
-    const p = personMap.get(id);
+  const matches: Array<{ id: number; fullName: string }> = [];
+  for (const bid of batterIds) {
+    const p = personMap.get(bid);
     if (!p) continue;
     if (p.fullName.toLowerCase().includes(q)) {
-      batters.push({ id, fullName: p.fullName });
+      matches.push({ id: bid, fullName: p.fullName });
     }
   }
-  batters.sort((a, b) => a.fullName.localeCompare(b.fullName));
+  matches.sort((a, b) => a.fullName.localeCompare(b.fullName));
   return NextResponse.json(
-    { batters: batters.slice(0, 12) },
+    { batters: matches.slice(0, SEARCH_LIMIT) },
     { headers: { "cache-control": "public, max-age=120" } },
   );
 }
