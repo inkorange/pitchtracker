@@ -153,7 +153,7 @@ export function AtBatHeader({ season }: { season: number }) {
           type="button"
           onClick={() => setUrl({ abGame: null, abNum: null })}
           aria-label="Exit at-bat playback"
-          className="flex-shrink-0 px-2 py-1 rounded text-[14px] leading-none text-white/55 hover:text-white hover:bg-white/[0.06]"
+          className="flex-shrink-0 w-10 h-10 -mr-1 flex items-center justify-center rounded text-2xl leading-none text-white/55 hover:text-white hover:bg-white/[0.06]"
           title="Exit at-bat playback"
         >
           ×

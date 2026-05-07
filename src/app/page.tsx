@@ -33,26 +33,65 @@ export default function Home() {
           </p>
         </header>
 
-        <PitcherSearch autoFocus />
+        {/* Sticky so the search stays reachable as the user scrolls
+            through the daily pick + featured strips. -mx-6 px-6
+            extends the backdrop to the container edges so scrolled
+            content underneath doesn't bleed through. */}
+        <div className="sticky top-2 z-20 -mx-6 px-6 py-3 bg-[#0a0e14]/95 backdrop-blur-md">
+          <PitcherSearch />
+        </div>
 
-        <div className="flex flex-wrap justify-center gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
             href="/browse"
-            className="text-[11px] uppercase tracking-[0.16em] text-white/55 hover:text-white transition-colors"
+            className="group flex items-center justify-between gap-3 px-5 py-3 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 hover:border-white/30 text-white/90 hover:text-white shadow-sm hover:shadow-md transition-all"
           >
-            Browse by team →
+            <div className="flex flex-col items-start min-w-0">
+              <span className="text-sm font-medium">Browse by team</span>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 group-hover:text-white/65">
+                Pitchers · rosters
+              </span>
+            </div>
+            <span
+              aria-hidden
+              className="text-white/55 group-hover:text-white group-hover:translate-x-0.5 transition-all"
+            >
+              →
+            </span>
           </Link>
           <Link
             href="/at-bat"
-            className="text-[11px] uppercase tracking-[0.16em] text-white/55 hover:text-white transition-colors"
+            className="group flex items-center justify-between gap-3 px-5 py-3 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 hover:border-white/30 text-white/90 hover:text-white shadow-sm hover:shadow-md transition-all"
           >
-            At-bat replays →
+            <div className="flex flex-col items-start min-w-0">
+              <span className="text-sm font-medium">At-bat replays</span>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 group-hover:text-white/65">
+                Pitch-by-pitch
+              </span>
+            </div>
+            <span
+              aria-hidden
+              className="text-white/55 group-hover:text-white group-hover:translate-x-0.5 transition-all"
+            >
+              →
+            </span>
           </Link>
           <Link
             href="/explore"
-            className="text-[11px] uppercase tracking-[0.16em] text-white/55 hover:text-white transition-colors"
+            className="group flex items-center justify-between gap-3 px-5 py-3 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/15 hover:border-white/30 text-white/90 hover:text-white shadow-sm hover:shadow-md transition-all"
           >
-            Explore the dataset →
+            <div className="flex flex-col items-start min-w-0">
+              <span className="text-sm font-medium">Explore the dataset</span>
+              <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 group-hover:text-white/65">
+                Filters · stats
+              </span>
+            </div>
+            <span
+              aria-hidden
+              className="text-white/55 group-hover:text-white group-hover:translate-x-0.5 transition-all"
+            >
+              →
+            </span>
           </Link>
         </div>
 

@@ -17,7 +17,7 @@
   <path d="M233,89 Q230,92 233,95" stroke="#BA0C2F" fill="none" stroke-width="1"></path>
 
   <!-- Text -->
-  <text x="60" y="85" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="600" fill="#0C2340">
+  <text x="60" y="85" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="600" fill="#ffffff">
     Pitch<tspan fill="#BA0C2F">tracker</tspan>
   </text>
 </svg>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { CatmullRomCurve3, TubeGeometry, Vector3 } from "three";
+import { CatmullRomCurve3, DoubleSide, TubeGeometry, Vector3 } from "three";
 import type { ThreeEvent } from "@react-three/fiber";
 import { statcastToThree } from "@/lib/viz/coords";
 import { type CompareSide, getPitchColor, getPitchColorForSide } from "@/lib/viz/colors";
@@ -90,6 +90,11 @@ export function Ribbon({
         transparent
         opacity={opacity}
         depthWrite={writeDepth}
+        // TubeGeometry leaves the start/end uncapped, so looking down
+        // an open end would show through to the scene behind. Render
+        // both sides so the inside of the far wall fills the opening
+        // with the same color, making the tube read as enclosed.
+        side={DoubleSide}
       />
     </mesh>
   );

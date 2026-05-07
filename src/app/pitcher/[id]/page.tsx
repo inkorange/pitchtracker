@@ -19,6 +19,7 @@ import { FiltersGate } from "./FiltersGate";
 import { MatchupsPanel } from "./MatchupsPanel";
 import { PitcherCardCollapse } from "./PitcherCardCollapse";
 import { AtBatHeader } from "./AtBatHeader";
+import { PitcherOutcomeLegend } from "./PitcherOutcomeLegend";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -228,6 +229,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           owns only the panels + chrome that should rebuild on
           pitcher change. */}
       <OutcomeLegend />
+      <PitcherOutcomeLegend />
 
       <TopNav
         back={{ href: "/", label: "Home" }}

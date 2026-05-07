@@ -16,11 +16,19 @@ const ITEMS: OutcomeCategory[] = ["whiff", "called", "ball", "foul", "inplay"];
 // to expand the panel upwards. Anchoring to bottom-6 lets the panel
 // grow up from the chip without colliding with the CameraPad on the
 // right side of the screen.
-export function AtBatOutcomeLegend() {
+//
+// Default `className` works for the at-bat replay page; the pitcher
+// view's inline at-bat playback overrides it (its mobile playback bar
+// already lives at bottom-20).
+export function AtBatOutcomeLegend({
+  className = "absolute bottom-20 sm:bottom-6 left-3 sm:left-6 z-20 flex flex-col items-start gap-2 pointer-events-auto",
+}: {
+  className?: string;
+} = {}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="absolute bottom-20 sm:bottom-6 left-3 sm:left-6 z-20 flex flex-col items-start gap-2 pointer-events-auto">
+    <div className={className}>
       {/* Items panel — always visible on desktop, mobile only when expanded. */}
       <div
         className={`${expanded ? "block" : "hidden"} sm:block rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 w-fit`}

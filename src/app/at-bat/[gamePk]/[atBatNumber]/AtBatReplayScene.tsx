@@ -9,6 +9,7 @@ import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
 import { BatterSilhouette, frontPresetForStand } from "@/components/scene/BatterSilhouette";
+import { BaseballGlyph } from "@/components/icons/BaseballGlyph";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
@@ -267,13 +268,14 @@ export function AtBatReplayScene({
   const detailLanded =
     detailIdx < currentIdx || (detailIdx === currentIdx && phase !== "flying");
 
-  const handleSelectPitch = useCallback(
-    (idx: number) => {
-      setSelectedDetailIdx(idx);
-      jumpTo(idx, false);
-    },
-    [jumpTo],
-  );
+  // Pin the metrics overlay to the clicked pitch and pause. We don't
+  // call jumpTo here — that would rewind currentIdx and hide every
+  // pitch after the click target, which is not what users expect when
+  // browsing a finished at-bat.
+  const handleSelectPitch = useCallback((idx: number) => {
+    setSelectedDetailIdx(idx);
+    setPlaying(false);
+  }, []);
 
   return (
     <>
@@ -790,10 +792,11 @@ function PitchStepper({
           // color instead of staying white.
           const landed =
             i < currentIdx || (i === currentIdx && phase !== "flying");
+          const isActiveFlying = i === currentIdx && !landed;
           const cls = landed
             ? dotColorForOutcome(p.raw.description)
-            : i === currentIdx
-              ? "bg-white"
+            : isActiveFlying
+              ? "bg-transparent"
               : "bg-white/30 hover:bg-white/60";
           const symbol = landed ? outcomeSymbol(p.raw.description) : null;
           return (
@@ -801,10 +804,12 @@ function PitchStepper({
               key={`dot-${i}`}
               type="button"
               onClick={() => onJumpTo(i, false)}
-              className={`w-5 h-5 rounded-full transition-colors flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls}`}
+              className={`w-5 h-5 rounded-full overflow-hidden transition-colors flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls}`}
               aria-label={`Jump to pitch ${i + 1}`}
             >
-              {symbol ? (
+              {isActiveFlying ? (
+                <BaseballGlyph spinning />
+              ) : symbol ? (
                 <span
                   aria-hidden
                   // Mirror the K visually for a "looking" (called)
