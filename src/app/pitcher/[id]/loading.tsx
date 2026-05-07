@@ -1,8 +1,13 @@
 import Image from "next/image";
 
 export default function Loading() {
+  // The layout above already owns the <main className="fixed inset-0">
+  // wrapper + the persistent Scene. This component only renders the
+  // panel skeleton on top, so it composes cleanly with the layout
+  // during pitcher swaps (Scene stays visible while the new server
+  // page is resolving).
   return (
-    <main className="fixed inset-0 bg-[#0a0e14] text-white/90">
+    <>
       <div className="absolute top-6 left-3 right-3 sm:left-6 sm:right-6 flex items-start justify-between gap-3 sm:gap-6">
         <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-white/45">
           <span>←</span>
@@ -35,6 +40,6 @@ export default function Loading() {
           Loading pitcher…
         </div>
       </div>
-    </main>
+    </>
   );
 }

@@ -39,12 +39,19 @@ const DIRT = "#a87c52";
 const LINE = "#f1f3f5";
 
 const Y_GRASS_BASE = 0.0;
-const Y_DIRT_FAN = 0.05;
-const Y_INFIELD_GRASS = 0.1;
-const Y_DIRT_FEATURE = 0.15;
-const Y_BASE = 0.2;
-const Y_PLATE = 0.21;
-const Y_LINE = 0.22;
+// Vertical layering — every layer is 0.10 ft (≈ 1.2") above the
+// previous one. That's small enough to be invisible from a
+// ground-level camera (the plate is 17" wide, so 1.2" of stack
+// height across multiple layers reads as flat ground), but large
+// enough that even at top-down camera distances the depth buffer
+// can still resolve every layer without flicker.
+const Y_DIRT_FAN = 0.1;
+const Y_INFIELD_GRASS = 0.2;
+const Y_BASEPATH = 0.3;
+const Y_DIRT_FEATURE = 0.4;
+const Y_BASE = 0.5;
+const Y_PLATE = 0.51;
+const Y_LINE = 0.52;
 
 // Mow-pattern shader: paints the classic ballpark crosshatch onto any grass
 // mesh by sampling world XZ position. Stripes are aligned with the foul lines
@@ -76,7 +83,48 @@ function useMowGrassMaterial() {
       shader.fragmentShader = shader.fragmentShader
         .replace(
           "#include <common>",
-          `#include <common>\nvarying vec3 vMowWorldPos;`,
+          `#include <common>
+          varying vec3 vMowWorldPos;
+          float grassHash21(vec2 p) {
+            p = fract(p * vec2(123.34, 456.21));
+            p += dot(p, p + 45.32);
+            return fract(p.x * p.y);
+          }
+          float grassNoise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            float a = grassHash21(i);
+            float b = grassHash21(i + vec2(1.0, 0.0));
+            float c = grassHash21(i + vec2(0.0, 1.0));
+            float d = grassHash21(i + vec2(1.0, 1.0));
+            return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+          }
+          // Two octaves so the bump field has both blade clumps (low
+          // freq) and individual blade-tip jitter (high freq).
+          float grassBumpField(vec2 p) {
+            return grassNoise(p * 1.8) * 0.55 + grassNoise(p * 6.0) * 0.45;
+          }
+          `,
+        )
+        // Match the dirt material: perturb the surface normal so the
+        // directional lighting picks up bump-map relief on top of
+        // the mow stripes.
+        .replace(
+          "#include <normal_fragment_maps>",
+          `#include <normal_fragment_maps>
+          {
+            vec2 dp = vMowWorldPos.xz;
+            float h0 = grassBumpField(dp);
+            float hx = grassBumpField(dp + vec2(0.05, 0.0));
+            float hz = grassBumpField(dp + vec2(0.0, 0.05));
+            float gx = (hx - h0) / 0.05;
+            float gz = (hz - h0) / 0.05;
+            float BUMP_STRENGTH = 0.30;
+            vec3 perturbed = normalize(vec3(-gx * BUMP_STRENGTH, 1.0, -gz * BUMP_STRENGTH));
+            normal = normalize(mix(normal, perturbed, 0.7));
+          }
+          `,
         )
         .replace(
           "#include <color_fragment>",
@@ -108,6 +156,103 @@ function useMowGrassMaterial() {
   }, []);
 }
 
+// Procedural dirt material — bump-map style. Instead of painting
+// color variation into the dirt, we perturb the surface normal from
+// a value-noise field so the directional lighting (lib/scene
+// Lighting.tsx) creates the highlights / shadows of a bumpy clay
+// surface. Color stays close to the base DIRT tone with only a
+// faint tint variation, so the relief comes from light interaction
+// with the displaced normals — not from baked color contrast.
+//
+// Shared by every dirt mesh (infield fan, base cutouts, home circle,
+// mound, basepaths) so the bump pattern is continuous across the
+// surface boundaries.
+function useDirtMaterial() {
+  return useMemo(() => {
+    const mat = new MeshStandardMaterial({
+      color: DIRT,
+      roughness: 0.95,
+      metalness: 0,
+    });
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          `#include <common>\nvarying vec3 vDirtWorldPos;`,
+        )
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>\nvDirtWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+        );
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          `#include <common>
+          varying vec3 vDirtWorldPos;
+          float dirtHash21(vec2 p) {
+            p = fract(p * vec2(123.34, 456.21));
+            p += dot(p, p + 45.32);
+            return fract(p.x * p.y);
+          }
+          float dirtNoise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            float a = dirtHash21(i);
+            float b = dirtHash21(i + vec2(1.0, 0.0));
+            float c = dirtHash21(i + vec2(0.0, 1.0));
+            float d = dirtHash21(i + vec2(1.0, 1.0));
+            return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+          }
+          // Two octaves weighted toward the high-frequency band so the
+          // bumps read as fine clay grain rather than broad undulation.
+          float dirtBumpField(vec2 p) {
+            return dirtNoise(p * 2.0) * 0.35 + dirtNoise(p * 8.0) * 0.65;
+          }
+          `,
+        )
+        // Perturb the normal AFTER three.js's standard normal pipeline
+        // has finished. Numerical gradient of the bump field gives
+        // a per-pixel slope, which we treat as a tangent-space normal
+        // and rotate into world space. Since every dirt mesh is laid
+        // flat (geometry rotated -PI/2 around X so its face points
+        // +Y in world), the world-up axis is the surface normal and
+        // the bump's (∂h/∂x, ∂h/∂z) maps directly to a tilt.
+        .replace(
+          "#include <normal_fragment_maps>",
+          `#include <normal_fragment_maps>
+          {
+            vec2 dp = vDirtWorldPos.xz;
+            float h0 = dirtBumpField(dp);
+            float hx = dirtBumpField(dp + vec2(0.05, 0.0));
+            float hz = dirtBumpField(dp + vec2(0.0, 0.05));
+            float gx = (hx - h0) / 0.05;
+            float gz = (hz - h0) / 0.05;
+            float BUMP_STRENGTH = 0.20;
+            vec3 perturbed = normalize(vec3(-gx * BUMP_STRENGTH, 1.0, -gz * BUMP_STRENGTH));
+            // Blend toward the perturbed normal — full replacement
+            // would over-darken at glancing angles; mostly base.
+            normal = normalize(mix(normal, perturbed, 0.7));
+          }
+          `,
+        )
+        .replace(
+          "#include <color_fragment>",
+          `#include <color_fragment>
+          // Tiny tint variation only — the bump map carries the
+          // lighting-driven detail. Without this slight wash the dirt
+          // reads as a uniform brown plane.
+          float tintN = dirtNoise(vDirtWorldPos.xz * 0.25);
+          vec3 base = diffuseColor.rgb * mix(0.88, 1.06, tintN);
+          diffuseColor.rgb = base;
+          `,
+        );
+    };
+    return mat;
+  }, []);
+}
+
 // Compute where the 95-ft-from-rubber arc intersects each foul line.
 const FOUL_HIT = (() => {
   const b = PLATE_TO_MOUND * Math.SQRT2;
@@ -121,18 +266,19 @@ const FOUL_HIT = (() => {
 
 export function Stage() {
   const mowMaterial = useMowGrassMaterial();
+  const dirtMaterial = useDirtMaterial();
   return (
     <group>
       <OutfieldGrass material={mowMaterial} />
-      <InfieldDirtFan />
+      <InfieldDirtFan material={dirtMaterial} />
       <InfieldGrassDiamond material={mowMaterial} />
-      <FoulLineBasepath side="first" />
-      <FoulLineBasepath side="third" />
-      <BaseCutout position={FIRST_BASE} />
-      <BaseCutout position={SECOND_BASE} />
-      <BaseCutout position={THIRD_BASE} />
-      <HomePlateArea />
-      <MoundDirt />
+      <FoulLineBasepath side="first" material={dirtMaterial} />
+      <FoulLineBasepath side="third" material={dirtMaterial} />
+      <BaseCutout position={FIRST_BASE} material={dirtMaterial} />
+      <BaseCutout position={SECOND_BASE} material={dirtMaterial} />
+      <BaseCutout position={THIRD_BASE} material={dirtMaterial} />
+      <HomePlateArea material={dirtMaterial} />
+      <MoundDirt material={dirtMaterial} />
       <FoulLines />
       <Base position={FIRST_BASE} />
       <Base position={SECOND_BASE} />
@@ -173,7 +319,7 @@ function OutfieldGrass({ material }: { material: MeshStandardMaterial }) {
 // from the front of the rubber. Includes the area past 2B where the
 // dirt curves through the outfield.
 // =====================================================================
-function InfieldDirtFan() {
+function InfieldDirtFan({ material }: { material: MeshStandardMaterial }) {
   const shape = useMemo(() => {
     const s = new Shape();
     s.moveTo(0, 0); // home
@@ -185,9 +331,12 @@ function InfieldDirtFan() {
     return s;
   }, []);
   return (
-    <mesh position={[0, Y_DIRT_FAN, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh
+      position={[0, Y_DIRT_FAN, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
+    >
       <shapeGeometry args={[shape]} />
-      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }
@@ -238,7 +387,13 @@ function InfieldGrassDiamond({ material }: { material: MeshStandardMaterial }) {
 // above the grass diamond, so the foul line reads as a real dirt strip
 // (similar to 1B/3B basepaths in the reference photo).
 // =====================================================================
-function FoulLineBasepath({ side }: { side: "first" | "third" }) {
+function FoulLineBasepath({
+  side,
+  material,
+}: {
+  side: "first" | "third";
+  material: MeshStandardMaterial;
+}) {
   const shape = useMemo(() => {
     const sign = side === "first" ? 1 : -1;
     // Extend each end 3 ft into its adjacent circle so the strip's
@@ -268,9 +423,17 @@ function FoulLineBasepath({ side }: { side: "first" | "third" }) {
     return s;
   }, [side]);
   return (
-    <mesh position={[0, Y_DIRT_FEATURE - 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh
+      // Dedicated layer between the grass diamond and the home-plate
+      // circle / base cutouts. With Y_BASEPATH = 0.15 and
+      // Y_DIRT_FEATURE = 0.20, the basepath sits 0.05 above the
+      // grass diamond and 0.05 below the discs that cap each end —
+      // enough headroom for depth-test ordering to be unambiguous.
+      position={[0, Y_BASEPATH, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
+    >
       <shapeGeometry args={[shape]} />
-      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }
@@ -281,35 +444,44 @@ function FoulLineBasepath({ side }: { side: "first" | "third" }) {
 // creating the rounded-concave corner look from the reference photos.
 // =====================================================================
 
-function BaseCutout({ position }: { position: [number, number, number] }) {
+function BaseCutout({
+  position,
+  material,
+}: {
+  position: [number, number, number];
+  material: MeshStandardMaterial;
+}) {
   return (
     <mesh
       position={[position[0], Y_DIRT_FEATURE, position[2]]}
       rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
     >
       <circleGeometry args={[BASE_CUT_R, 32]} />
-      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }
 
-function HomePlateArea() {
+function HomePlateArea({ material }: { material: MeshStandardMaterial }) {
   return (
-    <mesh position={[0, Y_DIRT_FEATURE, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh
+      position={[0, Y_DIRT_FEATURE, 0]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
+    >
       <circleGeometry args={[HOME_AREA_R, 48]} />
-      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }
 
-function MoundDirt() {
+function MoundDirt({ material }: { material: MeshStandardMaterial }) {
   return (
     <mesh
       position={[0, Y_DIRT_FEATURE, -PLATE_TO_MOUND]}
       rotation={[-Math.PI / 2, 0, 0]}
+      material={material}
     >
       <circleGeometry args={[MOUND_R, 32]} />
-      <meshStandardMaterial color={DIRT} roughness={0.92} metalness={0} />
     </mesh>
   );
 }

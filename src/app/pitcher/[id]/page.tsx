@@ -10,7 +10,6 @@ import {
   getPitchColor,
   type OutcomeCategory,
 } from "@/lib/viz/colors";
-import { PitcherArsenalScene } from "./PitcherArsenalScene";
 import { MobileCollapse } from "@/components/chrome/MobileCollapse";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
@@ -220,9 +219,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     : null;
 
   return (
-    <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
-      <PitcherArsenalScene pitches={renderable} pitcherLabel={pitcherLastName(pitcher)} />
-
+    <>
+      {/* Scene + <main> wrapper live in /pitcher/layout.tsx so the
+          3D canvas stays mounted across pitcher swaps. This page
+          owns only the panels + chrome that should rebuild on
+          pitcher change. */}
       <OutcomeLegend />
 
       <TopNav
@@ -350,13 +351,8 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           }
         />
       </section>
-    </main>
+    </>
   );
 }
 
-function pitcherLastName(p: { full_name: string; last_name?: string | null }): string {
-  if (p.last_name && p.last_name.trim().length > 0) return p.last_name;
-  const parts = p.full_name.trim().split(/\s+/);
-  return parts[parts.length - 1] ?? p.full_name;
-}
 

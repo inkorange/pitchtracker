@@ -25,13 +25,13 @@ export function SkyDome() {
   return (
     <mesh scale={[-1, 1, 1]}>
       <sphereGeometry args={[1500, 64, 32]} />
-      {/* Multiplier shifts the texture toward a richer blue: red/green
-          channels pulled down to ~0.72/0.78, blue held at ~0.91, so
-          the daytime sky reads blue instead of washed out without
-          losing the cloud + horizon-haze detail in the texture. */}
+      {/* Multiplier pulls red/green further down (~0.55/0.70) while
+          holding blue (~0.88), shifting the rendered sky toward a
+          deeper saturated daytime blue without darkening the clouds
+          to the point that they grey out. */}
       <meshBasicMaterial
         map={skyTexture}
-        color="#b8c8e8"
+        color="#8eb4e0"
         side={THREE.BackSide}
         depthWrite={false}
         toneMapped={false}
