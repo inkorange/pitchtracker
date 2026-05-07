@@ -15,10 +15,19 @@ import { fetchPersonsCached } from "@/lib/statsapi/client";
 //   GET /api/pitcher/[id]/batters?season=Y          (no q)
 //     Returns the 10 most-faced batters this season — used as
 //     suggestions before the user types in the dialog.
-// Both shapes return: { batters: [{ id, fullName }] }.
+// Both shapes return: { batters: [{ id, fullName, teamId }] }, where
+// teamId is the team the batter was on the most recent time this
+// pitcher faced him (derived from inning_topbot + the game's
+// home/away team ids).
 
 interface RouteParams {
   params: Promise<{ id: string }>;
+}
+
+interface BatterResult {
+  id: number;
+  fullName: string;
+  teamId: number | null;
 }
 
 const SUGGESTION_LIMIT = 10;
@@ -45,11 +54,25 @@ export async function GET(request: Request, { params }: RouteParams) {
   await ensurePitcherSeasonCache(pitcherId, season);
 
   // All pitches this pitcher threw in this season's regular-season
-  // games. We need every row (not distinct) so we can rank batters by
-  // pitches-faced for the suggestion mode below.
-  const { data: rows, error } = await supabase
+  // games. We need every row (not distinct) so we can both rank
+  // batters by pitches-faced (suggestion mode) and pick each batter's
+  // most-recent team for the team-logo badge in the picker UI.
+  interface PitchRow {
+    batter_id: number | null;
+    inning_topbot: string | null;
+    pitch_games: {
+      season: number;
+      game_type: string | null;
+      game_date: string;
+      home_team_id: number | null;
+      away_team_id: number | null;
+    } | null;
+  }
+  const { data, error } = await supabase
     .from("pitch_game_pitches")
-    .select("batter_id, pitch_games!inner(season, game_type)")
+    .select(
+      "batter_id, inning_topbot, pitch_games!inner(season, game_type, game_date, home_team_id, away_team_id)",
+    )
     .eq("pitcher_id", pitcherId)
     .eq("pitch_games.season", season)
     .eq("pitch_games.game_type", "R")
@@ -57,31 +80,55 @@ export async function GET(request: Request, { params }: RouteParams) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  const rows = (data ?? []) as unknown as PitchRow[];
 
-  // Pitch counts per batter — used both to enumerate the universe
-  // (for the search path) and to rank suggestions (for the empty-q
-  // path). Pitches-faced is a fine proxy for at-bats-faced for
-  // ordering purposes.
-  const counts = new Map<number, number>();
-  for (const r of rows ?? []) {
+  // Per-batter aggregate: pitches-faced count + the most-recent
+  // (game_date, team_id) we saw them on. Top half = away batting,
+  // bottom = home batting; if inning_topbot is missing the row's
+  // team contribution is dropped.
+  interface BatterAgg {
+    count: number;
+    lastDate: string;
+    lastTeamId: number | null;
+  }
+  const agg = new Map<number, BatterAgg>();
+  for (const r of rows) {
     const bid = r.batter_id;
     if (typeof bid !== "number") continue;
-    counts.set(bid, (counts.get(bid) ?? 0) + 1);
+    const meta = r.pitch_games;
+    const date = meta?.game_date ?? "";
+    let teamId: number | null = null;
+    if (r.inning_topbot === "Top") teamId = meta?.away_team_id ?? null;
+    else if (r.inning_topbot === "Bot") teamId = meta?.home_team_id ?? null;
+    const prior = agg.get(bid);
+    if (!prior) {
+      agg.set(bid, { count: 1, lastDate: date, lastTeamId: teamId });
+      continue;
+    }
+    prior.count += 1;
+    if (date > prior.lastDate) {
+      prior.lastDate = date;
+      prior.lastTeamId = teamId;
+    }
   }
 
   if (q.length === 0) {
     // Suggestion mode: top-N most-faced. Ranking has natural ties; a
     // secondary sort by id keeps the order stable across requests.
-    const topIds = Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1] || a[0] - b[0])
+    const topIds = Array.from(agg.entries())
+      .sort((a, b) => b[1].count - a[1].count || a[0] - b[0])
       .slice(0, SUGGESTION_LIMIT)
       .map(([bid]) => bid);
     const personMap = await fetchPersonsCached(topIds);
-    const batters: Array<{ id: number; fullName: string }> = [];
+    const batters: BatterResult[] = [];
     for (const bid of topIds) {
       const p = personMap.get(bid);
       if (!p) continue;
-      batters.push({ id: bid, fullName: p.fullName });
+      batters.push({
+        id: bid,
+        fullName: p.fullName,
+        teamId: agg.get(bid)?.lastTeamId ?? null,
+      });
     }
     return NextResponse.json(
       { batters },
@@ -90,14 +137,18 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   // Search mode: substring match against the resolved name set.
-  const batterIds = Array.from(counts.keys());
+  const batterIds = Array.from(agg.keys());
   const personMap = await fetchPersonsCached(batterIds);
-  const matches: Array<{ id: number; fullName: string }> = [];
+  const matches: BatterResult[] = [];
   for (const bid of batterIds) {
     const p = personMap.get(bid);
     if (!p) continue;
     if (p.fullName.toLowerCase().includes(q)) {
-      matches.push({ id: bid, fullName: p.fullName });
+      matches.push({
+        id: bid,
+        fullName: p.fullName,
+        teamId: agg.get(bid)?.lastTeamId ?? null,
+      });
     }
   }
   matches.sort((a, b) => a.fullName.localeCompare(b.fullName));

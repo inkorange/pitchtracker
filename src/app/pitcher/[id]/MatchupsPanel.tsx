@@ -11,6 +11,7 @@ import { personHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 interface BatterResult {
   id: number;
   fullName: string;
+  teamId: number | null;
 }
 
 interface AtBatSummary {
@@ -448,9 +449,33 @@ function BatterPickList({
           <button
             type="button"
             onClick={() => onPick(b)}
-            className="w-full text-left px-3 py-2 rounded hover:bg-white/[0.06] transition-colors text-sm text-white/95"
+            className="w-full flex items-center gap-2.5 text-left px-2 py-1.5 rounded hover:bg-white/[0.06] transition-colors text-sm text-white/95"
           >
-            {b.fullName}
+            <div className="relative w-8 h-8 flex-shrink-0">
+              <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden">
+                <Image
+                  src={personHeadshotUrl(b.id, 64)}
+                  alt=""
+                  fill
+                  sizes="32px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+              {b.teamId != null ? (
+                <div className="absolute -bottom-0.5 -right-1 w-4 h-4 rounded-full bg-white border border-white/30 shadow flex items-center justify-center overflow-hidden">
+                  <Image
+                    src={teamLogoUrl(b.teamId)}
+                    alt=""
+                    width={12}
+                    height={12}
+                    className="object-contain"
+                    unoptimized
+                  />
+                </div>
+              ) : null}
+            </div>
+            <span className="truncate">{b.fullName}</span>
           </button>
         </li>
       ))}
