@@ -47,7 +47,11 @@ export function CameraRig({ preset, presetTick = 0, presetOverride }: CameraRigP
     } else {
       animatingRef.current = true;
     }
-  }, [preset, presetTick, camera]);
+    // presetOverride is included so a memoized override flipping
+    // identity (e.g., null → MOBILE_FRONT_PRESET after hydration, or
+    // a new at-bat stance override) snaps the camera even if `preset`
+    // and `presetTick` haven't changed.
+  }, [preset, presetTick, presetOverride, camera]);
 
   // If the user starts orbiting, cancel any in-flight preset tween so the
   // tween doesn't fight the user's drag.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Scene } from "@/components/scene/Scene";
@@ -21,6 +21,26 @@ import {
   AtBatPlaybackLayer,
   useAtBatPlayback,
 } from "./AtBatPlaybackLayer";
+
+// Tailwind's `sm` breakpoint. useSyncExternalStore subscribes to the
+// MQL so the camera reframes on rotate / resize without a setState in
+// an effect (compiler-friendly) and stays SSR-safe.
+const MOBILE_MQL = "(max-width: 639px)";
+const MOBILE_FRONT_PRESET: CameraPosition = {
+  position: [0, 4.3, 13],
+  target: [0, 2.5, -55],
+};
+function subscribeIsMobile(callback: () => void): () => void {
+  const mql = window.matchMedia(MOBILE_MQL);
+  mql.addEventListener("change", callback);
+  return () => mql.removeEventListener("change", callback);
+}
+function getIsMobileSnapshot(): boolean {
+  return window.matchMedia(MOBILE_MQL).matches;
+}
+function getIsMobileServerSnapshot(): boolean {
+  return false;
+}
 
 interface CachedPitch {
   game_pk: number;
@@ -212,10 +232,27 @@ export function PitcherArsenalScene({
     return null;
   }, [atBatPitches]);
 
-  const presetOverride: CameraPosition | null = useMemo(
-    () => (inAtBatMode ? frontPresetForStand(preset, batterStand) : null),
-    [inAtBatMode, preset, batterStand],
+  // Mobile reframes the front preset. The desktop default biases the
+  // camera to the 3B side and points slightly toward 1B so action sits
+  // in the right half of the frame, clear of the left-anchored pitcher
+  // panel. On a portrait phone there's no side panel — the panel is
+  // pinned to the top — and that bias just shoves the strike zone off
+  // the right edge. Override to a centered framing.
+  const isMobile = useSyncExternalStore(
+    subscribeIsMobile,
+    getIsMobileSnapshot,
+    getIsMobileServerSnapshot,
   );
+
+  const presetOverride: CameraPosition | null = useMemo(() => {
+    if (inAtBatMode) {
+      return frontPresetForStand(preset, batterStand);
+    }
+    if (preset === "front" && isMobile) {
+      return MOBILE_FRONT_PRESET;
+    }
+    return null;
+  }, [inAtBatMode, preset, batterStand, isMobile]);
 
   // Snap the camera back to the front preset (with the stance shift
   // applied) every time a new at-bat is loaded — the user usually
