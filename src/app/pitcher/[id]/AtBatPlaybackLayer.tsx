@@ -99,6 +99,7 @@ interface PlaybackState {
   intraProgress: number;
   phase: Phase;
   playing: boolean;
+  selectedDetailIdx: number | null;
 }
 
 interface PlaybackHandlers {
@@ -106,6 +107,8 @@ interface PlaybackHandlers {
   togglePlay: () => void;
   setIntraProgress: (p: number) => void;
   setPhase: (p: Phase) => void;
+  selectPitch: (idx: number) => void;
+  clearSelection: () => void;
   settledTimerRef: React.MutableRefObject<number>;
 }
 
@@ -125,6 +128,12 @@ export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
   const [intraProgress, setIntraProgress] = useState(0);
   const [phase, setPhase] = useState<Phase>("flying");
   const [playing, setPlaying] = useState(true);
+  // User-pinned pitch for the metrics overlay. Null = follow the
+  // active pitch. Set by clicking a ribbon or landed ball; cleared by
+  // clicking empty space (wired in PitcherArsenalScene).
+  const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
+    null,
+  );
   const settledTimerRef = useRef(0);
 
   // Reset playback to the first pitch whenever the source list flips
@@ -139,6 +148,7 @@ export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
     setIntraProgress(0);
     setPhase("flying");
     setPlaying(true);
+    setSelectedDetailIdx(null);
     // The ref write happens during render here, which the React
     // Compiler flags. It's safe — settledTimerRef is private to this
     // hook and the value is consumed only inside useFrame on
@@ -177,13 +187,42 @@ export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
     setPlaying((p) => !p);
   }, [phase]);
 
+  // Click-to-focus: pin the metrics overlay to the picked pitch and
+  // stop playback at that pitch (settled, not flying) so the overlay
+  // stays anchored. Mirrors AtBatReplayScene's handleSelectPitch.
+  const selectPitch = useCallback(
+    (idx: number) => {
+      setSelectedDetailIdx(idx);
+      const clamped = Math.max(0, Math.min(idx, prepared.length - 1));
+      setCurrentIdx(clamped);
+      setIntraProgress(1);
+      setPhase("settled");
+      settledTimerRef.current = 0;
+      setPlaying(false);
+    },
+    [prepared.length],
+  );
+
+  const clearSelection = useCallback(() => {
+    setSelectedDetailIdx(null);
+  }, []);
+
   return {
-    state: { prepared, currentIdx, intraProgress, phase, playing },
+    state: {
+      prepared,
+      currentIdx,
+      intraProgress,
+      phase,
+      playing,
+      selectedDetailIdx,
+    },
     handlers: {
       jumpTo,
       togglePlay,
       setIntraProgress,
       setPhase,
+      selectPitch,
+      clearSelection,
       settledTimerRef,
     },
   };
@@ -196,8 +235,8 @@ interface AtBatPlaybackLayerProps {
 }
 
 export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps) {
-  const { prepared, currentIdx, intraProgress, phase, playing } = state;
-  const { setIntraProgress, setPhase, settledTimerRef } = handlers;
+  const { prepared, currentIdx, intraProgress, phase, playing, selectedDetailIdx } = state;
+  const { setIntraProgress, setPhase, selectPitch, settledTimerRef } = handlers;
 
   // Animation tick — same shape as AtBatReplayScene's ReplayDriver.
   // Advances intraProgress while flying, settles to the next pitch
@@ -235,11 +274,14 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
     }
   });
 
-  // Active pitch's platePos when landed — anchors the floating
-  // metrics card. Only show once the pitch has actually arrived at
-  // the plate so the card doesn't run ahead of the ball.
-  const activePitch = prepared[currentIdx];
-  const detailLanded = phase !== "flying";
+  // Click-to-focus: detail overlay anchors to the user-selected pitch
+  // when one is set, otherwise follows the active pitch as playback
+  // advances. detailLanded gates the overlay so it never floats ahead
+  // of a still-flying ball.
+  const detailIdx = selectedDetailIdx ?? currentIdx;
+  const detailPitch = prepared[detailIdx];
+  const detailLanded =
+    detailIdx < currentIdx || (detailIdx === currentIdx && phase !== "flying");
 
   return (
     <>
@@ -249,6 +291,7 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
           i < currentIdx ? 1 : phase === "flying" ? intraProgress : 1;
         const isFlying = i === currentIdx && phase === "flying";
         const landed = !isFlying;
+        const isSelected = selectedDetailIdx === i;
         const opacity = i < currentIdx ? 0.55 : 1;
         const outcomeColor =
           OUTCOME_COLORS[categorizeDescription(p.raw.description)];
@@ -257,9 +300,19 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
             <Ribbon
               path={p.path}
               pitchType={p.raw.pitch_type ?? ""}
-              radius={isFlying ? 0.11 : 0.09}
+              radius={isSelected ? 0.13 : isFlying ? 0.11 : 0.09}
               drawProgress={drawProgress}
               opacity={opacity}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                selectPitch(i);
+              }}
+              onPointerOver={() => {
+                document.body.style.cursor = "pointer";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "";
+              }}
             />
             {/* While flying: white BallTracer animates along the curve.
                 Once landed: a sphere parked at the plate, colored by
@@ -269,13 +322,29 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
             {isFlying ? (
               <BallTracer path={p.path} progress={drawProgress} />
             ) : (
-              <Sphere args={[0.13, 18, 18]} position={p.platePos}>
+              <Sphere
+                args={[isSelected ? 0.16 : 0.13, 18, 18]}
+                position={p.platePos}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  selectPitch(i);
+                }}
+                onPointerOver={(ev) => {
+                  ev.stopPropagation();
+                  document.body.style.cursor = "pointer";
+                }}
+                onPointerOut={() => {
+                  document.body.style.cursor = "";
+                }}
+              >
                 <meshStandardMaterial
                   color={outcomeColor}
                   roughness={0.4}
                   metalness={0.05}
                   transparent
                   opacity={opacity}
+                  emissive={isSelected ? outcomeColor : "#000000"}
+                  emissiveIntensity={isSelected ? 0.6 : 0}
                 />
               </Sphere>
             )}
@@ -289,14 +358,15 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
           </group>
         );
       })}
-      {/* Metrics overlay anchored to the most-recently-landed pitch.
-          Re-keyed on currentIdx so the <Html> portal cleanly
-          re-anchors when playback advances. */}
-      {activePitch && detailLanded ? (
+      {/* Metrics overlay anchored to the focused pitch — selected
+          (clicked) when set, otherwise the active pitch as playback
+          advances. Re-keyed so the <Html> portal cleanly re-anchors
+          when the focus changes. */}
+      {detailPitch && detailLanded ? (
         <PitchDetailsPanel
-          key={currentIdx}
-          position={activePitch.platePos}
-          pitch={activePitch.raw}
+          key={detailIdx}
+          position={detailPitch.platePos}
+          pitch={detailPitch.raw}
         />
       ) : null}
     </>
@@ -496,7 +566,7 @@ export function AtBatPlaybackBar({ state, handlers }: AtBatPlaybackBarProps) {
               aria-label={`Jump to pitch ${i + 1}`}
             >
               {isActiveFlying ? (
-                <BaseballGlyph />
+                <BaseballGlyph spinning />
               ) : symbol ? (
                 <span
                   aria-hidden

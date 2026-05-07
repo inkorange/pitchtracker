@@ -807,7 +807,7 @@ function PitchStepper({
               aria-label={`Jump to pitch ${i + 1}`}
             >
               {isActiveFlying ? (
-                <BaseballGlyph />
+                <BaseballGlyph spinning />
               ) : symbol ? (
                 <span
                   aria-hidden

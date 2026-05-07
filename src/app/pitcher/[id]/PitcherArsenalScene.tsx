@@ -243,7 +243,11 @@ export function PitcherArsenalScene({
         preset={preset}
         presetTick={presetTick}
         presetOverride={presetOverride}
-        onPointerMissed={inAtBatMode ? undefined : () => setSelectedId(null)}
+        onPointerMissed={
+          inAtBatMode
+            ? () => playback.handlers.clearSelection()
+            : () => setSelectedId(null)
+        }
       >
         {inAtBatMode && batterStand ? (
           <BatterSilhouette stand={batterStand} />
