@@ -34,16 +34,9 @@ export function TopNav({ back, title, rightSlot }: TopNavProps) {
         ) : null}
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 flex-shrink-0"
+          className="inline-flex items-center flex-shrink-0"
           aria-label="pitchtracker home"
         >
-          <Image
-            src="/Major_League_Baseball_logo.svg"
-            alt=""
-            width={26}
-            height={14}
-            className="h-3.5 w-auto"
-          />
           <Image
             src="/pitchtracker-logo.svg"
             alt="pitchtracker"
