@@ -7,9 +7,10 @@ import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { TunnelMesh } from "@/components/scene/TunnelMesh";
+import { BatterSilhouette, frontPresetForStand } from "@/components/scene/BatterSilhouette";
 import { statcastToThree } from "@/lib/viz/coords";
 import { getOutcomeColor, getPitchLabel } from "@/lib/viz/colors";
-import type { CameraPreset } from "@/lib/viz/camera-presets";
+import type { CameraPosition, CameraPreset } from "@/lib/viz/camera-presets";
 import {
   buildTunnelEnvelope,
   type TunnelEnvelope,
@@ -199,13 +200,34 @@ export function PitcherArsenalScene({
   const playback = useAtBatPlayback(atBatPitches ?? null);
   const inAtBatMode = atBatPitches != null && atBatPitches.length > 0;
 
+  // Stance is the same for the whole at-bat; first valid value wins.
+  // Drives both the silhouette in the box and the front-preset camera
+  // shift so RHB at-bats and LHB at-bats frame the strike zone the
+  // same way the dedicated replay page does.
+  const batterStand: "L" | "R" | null = useMemo(() => {
+    if (!atBatPitches) return null;
+    for (const p of atBatPitches) {
+      if (p.stand === "L" || p.stand === "R") return p.stand;
+    }
+    return null;
+  }, [atBatPitches]);
+
+  const presetOverride: CameraPosition | null = useMemo(
+    () => (inAtBatMode ? frontPresetForStand(preset, batterStand) : null),
+    [inAtBatMode, preset, batterStand],
+  );
+
   return (
     <>
       <Scene
         preset={preset}
         presetTick={presetTick}
+        presetOverride={presetOverride}
         onPointerMissed={inAtBatMode ? undefined : () => setSelectedId(null)}
       >
+        {inAtBatMode && batterStand ? (
+          <BatterSilhouette stand={batterStand} />
+        ) : null}
         {inAtBatMode ? (
           <AtBatPlaybackLayer
             state={playback.state}
