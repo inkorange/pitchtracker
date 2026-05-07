@@ -103,12 +103,18 @@ interface PlaybackHandlers {
   settledTimerRef: React.MutableRefObject<number>;
 }
 
-/** Centralized state + handlers for inline at-bat playback. */
-export function useAtBatPlayback(pitches: ReplayPitch[]): {
+/**
+ * Centralized state + handlers for inline at-bat playback. Accepts
+ * `null` for "not in at-bat mode" so the caller can pass the prop
+ * straight through without allocating a new `[]` literal each render
+ * (which would churn the useMemo identity below and trigger the
+ * prev-prop reset on every render → infinite re-render loop).
+ */
+export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
   state: PlaybackState;
   handlers: PlaybackHandlers;
 } {
-  const prepared = useMemo(() => prepare(pitches), [pitches]);
+  const prepared = useMemo(() => prepare(pitches ?? []), [pitches]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [intraProgress, setIntraProgress] = useState(0);
   const [phase, setPhase] = useState<Phase>("flying");

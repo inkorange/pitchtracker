@@ -193,7 +193,10 @@ export function PitcherArsenalScene({
   // At-bat playback state — only meaningful when `atBatPitches` is
   // set, but the hook runs unconditionally so the same Scene
   // component instance survives mode swaps without remounting.
-  const playback = useAtBatPlayback(atBatPitches ?? []);
+  // Pass null directly (don't `?? []`) — the hook handles null
+  // internally so we don't churn a fresh array identity on every
+  // render and trigger an infinite reset loop.
+  const playback = useAtBatPlayback(atBatPitches ?? null);
   const inAtBatMode = atBatPitches != null && atBatPitches.length > 0;
 
   return (
