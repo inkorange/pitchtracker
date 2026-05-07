@@ -217,6 +217,26 @@ export function PitcherArsenalScene({
     [inAtBatMode, preset, batterStand],
   );
 
+  // Snap the camera back to the front preset (with the stance shift
+  // applied) every time a new at-bat is loaded — the user usually
+  // orbits away during playback, and the next AB pick should reframe
+  // the strike zone for the new batter's handedness rather than leave
+  // them looking at the previous angle. Forcing the preset to "front"
+  // here also re-applies the stance override even if they'd switched
+  // to a side / top preset mid-playback.
+  const atBatKey =
+    atBatPitches && atBatPitches.length > 0
+      ? `${atBatPitches[0].game_pk}-${atBatPitches[0].at_bat_number}`
+      : null;
+  const [prevAtBatKey, setPrevAtBatKey] = useState<string | null>(atBatKey);
+  if (prevAtBatKey !== atBatKey) {
+    setPrevAtBatKey(atBatKey);
+    if (atBatKey != null) {
+      setPreset("front");
+      setPresetTick((t) => t + 1);
+    }
+  }
+
   return (
     <>
       <Scene
