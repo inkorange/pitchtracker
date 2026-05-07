@@ -45,28 +45,43 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [batterName, setBatterName] = useState<string | null>(null);
+  const [matchups, setMatchups] = useState<AtBatSummary[]>([]);
+  const [matchupsLoading, setMatchupsLoading] = useState(false);
+  const [matchupsError, setMatchupsError] = useState<string | null>(null);
 
-  // Resolve the selected batter's name when arriving via shared URL
-  // (no in-memory cache from a prior pick).
+  // Source of truth for matchups data. Fetched whenever a batter is
+  // selected via URL, regardless of whether the dialog is open — so
+  // the inline list (visible during at-bat mode) and the dialog list
+  // share one fetch.
   useEffect(() => {
     if (vsBatter == null || pitcherId == null) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setBatterName(null);
+      setMatchups([]);
+      setMatchupsError(null);
       return;
     }
     const ctrl = new AbortController();
+    setMatchupsLoading(true);
+    setMatchupsError(null);
     fetch(
       `/api/pitcher/${pitcherId}/matchups?batterId=${vsBatter}&season=${season}`,
       { signal: ctrl.signal },
     )
       .then(async (res) => {
-        if (!res.ok) return;
-        const body = (await res.json()) as { batterName: string };
+        if (!res.ok) throw new Error(`Matchups fetch ${res.status}`);
+        const body = (await res.json()) as {
+          batterName: string;
+          atBats: AtBatSummary[];
+        };
         setBatterName(body.batterName);
+        setMatchups(body.atBats);
       })
-      .catch(() => {
-        /* ignore */
-      });
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setMatchupsError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setMatchupsLoading(false));
     return () => ctrl.abort();
   }, [vsBatter, pitcherId, season]);
 
@@ -81,45 +96,75 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
   }
 
   const inAtBatMode = atBat.abGame != null && atBat.abNum != null;
+  const showInline = inAtBatMode && vsBatter != null;
 
   return (
     <div className="space-y-2">
-      {/* Compact entry pill — always present so the user can either
-          start fresh or change which batter they're studying. */}
-      <button
-        type="button"
-        onClick={() => setDialogOpen(true)}
-        className="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[11px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
-      >
-        {vsBatter != null && batterName ? `Browse matchups · ${batterName}` : "Find at-bats"}
-      </button>
-
-      {/* In at-bat mode, surface a quick exit so the user doesn't
-          have to re-open the dialog just to leave playback. */}
-      {inAtBatMode ? (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={exitAtBat}
-            className="flex-1 px-2.5 py-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.1] text-[10px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
-          >
-            Exit at-bat mode
-          </button>
-          <button
-            type="button"
-            onClick={clearMatchup}
-            className="px-2 py-1.5 rounded-md border border-white/10 text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white"
-          >
-            Clear
-          </button>
-        </div>
-      ) : null}
+      {showInline ? (
+        <>
+          <div className="flex items-baseline justify-between gap-2 px-1">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-white/55 truncate">
+              Matchups
+              {batterName ? (
+                <span className="text-white/85"> · {batterName}</span>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDialogOpen(true)}
+              className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white"
+            >
+              Change
+            </button>
+          </div>
+          <InlineMatchupsList
+            matchups={matchups}
+            loading={matchupsLoading}
+            error={matchupsError}
+            currentGame={atBat.abGame}
+            currentAtBat={atBat.abNum}
+            onPickAtBat={(ab) =>
+              setAtBat({ abGame: ab.game_pk, abNum: ab.at_bat_number })
+            }
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={exitAtBat}
+              className="flex-1 px-2.5 py-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.1] text-[10px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
+            >
+              Exit at-bat mode
+            </button>
+            <button
+              type="button"
+              onClick={clearMatchup}
+              className="px-2 py-1.5 rounded-md border border-white/10 text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white"
+            >
+              Clear
+            </button>
+          </div>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setDialogOpen(true)}
+          className="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[11px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
+        >
+          {vsBatter != null && batterName
+            ? `Browse matchups · ${batterName}`
+            : "Find at-bats"}
+        </button>
+      )}
 
       {dialogOpen ? (
         <MatchupsDialog
           pitcherId={pitcherId}
           season={season}
-          initialBatterId={vsBatter}
+          vsBatter={vsBatter}
+          batterName={batterName}
+          matchups={matchups}
+          matchupsLoading={matchupsLoading}
+          matchupsError={matchupsError}
           onClose={() => setDialogOpen(false)}
           onPickBatter={(b) => {
             setVsBatter(b.id);
@@ -139,59 +184,37 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
 // Overlays the page via React portal. Inside it has two sub-views:
 //   1. Typeahead — search a batter this pitcher faced this season.
 //   2. Matchups list — pick an at-bat to enter playback.
-// Picking an at-bat closes the dialog and lifts the result back to
-// MatchupsPanel via callbacks.
+// All matchups/loading state lives in MatchupsPanel and is passed
+// in here as props so the inline list (visible in at-bat mode) and
+// the dialog list share a single fetch.
 function MatchupsDialog({
   pitcherId,
   season,
-  initialBatterId,
+  vsBatter,
+  batterName,
+  matchups,
+  matchupsLoading,
+  matchupsError,
   onClose,
   onPickBatter,
   onPickAtBat,
 }: {
   pitcherId: number | null;
   season: number;
-  initialBatterId: number | null;
+  vsBatter: number | null;
+  batterName: string | null;
+  matchups: AtBatSummary[];
+  matchupsLoading: boolean;
+  matchupsError: string | null;
   onClose: () => void;
   onPickBatter: (b: BatterResult) => void;
   onPickAtBat: (ab: AtBatSummary) => void;
 }) {
-  const [batterId, setBatterId] = useState<number | null>(initialBatterId);
-  const [batterName, setBatterName] = useState<string | null>(null);
-  const [matchups, setMatchups] = useState<AtBatSummary[]>([]);
-  const [matchupsLoading, setMatchupsLoading] = useState(false);
-  const [matchupsError, setMatchupsError] = useState<string | null>(null);
-
-  // Load matchups when a batter is selected (or pre-loaded via URL).
-  useEffect(() => {
-    if (batterId == null || pitcherId == null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMatchups([]);
-      return;
-    }
-    const ctrl = new AbortController();
-    setMatchupsLoading(true);
-    setMatchupsError(null);
-    fetch(
-      `/api/pitcher/${pitcherId}/matchups?batterId=${batterId}&season=${season}`,
-      { signal: ctrl.signal },
-    )
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Matchups fetch ${res.status}`);
-        const body = (await res.json()) as {
-          batterName: string;
-          atBats: AtBatSummary[];
-        };
-        setBatterName(body.batterName);
-        setMatchups(body.atBats);
-      })
-      .catch((err) => {
-        if (err instanceof Error && err.name === "AbortError") return;
-        setMatchupsError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => setMatchupsLoading(false));
-    return () => ctrl.abort();
-  }, [batterId, pitcherId, season]);
+  // "Change batter" inside the dialog flips this on without clearing
+  // the URL state — we don't want to drop the user's current matchup
+  // until they pick a replacement (or close).
+  const [forceSearch, setForceSearch] = useState(false);
+  const showSearch = vsBatter == null || forceSearch;
 
   // Esc closes; also lock body scroll while open.
   useEffect(() => {
@@ -221,23 +244,18 @@ function MatchupsDialog({
     >
       <div className="w-full max-w-md rounded-lg bg-[#081a32]/95 backdrop-blur-md border border-white/10 shadow-2xl overflow-hidden">
         <DialogHeader
-          batterName={batterName}
-          onChangeBatter={() => {
-            setBatterId(null);
-            setBatterName(null);
-            setMatchups([]);
-          }}
+          batterName={showSearch ? null : batterName}
+          onChangeBatter={() => setForceSearch(true)}
           onClose={onClose}
         />
 
-        {batterId == null ? (
+        {showSearch ? (
           <BatterSearchBody
             pitcherId={pitcherId}
             season={season}
             onPick={(b) => {
-              setBatterId(b.id);
-              setBatterName(b.fullName);
               onPickBatter(b);
+              setForceSearch(false);
             }}
           />
         ) : (
@@ -406,57 +424,148 @@ function MatchupsListBody({
 }) {
   return (
     <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto scrollbar-thin">
+      <MatchupsListContent
+        matchups={matchups}
+        loading={loading}
+        error={error}
+        onPickAtBat={onPickAtBat}
+      />
+    </div>
+  );
+}
+
+// Inline list rendered on the pitcher card while in at-bat mode, so
+// the user can hop between the active batter's at-bats without
+// reopening the dialog. Marks the current at-bat with a brighter
+// treatment.
+function InlineMatchupsList({
+  matchups,
+  loading,
+  error,
+  currentGame,
+  currentAtBat,
+  onPickAtBat,
+}: {
+  matchups: AtBatSummary[];
+  loading: boolean;
+  error: string | null;
+  currentGame: number | null;
+  currentAtBat: number | null;
+  onPickAtBat: (ab: AtBatSummary) => void;
+}) {
+  return (
+    <div className="max-h-64 overflow-y-auto scrollbar-thin -mx-1 px-1">
+      <MatchupsListContent
+        matchups={matchups}
+        loading={loading}
+        error={error}
+        currentGame={currentGame}
+        currentAtBat={currentAtBat}
+        onPickAtBat={onPickAtBat}
+      />
+    </div>
+  );
+}
+
+function MatchupsListContent({
+  matchups,
+  loading,
+  error,
+  currentGame,
+  currentAtBat,
+  onPickAtBat,
+}: {
+  matchups: AtBatSummary[];
+  loading: boolean;
+  error: string | null;
+  currentGame?: number | null;
+  currentAtBat?: number | null;
+  onPickAtBat: (ab: AtBatSummary) => void;
+}) {
+  return (
+    <>
       {error ? (
-        <div className="text-[11px] text-rose-300/80">{error}</div>
+        <div className="text-[11px] text-rose-300/80 px-1">{error}</div>
       ) : null}
-      {loading ? (
-        <div className="text-[11px] text-white/55">Loading at-bats…</div>
+      {loading && matchups.length === 0 ? (
+        <div className="text-[11px] text-white/55 px-1">Loading at-bats…</div>
       ) : null}
       {!loading && matchups.length === 0 && !error ? (
-        <div className="text-[12px] text-white/55 italic">
+        <div className="text-[12px] text-white/55 italic px-1">
           No matchups found for this season.
         </div>
       ) : null}
       {matchups.length > 0 ? (
         <ul className="space-y-1">
-          {matchups.map((ab) => (
-            <li key={`${ab.game_pk}-${ab.at_bat_number}`}>
-              <button
-                type="button"
-                onClick={() => onPickAtBat(ab)}
-                className="w-full text-left flex items-start gap-2 px-2 py-1.5 rounded-md bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 text-white/85 transition-colors"
-              >
-                <OutcomeDot outcome={ab.outcome} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-[11px] tabular-nums truncate">
-                    <span className="text-white/55">{ab.game_date}</span>
-                    {ab.away_abbr || ab.home_abbr ? (
-                      <span className="text-white/45">
-                        {" "}
-                        · {ab.away_abbr ?? "?"} @ {ab.home_abbr ?? "?"}
-                      </span>
-                    ) : null}
-                    {ab.inning != null ? (
-                      <span className="text-white/45">
-                        {" "}
-                        · {ab.inning_topbot === "Bot" ? "Bot" : "Top"} {ab.inning}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-[11px] truncate">
-                    {humanizeOutcome(ab.outcome)}{" "}
-                    <span className="text-white/45 tabular-nums">
-                      · {ab.pitch_count} pitch
-                      {ab.pitch_count === 1 ? "" : "es"}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            </li>
-          ))}
+          {matchups.map((ab) => {
+            const isCurrent =
+              ab.game_pk === currentGame && ab.at_bat_number === currentAtBat;
+            return (
+              <li key={`${ab.game_pk}-${ab.at_bat_number}`}>
+                <MatchupRow ab={ab} current={isCurrent} onPick={onPickAtBat} />
+              </li>
+            );
+          })}
         </ul>
       ) : null}
-    </div>
+    </>
+  );
+}
+
+function MatchupRow({
+  ab,
+  current,
+  onPick,
+}: {
+  ab: AtBatSummary;
+  current: boolean;
+  onPick: (ab: AtBatSummary) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-current={current ? "true" : undefined}
+      onClick={() => onPick(ab)}
+      className={
+        "w-full text-left flex items-start gap-2 px-2 py-1.5 rounded-md border transition-colors " +
+        (current
+          ? "bg-white/[0.14] border-white/30 text-white"
+          : "bg-white/[0.04] hover:bg-white/[0.1] border-white/10 text-white/85")
+      }
+    >
+      <OutcomeDot outcome={ab.outcome} />
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] tabular-nums truncate">
+          <span className={current ? "text-white/85" : "text-white/55"}>
+            {ab.game_date}
+          </span>
+          {ab.away_abbr || ab.home_abbr ? (
+            <span className={current ? "text-white/70" : "text-white/45"}>
+              {" "}
+              · {ab.away_abbr ?? "?"} @ {ab.home_abbr ?? "?"}
+            </span>
+          ) : null}
+          {ab.inning != null ? (
+            <span className={current ? "text-white/70" : "text-white/45"}>
+              {" "}
+              · {ab.inning_topbot === "Bot" ? "Bot" : "Top"} {ab.inning}
+            </span>
+          ) : null}
+        </div>
+        <div className="text-[11px] truncate">
+          {humanizeOutcome(ab.outcome)}{" "}
+          <span
+            className={
+              current
+                ? "text-white/70 tabular-nums"
+                : "text-white/45 tabular-nums"
+            }
+          >
+            · {ab.pitch_count} pitch{ab.pitch_count === 1 ? "" : "es"}
+          </span>
+        </div>
+      </div>
+    </button>
   );
 }
 
