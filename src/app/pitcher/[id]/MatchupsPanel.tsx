@@ -247,7 +247,7 @@ function MatchupsDialog({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-lg bg-[#081a32]/95 backdrop-blur-md border border-white/10 shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md max-h-[60vh] sm:max-h-[85vh] rounded-lg bg-[#081a32]/95 backdrop-blur-md border border-white/10 shadow-2xl overflow-hidden">
         <DialogHeader
           batterName={showSearch ? null : batterName}
           onChangeBatter={() => setForceSearch(true)}
@@ -540,7 +540,7 @@ function TeamPickList({
   onPick: (t: TeamResult) => void;
 }) {
   return (
-    <ul className="max-h-72 overflow-y-auto scrollbar-thin -mx-1">
+    <ul className="max-h-[50vh] sm:max-h-72 overflow-y-auto scrollbar-thin -mx-1">
       {teams.map((t) => (
         <li key={t.id}>
           <button
@@ -633,7 +633,7 @@ function BatterPickList({
   onPick: (b: BatterResult) => void;
 }) {
   return (
-    <ul className="max-h-72 overflow-y-auto scrollbar-thin -mx-1">
+    <ul className="max-h-[50vh] sm:max-h-72 overflow-y-auto scrollbar-thin -mx-1">
       {batters.map((b) => (
         <li key={b.id}>
           <button
