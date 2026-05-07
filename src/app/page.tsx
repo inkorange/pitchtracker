@@ -33,7 +33,13 @@ export default function Home() {
           </p>
         </header>
 
-        <PitcherSearch autoFocus />
+        {/* Sticky so the search stays reachable as the user scrolls
+            through the daily pick + featured strips. -mx-6 px-6
+            extends the backdrop to the container edges so scrolled
+            content underneath doesn't bleed through. */}
+        <div className="sticky top-2 z-20 -mx-6 px-6 py-3 bg-[#0a0e14]/95 backdrop-blur-md">
+          <PitcherSearch autoFocus />
+        </div>
 
         <div className="flex flex-wrap justify-center gap-4">
           <Link
