@@ -87,7 +87,7 @@ export function AtBatHeader({ season }: { season: number }) {
   }
 
   return (
-    <div className="border-t border-white/[0.08] mt-3 pt-3">
+    <div className="sm:hidden border-t border-white/[0.08] mt-3 pt-3">
       <div className="flex items-start gap-2.5">
         {/* Batter headshot with the team-logo badge for the team
             they were on during this at-bat. */}
