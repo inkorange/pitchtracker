@@ -500,7 +500,7 @@ function TunnelHelp({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-white/55 hover:text-white text-lg leading-none"
+            className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded text-2xl sm:text-lg leading-none text-white/55 hover:text-white hover:bg-white/[0.06]"
           >
             ×
           </button>

@@ -311,7 +311,7 @@ function DialogHeader({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="px-2 py-1 rounded text-[14px] text-white/55 hover:text-white hover:bg-white/[0.06]"
+          className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded text-2xl sm:text-[14px] leading-none text-white/55 hover:text-white hover:bg-white/[0.06]"
         >
           ×
         </button>
