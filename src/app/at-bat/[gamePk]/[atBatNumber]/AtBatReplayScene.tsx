@@ -268,13 +268,14 @@ export function AtBatReplayScene({
   const detailLanded =
     detailIdx < currentIdx || (detailIdx === currentIdx && phase !== "flying");
 
-  const handleSelectPitch = useCallback(
-    (idx: number) => {
-      setSelectedDetailIdx(idx);
-      jumpTo(idx, false);
-    },
-    [jumpTo],
-  );
+  // Pin the metrics overlay to the clicked pitch and pause. We don't
+  // call jumpTo here — that would rewind currentIdx and hide every
+  // pitch after the click target, which is not what users expect when
+  // browsing a finished at-bat.
+  const handleSelectPitch = useCallback((idx: number) => {
+    setSelectedDetailIdx(idx);
+    setPlaying(false);
+  }, []);
 
   return (
     <>

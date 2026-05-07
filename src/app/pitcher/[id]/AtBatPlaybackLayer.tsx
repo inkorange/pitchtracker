@@ -188,20 +188,14 @@ export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
   }, [phase]);
 
   // Click-to-focus: pin the metrics overlay to the picked pitch and
-  // stop playback at that pitch (settled, not flying) so the overlay
-  // stays anchored. Mirrors AtBatReplayScene's handleSelectPitch.
-  const selectPitch = useCallback(
-    (idx: number) => {
-      setSelectedDetailIdx(idx);
-      const clamped = Math.max(0, Math.min(idx, prepared.length - 1));
-      setCurrentIdx(clamped);
-      setIntraProgress(1);
-      setPhase("settled");
-      settledTimerRef.current = 0;
-      setPlaying(false);
-    },
-    [prepared.length],
-  );
+  // pause so the user can inspect it. Crucially, we don't touch
+  // currentIdx / phase / intraProgress — clicking pitch 2 of a fully
+  // landed at-bat shouldn't unwind playback and hide pitches 3-5;
+  // every pitch that was already on screen stays on screen.
+  const selectPitch = useCallback((idx: number) => {
+    setSelectedDetailIdx(idx);
+    setPlaying(false);
+  }, []);
 
   const clearSelection = useCallback(() => {
     setSelectedDetailIdx(null);
