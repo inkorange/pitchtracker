@@ -17,9 +17,15 @@ import { CompareSharedFilters } from "./CompareSharedFilters";
 import { CompareLinkActions } from "./CompareLinkActions";
 import { CompareSlotSearch } from "./CompareSlotSearch";
 import { TunnelingPanel } from "./TunnelingPanel";
-import { CompareHoverProvider, HoverableSide } from "./CompareHoverContext";
+import {
+  CompareHoverProvider,
+  HoverableSide,
+  SelectableHeadshotFrame,
+} from "./CompareHoverContext";
+import { SwitchPitcherButton } from "./SwitchPitcherButton";
 import { OutcomeLegend } from "./OutcomeLegend";
 import { TopNav } from "@/components/chrome/TopNav";
+import { MobileCollapse } from "@/components/chrome/MobileCollapse";
 
 interface PageProps {
   searchParams: Promise<{
@@ -149,7 +155,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
 
         <OutcomeLegend />
 
-        <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+        <section className="absolute top-20 -translate-y-5 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 pointer-events-auto max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
           <HoverableSide side="a">
             <PitcherCard
               side="a"
@@ -175,9 +181,9 @@ export default async function ComparePage({ searchParams }: PageProps) {
           </HoverableSide>
 
           <div className="border-t border-white/[0.08]" />
-          <CompareSharedFilters />
-
           <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
+
+          <CompareSharedFilters />
 
           <div className="text-[11px] tabular-nums text-white/45 pt-2 border-t border-white/[0.05] flex items-center justify-between">
             <span>
@@ -484,79 +490,86 @@ function PitcherCard({
 }) {
   const sideLabel = side === "a" ? "Pitcher A" : "Pitcher B";
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-          <Image
-            src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
-            alt=""
-            fill
-            sizes="48px"
-            className="object-cover"
-            unoptimized
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-            {sideLabel} · {season}
-          </div>
-          <div className="text-sm font-medium text-white truncate">{pitcher.full_name}</div>
-          <div className="text-[11px] text-white/55 tabular-nums">
-            {pitcher.throws ? `${pitcher.throws}HP` : ""}
-            {team ? ` · ${team.abbreviation}` : ""}
-          </div>
-        </div>
-        {team ? (
-          <div className="relative w-9 h-9 flex-shrink-0">
+    <MobileCollapse
+      header={
+        <div className="flex items-center gap-3">
+          <SelectableHeadshotFrame side={side}>
             <Image
-              src={teamLogoUrl(team.mlb_id)}
-              alt={team.name}
+              src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
+              alt=""
               fill
-              sizes="36px"
-              className="object-contain"
+              sizes="48px"
+              className="object-cover"
               unoptimized
             />
+          </SelectableHeadshotFrame>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+              {sideLabel} · {season}
+            </div>
+            <div className="text-sm font-medium text-white truncate">{pitcher.full_name}</div>
+            <div className="text-[11px] text-white/55 tabular-nums">
+              {pitcher.throws ? `${pitcher.throws}HP` : ""}
+              {team ? ` · ${team.abbreviation}` : ""}
+            </div>
           </div>
-        ) : null}
-      </div>
-      {aggregates.length === 0 ? (
-        <div className="text-xs text-white/55">No arsenal data for {season}.</div>
-      ) : (
-        <ul className="space-y-1">
-          {aggregates.slice(0, 6).map((a) => (
-            <li
-              key={a.pitch_type}
-              className="flex items-center gap-2 text-xs tabular-nums"
-            >
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ background: getPitchColorForSide(a.pitch_type, side) }}
+          {team ? (
+            <div className="hidden sm:block relative w-9 h-9 flex-shrink-0">
+              <Image
+                src={teamLogoUrl(team.mlb_id)}
+                alt={team.name}
+                fill
+                sizes="36px"
+                className="object-contain"
+                unoptimized
               />
-              <span className="text-white/85 flex-1 truncate">
-                {getPitchLabel(a.pitch_type)}
-              </span>
-              <span className="text-white/55">
-                {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
-              </span>
-              <span className="text-white/45 w-16 text-right">
-                {a.usage_pct != null
-                  ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
-                  : "—"}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <CompareSideFilters
-        side={side}
-        availableSeasons={availableSeasons}
-        arsenal={aggregates.map((a) => ({
-          pitch_type: a.pitch_type,
-          pitch_count: a.pitch_count,
-        }))}
-        games={games}
-      />
-    </div>
+            </div>
+          ) : null}
+        </div>
+      }
+      body={
+        <>
+          <SwitchPitcherButton side={side} />
+          {aggregates.length === 0 ? (
+            <div className="text-xs text-white/55">No arsenal data for {season}.</div>
+          ) : (
+            <ul className="space-y-1">
+              {aggregates.slice(0, 6).map((a) => (
+                <li
+                  key={a.pitch_type}
+                  className="flex items-center gap-2 text-xs tabular-nums"
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: getPitchColorForSide(a.pitch_type, side) }}
+                  />
+                  <span className="text-white/85 flex-1 truncate">
+                    {getPitchLabel(a.pitch_type)}
+                  </span>
+                  <span className="text-white/55">
+                    {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
+                  </span>
+                  <span className="text-white/45 w-16 text-right">
+                    {a.usage_pct != null
+                      ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
+                      : "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <CompareSideFilters
+            side={side}
+            availableSeasons={availableSeasons}
+            arsenal={aggregates.map((a) => ({
+              pitch_type: a.pitch_type,
+              pitch_count: a.pitch_count,
+            }))}
+            games={games}
+          />
+        </>
+      }
+    />
   );
 }
 

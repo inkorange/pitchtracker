@@ -42,31 +42,21 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
 
   // Two modes for the games list below:
   //   - sp.date set (date-only search): every regular-season game on
-  //     that date *with cached pitch data*. We don't want to surface
-  //     a game in the list and then dead-end the user with a "no data
-  //     yet" stub on click.
+  //     that date, sourced from the schedule table. Clicking into an
+  //     uncached game is safe — the destination /at-bat/[gamePk] page
+  //     calls ensureGameCache() to lazy-fetch from Savant on first
+  //     visit, so we no longer have to filter to pre-cached games.
   //   - default: most-recently-cached games derived from
   //     pitch_pitcher_games.
   let games: GameRow[] = [];
   if (sp.date) {
     const { data: rows } = await supabase
-      .from("pitch_pitcher_games")
-      .select(
-        "game_pk, pitch_games!inner(game_pk, game_date, home_team_id, away_team_id, season, game_type)",
-      )
-      .eq("pitch_games.game_date", sp.date)
-      .eq("pitch_games.game_type", "R");
-    type JoinRow = {
-      game_pk: number;
-      pitch_games: GameRow;
-    };
-    const seen = new Set<number>();
-    for (const r of (rows ?? []) as unknown as JoinRow[]) {
-      if (seen.has(r.game_pk)) continue;
-      seen.add(r.game_pk);
-      games.push(r.pitch_games);
-    }
-    games.sort((a, b) => a.game_pk - b.game_pk);
+      .from("pitch_games")
+      .select("game_pk, game_date, home_team_id, away_team_id, season")
+      .eq("game_date", sp.date)
+      .eq("game_type", "R")
+      .order("game_pk", { ascending: true });
+    games = (rows ?? []) as GameRow[];
   } else {
     const { data: ppgRows } = await supabase
       .from("pitch_pitcher_games")
@@ -127,7 +117,7 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
 
   const listHeading = sp.date ? `Games on ${sp.date}` : "Recent games";
   const emptyMessage = sp.date
-    ? `No games with pitch data for ${sp.date}. Visit a pitcher's profile to load that day's pitches.`
+    ? `No regular-season games scheduled on ${sp.date}.`
     : "No games available yet. Visit a pitcher's page to load their season data.";
 
   return (

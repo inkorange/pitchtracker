@@ -66,15 +66,8 @@ export function TransportBar({ flightDuration, speed = 0.5, onProgressChange }: 
     setPlaying(false);
   };
 
-  const replay = () => {
-    pausedAtRef.current = 0;
-    startRef.current = null;
-    setProgress(0);
-    setPlaying(true);
-  };
-
   return (
-    <div className="absolute bottom-24 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex items-center justify-center gap-3 px-4 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex-wrap">
+    <div className="absolute bottom-24 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 translate-y-5 flex items-center justify-center gap-3 px-4 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex-wrap">
       <button
         onClick={togglePlay}
         className="text-white/85 hover:text-white text-xs uppercase tracking-[0.14em] w-12"
@@ -92,13 +85,6 @@ export function TransportBar({ flightDuration, speed = 0.5, onProgressChange }: 
         className="w-64 accent-white/80"
         aria-label="Scrub playback"
       />
-      <button
-        onClick={replay}
-        className="text-white/55 hover:text-white text-[11px] uppercase tracking-[0.14em]"
-        aria-label="Replay"
-      >
-        ↺
-      </button>
     </div>
   );
 }
