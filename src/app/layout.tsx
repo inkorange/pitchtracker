@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { SiteFooter } from "@/components/chrome/SiteFooter";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,7 +30,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} antialiased dark`}
     >
       <body className="bg-[#0a0e14] text-white/90">
-        <NuqsAdapter>{children}</NuqsAdapter>
+        <NuqsAdapter>
+          {children}
+          <SiteFooter />
+        </NuqsAdapter>
       </body>
     </html>
   );
