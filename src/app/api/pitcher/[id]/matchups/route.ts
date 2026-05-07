@@ -23,6 +23,12 @@ interface AtBatSummary {
   inning_topbot: string | null;
   away_abbr: string | null;
   home_abbr: string | null;
+  /**
+   * The team the batter was playing for during this at-bat — derived
+   * from inning_topbot (Top → away batting, Bot → home batting). Used
+   * to fetch the right team logo on matchup rows.
+   */
+  batter_team_id: number | null;
   pitch_count: number;
   /** Last pitch's `events` if non-empty, else its `description`. */
   outcome: string | null;
@@ -142,6 +148,15 @@ export async function GET(request: Request, { params }: RouteParams) {
       inning_topbot: b.inning_topbot,
       away_abbr: b.away_team_id ? teamAbbr.get(b.away_team_id) ?? null : null,
       home_abbr: b.home_team_id ? teamAbbr.get(b.home_team_id) ?? null : null,
+      // Top half = away team batting, Bot = home team batting. If
+      // inning_topbot is missing we fall back to null rather than
+      // guess.
+      batter_team_id:
+        b.inning_topbot === "Top"
+          ? b.away_team_id
+          : b.inning_topbot === "Bot"
+            ? b.home_team_id
+            : null,
       pitch_count: b.pitch_count,
       // Prefer the events string (single, double, strikeout, ...);
       // fall back to the last description (called_strike etc.) for

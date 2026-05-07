@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { parseAsInteger, useQueryState, useQueryStates } from "nuqs";
 import { categorizeDescription, OUTCOME_COLORS } from "@/lib/viz/colors";
+import { personHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 
 interface BatterResult {
   id: number;
@@ -19,6 +21,7 @@ interface AtBatSummary {
   inning_topbot: string | null;
   away_abbr: string | null;
   home_abbr: string | null;
+  batter_team_id: number | null;
   pitch_count: number;
   outcome: string | null;
 }
@@ -121,6 +124,7 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
             matchups={matchups}
             loading={matchupsLoading}
             error={matchupsError}
+            batterId={vsBatter}
             currentGame={atBat.abGame}
             currentAtBat={atBat.abNum}
             onPickAtBat={(ab) =>
@@ -263,6 +267,7 @@ function MatchupsDialog({
             matchups={matchups}
             loading={matchupsLoading}
             error={matchupsError}
+            batterId={vsBatter}
             onPickAtBat={onPickAtBat}
           />
         )}
@@ -415,11 +420,13 @@ function MatchupsListBody({
   matchups,
   loading,
   error,
+  batterId,
   onPickAtBat,
 }: {
   matchups: AtBatSummary[];
   loading: boolean;
   error: string | null;
+  batterId: number | null;
   onPickAtBat: (ab: AtBatSummary) => void;
 }) {
   return (
@@ -428,6 +435,7 @@ function MatchupsListBody({
         matchups={matchups}
         loading={loading}
         error={error}
+        batterId={batterId}
         onPickAtBat={onPickAtBat}
       />
     </div>
@@ -442,6 +450,7 @@ function InlineMatchupsList({
   matchups,
   loading,
   error,
+  batterId,
   currentGame,
   currentAtBat,
   onPickAtBat,
@@ -449,16 +458,18 @@ function InlineMatchupsList({
   matchups: AtBatSummary[];
   loading: boolean;
   error: string | null;
+  batterId: number | null;
   currentGame: number | null;
   currentAtBat: number | null;
   onPickAtBat: (ab: AtBatSummary) => void;
 }) {
   return (
-    <div className="max-h-64 overflow-y-auto scrollbar-thin -mx-1 px-1">
+    <div className="max-h-72 overflow-y-auto scrollbar-thin -mx-1 px-1">
       <MatchupsListContent
         matchups={matchups}
         loading={loading}
         error={error}
+        batterId={batterId}
         currentGame={currentGame}
         currentAtBat={currentAtBat}
         onPickAtBat={onPickAtBat}
@@ -471,6 +482,7 @@ function MatchupsListContent({
   matchups,
   loading,
   error,
+  batterId,
   currentGame,
   currentAtBat,
   onPickAtBat,
@@ -478,6 +490,7 @@ function MatchupsListContent({
   matchups: AtBatSummary[];
   loading: boolean;
   error: string | null;
+  batterId: number | null;
   currentGame?: number | null;
   currentAtBat?: number | null;
   onPickAtBat: (ab: AtBatSummary) => void;
@@ -496,13 +509,18 @@ function MatchupsListContent({
         </div>
       ) : null}
       {matchups.length > 0 ? (
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {matchups.map((ab) => {
             const isCurrent =
               ab.game_pk === currentGame && ab.at_bat_number === currentAtBat;
             return (
               <li key={`${ab.game_pk}-${ab.at_bat_number}`}>
-                <MatchupRow ab={ab} current={isCurrent} onPick={onPickAtBat} />
+                <MatchupRow
+                  ab={ab}
+                  batterId={batterId}
+                  current={isCurrent}
+                  onPick={onPickAtBat}
+                />
               </li>
             );
           })}
@@ -514,10 +532,12 @@ function MatchupsListContent({
 
 function MatchupRow({
   ab,
+  batterId,
   current,
   onPick,
 }: {
   ab: AtBatSummary;
+  batterId: number | null;
   current: boolean;
   onPick: (ab: AtBatSummary) => void;
 }) {
@@ -527,42 +547,72 @@ function MatchupRow({
       aria-current={current ? "true" : undefined}
       onClick={() => onPick(ab)}
       className={
-        "w-full text-left flex items-start gap-2 px-2 py-1.5 rounded-md border transition-colors " +
+        "w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md border transition-colors " +
         (current
           ? "bg-white/[0.14] border-white/30 text-white"
           : "bg-white/[0.04] hover:bg-white/[0.1] border-white/10 text-white/85")
       }
     >
-      <OutcomeDot outcome={ab.outcome} />
+      {/* Batter headshot with the team-logo badge at the time of the
+          AB tucked into the bottom-right corner. */}
+      <div className="relative w-10 h-10 flex-shrink-0">
+        {batterId != null ? (
+          <div className="relative w-10 h-10 rounded-full bg-white/5 overflow-hidden">
+            <Image
+              src={personHeadshotUrl(batterId, 80)}
+              alt=""
+              fill
+              sizes="40px"
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-white/5" />
+        )}
+        {ab.batter_team_id != null ? (
+          <div className="absolute -bottom-0.5 -right-1 w-5 h-5 rounded-full bg-[#081a32] border border-white/15 flex items-center justify-center overflow-hidden">
+            <Image
+              src={teamLogoUrl(ab.batter_team_id)}
+              alt=""
+              width={16}
+              height={16}
+              className="object-contain"
+              unoptimized
+            />
+          </div>
+        ) : null}
+      </div>
+
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] tabular-nums truncate">
-          <span className={current ? "text-white/85" : "text-white/55"}>
-            {ab.game_date}
+        <div className="flex items-center gap-1.5 text-[11px] tabular-nums truncate">
+          <OutcomeDot outcome={ab.outcome} />
+          <span className="text-white/95 truncate">
+            {humanizeOutcome(ab.outcome)}
           </span>
-          {ab.away_abbr || ab.home_abbr ? (
-            <span className={current ? "text-white/70" : "text-white/45"}>
-              {" "}
-              · {ab.away_abbr ?? "?"} @ {ab.home_abbr ?? "?"}
-            </span>
-          ) : null}
+          <span className={current ? "text-white/65" : "text-white/45"}>
+            · {ab.pitch_count}p
+          </span>
+        </div>
+        <div
+          className={
+            "text-[10.5px] tabular-nums truncate mt-0.5 " +
+            (current ? "text-white/70" : "text-white/45")
+          }
+        >
+          {ab.game_date}
           {ab.inning != null ? (
-            <span className={current ? "text-white/70" : "text-white/45"}>
+            <>
               {" "}
               · {ab.inning_topbot === "Bot" ? "Bot" : "Top"} {ab.inning}
-            </span>
+            </>
           ) : null}
-        </div>
-        <div className="text-[11px] truncate">
-          {humanizeOutcome(ab.outcome)}{" "}
-          <span
-            className={
-              current
-                ? "text-white/70 tabular-nums"
-                : "text-white/45 tabular-nums"
-            }
-          >
-            · {ab.pitch_count} pitch{ab.pitch_count === 1 ? "" : "es"}
-          </span>
+          {ab.away_abbr || ab.home_abbr ? (
+            <>
+              {" "}
+              · {ab.away_abbr ?? "?"} @ {ab.home_abbr ?? "?"}
+            </>
+          ) : null}
         </div>
       </div>
     </button>
