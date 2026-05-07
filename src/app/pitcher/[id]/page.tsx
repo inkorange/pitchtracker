@@ -10,12 +10,15 @@ import {
   getPitchColor,
   type OutcomeCategory,
 } from "@/lib/viz/colors";
-import { MobileCollapse } from "@/components/chrome/MobileCollapse";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
 import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
 import { TopNav } from "@/components/chrome/TopNav";
+import { FiltersGate } from "./FiltersGate";
+import { MatchupsPanel } from "./MatchupsPanel";
+import { PitcherCardCollapse } from "./PitcherCardCollapse";
+import { AtBatHeader } from "./AtBatHeader";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -245,7 +248,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       </div>
 
       <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
-        <MobileCollapse
+        <PitcherCardCollapse
           header={
             <>
               <div className="flex items-center gap-3">
@@ -326,30 +329,50 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                 )}
               </div>
 
-              <div className="border-t border-white/[0.08] pt-3">
-                <PitcherFilters
-                  arsenal={(aggregates ?? []).map((a) => ({
-                    pitch_type: a.pitch_type,
-                    pitch_count: a.pitch_count,
-                  }))}
-                  games={games}
-                  season={season}
-                />
-              </div>
+              {/* Per-side filters live inside the FiltersGate so they
+                  collapse out of the way when at-bat mode is active.
+                  When the user is replaying a specific AB, none of
+                  these filters apply, so we hide them entirely. */}
+              <FiltersGate>
+                <div className="border-t border-white/[0.08] pt-3">
+                  <PitcherFilters
+                    arsenal={(aggregates ?? []).map((a) => ({
+                      pitch_type: a.pitch_type,
+                      pitch_count: a.pitch_count,
+                    }))}
+                    games={games}
+                    season={season}
+                  />
+                </div>
 
-              {renderable.length > 0 && (
-                <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
-                  Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
-                </div>
-              )}
-              {(cachedPitches ?? []).length === 0 && (
-                <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-                  No pitch trajectory data available for this filter.
-                </div>
-              )}
+                {renderable.length > 0 && (
+                  <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
+                    Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
+                  </div>
+                )}
+                {(cachedPitches ?? []).length === 0 && (
+                  <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
+                    No pitch trajectory data available for this filter.
+                  </div>
+                )}
+              </FiltersGate>
+
+              {/* Pitcher-vs-batter matchups: typeahead → at-bat list →
+                  at-bat playback. URL-state-backed, so the panel is
+                  shareable. Composes inside the MobileCollapse body
+                  so the matchups list rides the collapse on mobile. */}
+              <div className="border-t border-white/[0.08] pt-3 space-y-2">
+                <MatchupsPanel season={season} />
+              </div>
             </>
           }
         />
+
+        {/* At-bat info card: lives outside the collapsing body so it
+            stays on screen on mobile after the auto-collapse. Shows
+            the active matchup's batter, outcome, and game context.
+            Renders nothing when not in at-bat mode. */}
+        <AtBatHeader season={season} />
       </section>
     </>
   );
