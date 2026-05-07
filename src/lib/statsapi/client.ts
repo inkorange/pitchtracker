@@ -115,8 +115,14 @@ export async function fetchTeamPitchers(
   const data = await fetchJson<RawRosterResponse>(
     `${BASE}/teams/${teamId}/roster?rosterType=fullSeason&season=${season}`,
   );
+  // Position code "1" = pitcher, "Y" = two-way player (TWP). Both
+  // throw real pitches we can render — Ohtani is classified TWP, so
+  // filtering on "1" alone silently drops him from the search index.
   return data.roster
-    .filter((entry) => entry.position?.code === "1") // pitchers only
+    .filter((entry) => {
+      const code = entry.position?.code;
+      return code === "1" || code === "Y";
+    })
     .map((entry) => ({ id: entry.person.id, fullName: entry.person.fullName }));
 }
 
