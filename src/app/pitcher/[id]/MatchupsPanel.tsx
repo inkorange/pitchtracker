@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { parseAsInteger, useQueryState, useQueryStates } from "nuqs";
-import { categorizeDescription, OUTCOME_COLORS } from "@/lib/viz/colors";
+import { eventPillColor } from "@/lib/viz/colors";
 import { personHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 
 interface BatterResult {
@@ -585,18 +585,27 @@ function MatchupRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-[11px] tabular-nums truncate">
-          <OutcomeDot outcome={ab.outcome} />
-          <span className="text-white/95 truncate">
+        <div className="flex items-center gap-1.5 truncate">
+          <span
+            className={
+              "inline-flex items-center px-2 py-0.5 rounded-full border text-white text-[9.5px] font-semibold uppercase tracking-[0.08em] shadow-sm flex-shrink-0 " +
+              eventPillColor(ab.outcome)
+            }
+          >
             {humanizeOutcome(ab.outcome)}
           </span>
-          <span className={current ? "text-white/65" : "text-white/45"}>
-            · {ab.pitch_count}p
+          <span
+            className={
+              "text-[11px] tabular-nums " +
+              (current ? "text-white/65" : "text-white/45")
+            }
+          >
+            {ab.pitch_count}p
           </span>
         </div>
         <div
           className={
-            "text-[10.5px] tabular-nums truncate mt-0.5 " +
+            "text-[10.5px] tabular-nums truncate mt-1 " +
             (current ? "text-white/70" : "text-white/45")
           }
         >
@@ -616,17 +625,6 @@ function MatchupRow({
         </div>
       </div>
     </button>
-  );
-}
-
-function OutcomeDot({ outcome }: { outcome: string | null }) {
-  const cat = categorizeDescription(outcome);
-  return (
-    <span
-      className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-      style={{ background: OUTCOME_COLORS[cat] }}
-      aria-hidden
-    />
   );
 }
 

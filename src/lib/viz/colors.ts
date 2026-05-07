@@ -161,6 +161,38 @@ export function getOutcomeColor(description: string | null | undefined): string 
   return OUTCOME_COLORS[categorizeDescription(description)];
 }
 
+// Tailwind classes for the at-bat result pill — green for hits and
+// productive outcomes, red for outs, neutral for everything else.
+// Static class strings so they stay statically analyzable.
+export function eventPillColor(event: string | null | undefined): string {
+  if (!event) return "bg-white/[0.18] border-white/30";
+  const e = event.toLowerCase();
+  const greens = new Set([
+    "single",
+    "double",
+    "triple",
+    "home_run",
+    "sac_fly",
+    "sac_bunt",
+  ]);
+  const reds = new Set([
+    "strikeout",
+    "strikeout_double_play",
+    "field_out",
+    "force_out",
+    "grounded_into_double_play",
+    "double_play",
+    "triple_play",
+    "fielders_choice",
+    "fielders_choice_out",
+    "sac_fly_double_play",
+    "other_out",
+  ]);
+  if (greens.has(e)) return "bg-emerald-500/35 border-emerald-400/60";
+  if (reds.has(e)) return "bg-red-500/35 border-red-400/60";
+  return "bg-white/[0.18] border-white/30";
+}
+
 function hslToRgb(h: number, s: number, l: number) {
   if (s === 0) return { r: l, g: l, b: l };
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
