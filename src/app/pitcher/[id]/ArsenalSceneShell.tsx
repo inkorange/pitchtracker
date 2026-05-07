@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
+import type { ReplayPitch } from "@/app/at-bat/[gamePk]/[atBatNumber]/AtBatReplayScene";
 
 interface CachedPitch {
   game_pk: number;
@@ -35,68 +36,108 @@ interface ArsenalResponse {
   pitcherLabel: string;
 }
 
+interface AtBatPitchesResponse {
+  pitches: ReplayPitch[];
+}
+
 // Persistent client-side Scene shell. Lives in /pitcher/layout.tsx
 // (which Next.js preserves across [id] route changes), so when the
 // user picks a different pitcher from the search input the WebGL
 // canvas stays mounted, the camera state is preserved, and only the
-// pitch ribbons + pitcher label cross-fade in via prop change. The
-// alternative — letting the server-rendered page.tsx own the Scene —
-// re-creates the entire Three.js scene on every URL change.
+// pitch ribbons + pitcher label cross-fade in via prop change.
 //
-// The shell reads the same URL params page.tsx reads (id, season,
-// hand, game, pitch, outcome) and pulls renderable pitches from
-// /api/pitcher/[id]/arsenal, which mirrors the inline filter logic
-// page.tsx applied before passing pitches to the Scene.
+// Two fetch streams:
+//   - Arsenal: pitcher × season × side filters → renderable pitches
+//     for arsenal mode.
+//   - At-bat:  ?abGame=N&abNum=M → that single AB's pitches for
+//     inline at-bat playback. When set, the Scene swaps into
+//     playback mode without remounting; arsenal data is kept warm
+//     so leaving at-bat mode is instantaneous.
 export function ArsenalSceneShell() {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
   const id = params?.id;
-  const queryString = searchParams.toString();
 
-  const [data, setData] = useState<ArsenalResponse>({
+  // Strip at-bat-mode params from the arsenal fetch — the per-side
+  // filters page.tsx reads stay in the URL during at-bat mode but
+  // shouldn't refetch the arsenal until the user exits at-bat mode.
+  const arsenalQuery = (() => {
+    const sp = new URLSearchParams(searchParams.toString());
+    sp.delete("abGame");
+    sp.delete("abNum");
+    sp.delete("vsBatter");
+    sp.delete("batterQ");
+    return sp.toString();
+  })();
+
+  const abGame = searchParams.get("abGame");
+  const abNum = searchParams.get("abNum");
+  const inAtBatMode = abGame != null && abNum != null;
+
+  const [arsenal, setArsenal] = useState<ArsenalResponse>({
     pitches: [],
     pitcherLabel: "",
   });
-  const [error, setError] = useState<string | null>(null);
+  const [atBatPitches, setAtBatPitches] = useState<ReplayPitch[] | null>(null);
 
-  // Re-fetch whenever the pitcher id or filter params change. The
-  // Scene below stays mounted through the swap.
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     const ctrl = new AbortController();
-    const url = `/api/pitcher/${id}/arsenal${queryString ? `?${queryString}` : ""}`;
+    const url = `/api/pitcher/${id}/arsenal${arsenalQuery ? `?${arsenalQuery}` : ""}`;
     fetch(url, { signal: ctrl.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`Arsenal fetch ${res.status}`);
         const body = (await res.json()) as ArsenalResponse;
         if (cancelled) return;
-        setData(body);
-        setError(null);
+        setArsenal(body);
       })
-      .catch((err) => {
-        if (cancelled) return;
-        if (err instanceof Error && err.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : String(err));
+      .catch(() => {
+        // Ignore — leaves prior arsenal state in place. Panel above
+        // will surface user-facing errors via the page route's
+        // notFound for missing pitchers.
       });
     return () => {
       cancelled = true;
       ctrl.abort();
     };
-  }, [id, queryString]);
+  }, [id, arsenalQuery]);
+
+  // Fetch the at-bat's pitches when the URL flips into at-bat mode.
+  // Clear them when the URL leaves at-bat mode so a stale playback
+  // doesn't render after the user exits.
+  useEffect(() => {
+    if (!inAtBatMode || !abGame || !abNum) {
+      // eslint-disable-next-line
+      setAtBatPitches(null);
+      return;
+    }
+    let cancelled = false;
+    const ctrl = new AbortController();
+    fetch(`/api/at-bat/${abGame}/${abNum}/pitches`, { signal: ctrl.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`At-bat pitches fetch ${res.status}`);
+        const body = (await res.json()) as AtBatPitchesResponse;
+        if (cancelled) return;
+        setAtBatPitches(body.pitches ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAtBatPitches([]);
+      });
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
+  }, [inAtBatMode, abGame, abNum]);
 
   if (!id) return null;
 
-  // Errors render minimally; the panel content above will surface
-  // a 404 if the pitcher is invalid.
-  if (error) {
-    return null;
-  }
-
   return (
     <PitcherArsenalScene
-      pitches={data.pitches}
-      pitcherLabel={data.pitcherLabel}
+      pitches={arsenal.pitches}
+      pitcherLabel={arsenal.pitcherLabel}
+      atBatPitches={atBatPitches}
     />
   );
 }

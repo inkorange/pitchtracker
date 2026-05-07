@@ -16,6 +16,8 @@ import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
 import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
 import { TopNav } from "@/components/chrome/TopNav";
+import { FiltersGate } from "./FiltersGate";
+import { MatchupsPanel } from "./MatchupsPanel";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -326,27 +328,41 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                 )}
               </div>
 
-              <div className="border-t border-white/[0.08] pt-3">
-                <PitcherFilters
-                  arsenal={(aggregates ?? []).map((a) => ({
-                    pitch_type: a.pitch_type,
-                    pitch_count: a.pitch_count,
-                  }))}
-                  games={games}
-                  season={season}
-                />
-              </div>
+              {/* Per-side filters live inside the FiltersGate so they
+                  collapse out of the way when at-bat mode is active.
+                  When the user is replaying a specific AB, none of
+                  these filters apply, so we hide them entirely. */}
+              <FiltersGate>
+                <div className="border-t border-white/[0.08] pt-3">
+                  <PitcherFilters
+                    arsenal={(aggregates ?? []).map((a) => ({
+                      pitch_type: a.pitch_type,
+                      pitch_count: a.pitch_count,
+                    }))}
+                    games={games}
+                    season={season}
+                  />
+                </div>
 
-              {renderable.length > 0 && (
-                <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
-                  Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
-                </div>
-              )}
-              {(cachedPitches ?? []).length === 0 && (
-                <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-                  No pitch trajectory data available for this filter.
-                </div>
-              )}
+                {renderable.length > 0 && (
+                  <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
+                    Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
+                  </div>
+                )}
+                {(cachedPitches ?? []).length === 0 && (
+                  <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
+                    No pitch trajectory data available for this filter.
+                  </div>
+                )}
+              </FiltersGate>
+
+              {/* Pitcher-vs-batter matchups: typeahead → at-bat list →
+                  at-bat playback. URL-state-backed, so the panel is
+                  shareable. Composes inside the MobileCollapse body
+                  so the matchups list rides the collapse on mobile. */}
+              <div className="border-t border-white/[0.08] pt-3 space-y-2">
+                <MatchupsPanel season={season} />
+              </div>
             </>
           }
         />

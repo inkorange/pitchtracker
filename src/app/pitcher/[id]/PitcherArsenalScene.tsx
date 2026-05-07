@@ -14,6 +14,12 @@ import {
   buildTunnelEnvelope,
   type TunnelEnvelope,
 } from "@/lib/pitch/tunnelEnvelope";
+import type { ReplayPitch } from "@/app/at-bat/[gamePk]/[atBatNumber]/AtBatReplayScene";
+import {
+  AtBatPlaybackBar,
+  AtBatPlaybackLayer,
+  useAtBatPlayback,
+} from "./AtBatPlaybackLayer";
 
 interface CachedPitch {
   game_pk: number;
@@ -44,6 +50,15 @@ interface CachedPitch {
 interface PitcherArsenalSceneProps {
   pitches: CachedPitch[];
   pitcherLabel: string;
+  /**
+   * When set, the Scene's children swap into at-bat playback mode:
+   * progressive ribbon draws + ball tracer for the active pitch +
+   * transport bar at the bottom (in place of the camera pad). The
+   * arsenal entries / sphere markers / tunnel envelope are hidden
+   * for the duration. Filters in the side panel collapse via
+   * FiltersGate so this is the focused view.
+   */
+  atBatPitches?: ReplayPitch[] | null;
 }
 
 interface PitchEntry {
@@ -55,7 +70,11 @@ interface PitchEntry {
   source: CachedPitch;
 }
 
-export function PitcherArsenalScene({ pitches, pitcherLabel }: PitcherArsenalSceneProps) {
+export function PitcherArsenalScene({
+  pitches,
+  pitcherLabel,
+  atBatPitches,
+}: PitcherArsenalSceneProps) {
   const [preset, setPreset] = useState<CameraPreset>("front");
   const [presetTick, setPresetTick] = useState(0);
   const handlePresetChange = (next: CameraPreset) => {
@@ -171,14 +190,26 @@ export function PitcherArsenalScene({ pitches, pitcherLabel }: PitcherArsenalSce
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [entries]);
 
+  // At-bat playback state — only meaningful when `atBatPitches` is
+  // set, but the hook runs unconditionally so the same Scene
+  // component instance survives mode swaps without remounting.
+  const playback = useAtBatPlayback(atBatPitches ?? []);
+  const inAtBatMode = atBatPitches != null && atBatPitches.length > 0;
+
   return (
     <>
       <Scene
         preset={preset}
         presetTick={presetTick}
-        onPointerMissed={() => setSelectedId(null)}
+        onPointerMissed={inAtBatMode ? undefined : () => setSelectedId(null)}
       >
-        {entries.map((e) => {
+        {inAtBatMode ? (
+          <AtBatPlaybackLayer
+            state={playback.state}
+            handlers={playback.handlers}
+          />
+        ) : null}
+        {!inAtBatMode && entries.map((e) => {
           const isSelected = selectedEntry?.id === e.id;
           // Tunnel mode dims pitches to 0.1 so the cone reads as the
           // dominant element. Selection still pulls focus when
@@ -232,30 +263,42 @@ export function PitcherArsenalScene({ pitches, pitcherLabel }: PitcherArsenalSce
             </group>
           );
         })}
-        {selectedEntry && (
+        {!inAtBatMode && selectedEntry && (
           <SelectedLabels entry={selectedEntry} pitcherLabel={pitcherLabel} />
         )}
-        {tunnelEnvelope ? (
+        {!inAtBatMode && tunnelEnvelope ? (
           <>
             <TunnelMesh envelope={tunnelEnvelope} opacity={0.75} />
             <TunnelStatsLabel envelope={tunnelEnvelope} />
           </>
         ) : null}
       </Scene>
+      {/* Bottom-of-screen controls swap with the mode. Camera pad +
+          tunnel toggle for arsenal browsing; transport bar for
+          at-bat playback. */}
       <CameraPad current={preset} onChange={handlePresetChange} />
-      <TunnelToggle
-        active={tunnelOn}
-        unavailable={tunnelOn && !tunnelEnvelope}
-        onToggle={() => setTunnelOn((v) => !v)}
-      />
-      {hasSelection && (
-        <button
-          type="button"
-          onClick={() => setSelectedId(null)}
-          className="absolute bottom-24 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-md bg-white/[0.08] hover:bg-white/[0.14] backdrop-blur-md border border-white/15 text-[11px] uppercase tracking-[0.14em] text-white/85 pointer-events-auto"
-        >
-          Clear selection
-        </button>
+      {inAtBatMode ? (
+        <AtBatPlaybackBar
+          state={playback.state}
+          handlers={playback.handlers}
+        />
+      ) : (
+        <>
+          <TunnelToggle
+            active={tunnelOn}
+            unavailable={tunnelOn && !tunnelEnvelope}
+            onToggle={() => setTunnelOn((v) => !v)}
+          />
+          {hasSelection && (
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="absolute bottom-24 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-md bg-white/[0.08] hover:bg-white/[0.14] backdrop-blur-md border border-white/15 text-[11px] uppercase tracking-[0.14em] text-white/85 pointer-events-auto"
+            >
+              Clear selection
+            </button>
+          )}
+        </>
       )}
     </>
   );

@@ -46,6 +46,44 @@ There should be a toggle on the pitcher card on the left that allows to show/hid
 
 When the pitch filters on the left are changed, it needs to re-calculate the tunnel rendering.
 
+** DONE **
+
+## Pitcher - Batter Filtering
+
+When on the pitcher view, I want to be able to search any batter from the current season selected form the pitcher's filters, and see all the at bats against that batter. The list if ABs vs that pitcher will be listed on a new pop-up listing, and the user can select any of the at-bats.
+
+The idea is that we can quickly see the matchups of any pitcher with any batter without having to find the game where they pitched. Its a quick reference to see how Paul Skenes has attacked Juan Soto across the entire year.
+
+### Integration
+
+We will present a button below the pitcher panel, as a stand-alone, that says "Find At Bats". We will do this one batter at a time, not select many batters to look through. If the user wants a different batter, for now they need to search again.
+
+Adding a batter, like "Mike Trout" will have a type-head where the user can select the batter. Upon selecting the batter, we will run a API call to get all the at-bats that this hitter has had in the selected season only.
+
+If any exist, there will be a panel that lists all the AB records, with the game date and team vs on the card, similar to the /at-bat/[gameId] listing page, but inset on the pitcher page.
+
+If a batter has no games facing the pitcher, a message will show saying, no matchups found.
+
+There will be a listing of all the matchups between the pitcher and batter that can be quickly clicked through. We should also list the outcome of each at bat, like Strikeout, double, homerun, walk...
+
+### At Bat Mode
+
+If the user selects one of the found at-bat entries, we will enter a very similar at-bat view that we already have for the data on the at-bat. But it will be rendering on the pitcher page.
+
+When we are in at-bat mode on the pitcher page, the controls for Pitch Type, Outcome, Batter Side are collapsed and removed, since they have no effect on the at-bat mode. This will also give us a little more real estate to present the batter UI below it.
+
+Any of the current filters in place will be ignored when in at-bat mode. But if the user leaves at-bat mode, they are re-applied, and the filter menu is presented again.
+
+### UX Considerations
+
+Stay on the same 3d scene, do not re-render the scene. We are just changing the pitch playback mode to use the same on from at-bat mode.
+
+The url should also reflect this so we can send this to a friend and show them all the matchups in 2026 of Skeves vs Soto.
+
+### Mobile Considerations
+
+The batter selector on mobile will be within the pitcher panel, that is collapsed by deafult. It will be situated in there, with the listing of games showing within the same panel after finding a valid batter.
+
 ## AI Integration
 
 ### TDB
