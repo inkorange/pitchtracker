@@ -34,7 +34,7 @@ export function Scene({
       gl={{ antialias: true, powerPreference: "high-performance" }}
       dpr={[1, 2]}
       style={{ background: "#7ea7c8" }}
-      camera={{ fov: 45, near: 0.1, far: 2500 }}
+      camera={{ fov: 45, near: 0.02, far: 2500 }}
       onPointerMissed={onPointerMissed}
     >
       <Suspense fallback={null}>

@@ -377,6 +377,7 @@ export function AtBatReplayScene({
         prepared={prepared}
         currentIdx={currentIdx}
         playing={playing}
+        phase={phase}
         onJumpTo={jumpTo}
         onTogglePlay={handleTogglePlay}
         activePitch={activePitch}
@@ -780,6 +781,11 @@ interface PitchStepperProps {
   prepared: PreparedPitch[];
   currentIdx: number;
   playing: boolean;
+  // Whether the active pitch is mid-flight or already landed/done.
+  // Drives the active dot color: white while flying, outcome-colored
+  // once it lands (so the final pitch ends up in its outcome color
+  // instead of stuck on white forever).
+  phase: "flying" | "settled" | "done";
   onJumpTo: (idx: number, autoPlay?: boolean) => void;
   onTogglePlay: () => void;
   activePitch: PreparedPitch | undefined;
@@ -789,6 +795,7 @@ function PitchStepper({
   prepared,
   currentIdx,
   playing,
+  phase,
   onJumpTo,
   onTogglePlay,
   activePitch,
@@ -809,27 +816,6 @@ function PitchStepper({
     // sm+: revert to the canonical bottom-center transport bar.
     <div className="absolute top-[15.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
-        <button
-          type="button"
-          onClick={() => onJumpTo(0, true)}
-          className="p-1.5 rounded text-white/55 hover:text-white hover:bg-white/[0.08] transition-colors"
-          aria-label="Restart from first pitch"
-          title="Restart"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 12a9 9 0 1 0 9-9" />
-            <path d="M3 4v5h5" />
-          </svg>
-        </button>
         <button
           type="button"
           onClick={() => onJumpTo(currentIdx - 1, false)}
@@ -875,24 +861,76 @@ function PitchStepper({
         </div>
       </div>
       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg">
-        {prepared.map((p, i) => (
-          <button
-            key={`dot-${i}`}
-            type="button"
-            onClick={() => onJumpTo(i, false)}
-            className={`w-2.5 h-2.5 rounded-full transition-colors ${
-              i === currentIdx
-                ? "bg-white"
-                : i < currentIdx
-                  ? dotColorForOutcome(p.raw.description)
-                  : "bg-white/30 hover:bg-white/60"
-            }`}
-            aria-label={`Jump to pitch ${i + 1}`}
-          />
-        ))}
+        {prepared.map((p, i) => {
+          // A pitch is "landed" once it's past or sitting at currentIdx
+          // with the phase no longer flying — the final pitch hits this
+          // case after its animation ends, so it picks up its outcome
+          // color instead of staying white.
+          const landed =
+            i < currentIdx || (i === currentIdx && phase !== "flying");
+          const cls = landed
+            ? dotColorForOutcome(p.raw.description)
+            : i === currentIdx
+              ? "bg-white"
+              : "bg-white/30 hover:bg-white/60";
+          const symbol = landed ? outcomeSymbol(p.raw.description) : null;
+          return (
+            <button
+              key={`dot-${i}`}
+              type="button"
+              onClick={() => onJumpTo(i, false)}
+              className={`w-5 h-5 rounded-full transition-colors flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls}`}
+              aria-label={`Jump to pitch ${i + 1}`}
+            >
+              {symbol ? (
+                <span
+                  aria-hidden
+                  // Mirror the K visually for a "looking" (called)
+                  // strike — the standard scorebook convention.
+                  style={
+                    symbol.mirrored
+                      ? { transform: "scaleX(-1)", display: "inline-block" }
+                      : undefined
+                  }
+                >
+                  {symbol.letter}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
+}
+
+// Scorebook-style symbol per outcome category, rendered inside the
+// stepper dot once the pitch has landed:
+//   B   ball
+//   K   swinging strike (whiff)
+//   ꓘ   called strike (rendered as a mirrored "K" via CSS scaleX(-1))
+//   F   foul
+//   P   in play
+// Other / unknown outcomes get no symbol — the colored dot is the
+// signal.
+function outcomeSymbol(
+  description: string | null,
+): { letter: string; mirrored: boolean } | null {
+  const cat = categorizeDescription(description);
+  switch (cat) {
+    case "ball":
+      return { letter: "B", mirrored: false };
+    case "whiff":
+      return { letter: "K", mirrored: false };
+    case "called":
+      return { letter: "K", mirrored: true };
+    case "foul":
+      return { letter: "F", mirrored: false };
+    case "inplay":
+      return { letter: "P", mirrored: false };
+    default:
+      return null;
+  }
 }
 
 function dotColorForOutcome(description: string | null): string {

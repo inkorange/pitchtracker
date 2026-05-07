@@ -155,6 +155,13 @@ function OutfieldGrass({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_GRASS_BASE, -200]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      // Force grass to render before any other transparent geometry.
+      // mowMaterial uses transparent + depthWrite:false for the
+      // distance fade; without an explicit render order, three.js
+      // sorts the grass by centroid distance and at certain camera
+      // angles the grass ends up sorted AFTER pitch ribbons, masking
+      // them. Drawing grass first removes that ambiguity entirely.
+      renderOrder={-1}
     >
       <planeGeometry args={[1400, 1400]} />
     </mesh>
@@ -218,6 +225,7 @@ function InfieldGrassDiamond({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_INFIELD_GRASS, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      renderOrder={-1}
     >
       <shapeGeometry args={[shape]} />
     </mesh>
@@ -327,10 +335,14 @@ function FoulLines() {
     [0, Y_LINE, 0],
     [-extent / Math.SQRT2, Y_LINE, -extent / Math.SQRT2],
   ];
+  // renderOrder pulls these in with the rest of the field — same fix
+  // as the grass: transparent objects sort by centroid distance, so
+  // foul lines were occasionally drawn after pitch ribbons and masked
+  // them at certain camera angles.
   return (
     <>
-      <Line points={firstLine} color={LINE} lineWidth={2} transparent opacity={0.9} />
-      <Line points={thirdLine} color={LINE} lineWidth={2} transparent opacity={0.9} />
+      <Line points={firstLine} color={LINE} lineWidth={2} transparent opacity={0.9} renderOrder={-1} />
+      <Line points={thirdLine} color={LINE} lineWidth={2} transparent opacity={0.9} renderOrder={-1} />
     </>
   );
 }

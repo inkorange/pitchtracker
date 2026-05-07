@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Html } from "@react-three/drei";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
@@ -15,7 +15,7 @@ import {
 import { computeTunnelStats } from "@/lib/pitch/tunneling";
 import type { Pitch } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
-import type { CameraPreset } from "@/lib/viz/camera-presets";
+import type { CameraPosition, CameraPreset } from "@/lib/viz/camera-presets";
 import { TunnelMarker } from "./TunnelMarker";
 import { OutcomeMarkers } from "./OutcomeMarkers";
 import { useCompareHover, useOpacityForSide } from "./CompareHoverContext";
@@ -68,7 +68,7 @@ export function ComparisonScene({
   bLabel,
   normalizeRelease = true,
 }: ComparisonSceneProps) {
-  const [preset, setPreset] = useState<CameraPreset>("side");
+  const [preset, setPreset] = useState<CameraPreset>("front");
   const [presetTick, setPresetTick] = useState(0);
   const handlePresetChange = (next: CameraPreset) => {
     setPreset(next);
@@ -213,6 +213,30 @@ export function ComparisonScene({
   const showTracers = aRibbons.length + bRibbons.length > 0;
   const hasSelection = selected !== null;
 
+  // Compare-specific FRONT override. The static FRONT preset is tuned
+  // for the pitcher arsenal page (heavily shifted toward 3B so the
+  // wide info panel doesn't block the action). On compare we want a
+  // mostly head-on hitter's-eye view with the strike zone centered in
+  // the visible area to the right of the info panel — pulled in
+  // closer than the arsenal preset, with a small lateral offset that
+  // reads as "turned" without going off-axis.
+  const frontOverride: CameraPosition | null = useMemo(() => {
+    if (preset !== "front") return null;
+    return {
+      position: [-1.5, 3.7, 9],
+      target: [0.5, 2.8, -20],
+    };
+  }, [preset]);
+
+  // Mirror the selected side into the shared CompareHoverContext so
+  // the pitcher card above can glow in matching A/B color when the
+  // user clicks a pitch in the 3D scene. Cleared when nothing is
+  // selected (pointer-missed or selection toggled off).
+  const { setSelectedSide } = useCompareHover();
+  useEffect(() => {
+    setSelectedSide(selected ? selected.side : null);
+  }, [selected, setSelectedSide]);
+
   const selectPitch = useCallback((side: CompareSide, index: number) => {
     setSelected((prev) =>
       prev && prev.kind === "pitch" && prev.side === side && prev.index === index
@@ -237,6 +261,7 @@ export function ComparisonScene({
       <Scene
         preset={preset}
         presetTick={presetTick}
+        presetOverride={frontOverride}
         onPointerMissed={() => setSelected(null)}
       >
         <SideLayer

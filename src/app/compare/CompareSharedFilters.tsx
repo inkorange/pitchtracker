@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
 import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
+import { MobileCollapse } from "@/components/chrome/MobileCollapse";
 import {
   OUTCOME_COLORS,
   OUTCOME_LABELS,
@@ -37,6 +38,19 @@ export function CompareSharedFilters() {
   const activeHand = params.get("hand") ?? "";
   const activeOutcomes = (params.get("outcome") ?? "").split(",").filter(Boolean);
 
+  // Compact summary for the collapsed mobile state — gives the user
+  // a hint of what's set without expanding.
+  const summaryParts: string[] = [];
+  summaryParts.push(activeHand ? `vs ${activeHand}HB` : "Any side");
+  if (activeOutcomes.length > 0)
+    summaryParts.push(
+      activeOutcomes
+        .map((c) => OUTCOME_LABELS[c as OutcomeCategory] ?? c)
+        .join(", "),
+    );
+  else summaryParts.push("All outcomes");
+  const summary = summaryParts.join(" · ");
+
   const toggleOutcome = (cat: OutcomeCategory) => {
     const cur = new Set(activeOutcomes);
     if (cur.has(cat)) cur.delete(cat);
@@ -48,6 +62,21 @@ export function CompareSharedFilters() {
     <div className="space-y-3">
       <TransitionOverlay isPending={isPending} />
 
+      <MobileCollapse
+        size="compact"
+        ariaLabel="Toggle batter side and outcome filters"
+        header={
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+              Filters
+            </div>
+            <div className="text-[11px] text-white/85 truncate sm:hidden">
+              {summary}
+            </div>
+          </div>
+        }
+        body={
+          <>
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
           Batter side
@@ -102,6 +131,9 @@ export function CompareSharedFilters() {
           })}
         </div>
       </div>
+          </>
+        }
+      />
     </div>
   );
 }

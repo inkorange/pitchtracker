@@ -11,7 +11,7 @@ import {
   type OutcomeCategory,
 } from "@/lib/viz/colors";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
-import { PitcherCardCollapse } from "./PitcherCardCollapse";
+import { MobileCollapse } from "@/components/chrome/MobileCollapse";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
@@ -144,21 +144,42 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     }))
     .sort((a, b) => b.pitch_count - a.pitch_count);
 
-  // Game dropdown comes from the same one-shot query — embedded
-  // pitch_games metadata, deduped by game_pk.
+  // Game dropdown is fetched separately from the pitch query so that
+  // applying ?game=N (which narrows cachedPitches to a single game)
+  // doesn't collapse the dropdown to one option. Sourced from the
+  // pitcher×game mapping table joined with pitch_games metadata.
   type GameMeta = {
     game_pk: number;
     game_date: string;
     home_team_id: number | null;
     away_team_id: number | null;
   };
+  type PitcherGameJoinRow = {
+    game_pk: number;
+    pitch_games: {
+      game_date: string;
+      home_team_id: number | null;
+      away_team_id: number | null;
+      season: number;
+      game_type: string | null;
+    } | null;
+  };
+  const { data: pitcherGameRowsRaw } = await supabase
+    .from("pitch_pitcher_games")
+    .select(
+      "game_pk, pitch_games!inner(game_date, home_team_id, away_team_id, season, game_type)",
+    )
+    .eq("pitcher_id", pitcherId)
+    .eq("pitch_games.season", season)
+    .eq("pitch_games.game_type", "R");
+  const pitcherGameRows = (pitcherGameRowsRaw ?? []) as unknown as PitcherGameJoinRow[];
   const gameByPk = new Map<number, GameMeta>();
-  for (const p of cachedPitches ?? []) {
-    if (gameByPk.has(p.game_pk)) continue;
-    const meta = p.pitch_games;
+  for (const r of pitcherGameRows) {
+    if (gameByPk.has(r.game_pk)) continue;
+    const meta = r.pitch_games;
     if (!meta) continue;
-    gameByPk.set(p.game_pk, {
-      game_pk: p.game_pk,
+    gameByPk.set(r.game_pk, {
+      game_pk: r.game_pk,
       game_date: meta.game_date,
       home_team_id: meta.home_team_id,
       away_team_id: meta.away_team_id,
@@ -210,9 +231,9 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         rightSlot={
           <Link
             href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
-            className="text-[10px] uppercase tracking-[0.14em] text-white/70 hover:text-white transition-colors"
+            className="px-2.5 py-1 rounded-md bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-white text-[10px] uppercase tracking-[0.14em] transition-colors"
           >
-            Compare with…
+            Compare
           </Link>
         }
       />
@@ -222,8 +243,8 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         <PitcherSearch placeholder="Search another pitcher…" />
       </div>
 
-      <section className="absolute top-20 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
-        <PitcherCardCollapse
+      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+        <MobileCollapse
           header={
             <>
               <div className="flex items-center gap-3">
