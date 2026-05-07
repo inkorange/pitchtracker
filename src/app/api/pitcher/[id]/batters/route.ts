@@ -3,22 +3,27 @@ import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 
-// Typeahead for the "Find at-bats" picker on /pitcher/[id]. Scoped
-// to batters this pitcher actually faced in the selected season —
-// we don't need to surface the full MLB roster here, and we don't
-// have a `pitch_batters` table to search anyway. The batter ID
-// universe is computed server-side from pitch_game_pitches; names
-// come from the MLB Stats API (cached by fetchPersonsCached).
+// Typeahead + team-filter feed for the "Find at-bats" picker on
+// /pitcher/[id]. Scoped to batters/teams this pitcher actually faced
+// in the selected season — we don't need to surface the full MLB
+// roster here, and we don't have a `pitch_batters` table to search
+// anyway. The batter ID universe is computed server-side from
+// pitch_game_pitches; names come from the MLB Stats API (cached by
+// fetchPersonsCached).
 //
 //   GET /api/pitcher/[id]/batters?season=Y&q=trout
 //     Substring match on batter name; up to 12 results sorted by name.
-//   GET /api/pitcher/[id]/batters?season=Y          (no q)
-//     Returns the 10 most-faced batters this season — used as
-//     suggestions before the user types in the dialog.
-// Both shapes return: { batters: [{ id, fullName, teamId }] }, where
-// teamId is the team the batter was on the most recent time this
-// pitcher faced him (derived from inning_topbot + the game's
-// home/away team ids).
+//   GET /api/pitcher/[id]/batters?season=Y                (no q)
+//     Returns the 10 most-faced batters this season AND the full
+//     list of teams faced (one per opposing team, with each team's
+//     most-recent game date + game count).
+//   GET /api/pitcher/[id]/batters?season=Y&teamId=N
+//     All batters this pitcher faced while they were on team N this
+//     season, sorted by name. Catches mid-season trades — a batter
+//     traded to N partway through the year shows up here only for
+//     the N-side appearances.
+// All shapes return: { batters: [{ id, fullName, teamId }] }; the
+// no-q shape additionally returns `teams: TeamResult[]`.
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -28,6 +33,14 @@ interface BatterResult {
   id: number;
   fullName: string;
   teamId: number | null;
+}
+
+interface TeamResult {
+  id: number;
+  abbr: string;
+  name: string;
+  gameCount: number;
+  lastDate: string;
 }
 
 const SUGGESTION_LIMIT = 10;
@@ -42,6 +55,8 @@ export async function GET(request: Request, { params }: RouteParams) {
   const url = new URL(request.url);
   const season = Number(url.searchParams.get("season")) || new Date().getFullYear();
   const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+  const teamIdParam = url.searchParams.get("teamId");
+  const filterTeamId = teamIdParam ? Number(teamIdParam) : null;
   // Single-letter queries are noisy and rarely useful; reserve the
   // empty-q path for "give me suggestions" and require ≥2 chars for
   // an actual search.
@@ -54,9 +69,10 @@ export async function GET(request: Request, { params }: RouteParams) {
   await ensurePitcherSeasonCache(pitcherId, season);
 
   // All pitches this pitcher threw in this season's regular-season
-  // games. We need every row (not distinct) so we can both rank
-  // batters by pitches-faced (suggestion mode) and pick each batter's
-  // most-recent team for the team-logo badge in the picker UI.
+  // games. We need every row (not distinct) so we can rank batters
+  // by pitches-faced AND track each batter's set of teams (for the
+  // teamId filter — handles mid-season trades correctly), plus a
+  // per-team aggregate for the suggestions sidebar.
   interface PitchRow {
     batter_id: number | null;
     inning_topbot: string | null;
@@ -64,6 +80,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       season: number;
       game_type: string | null;
       game_date: string;
+      game_pk: number;
       home_team_id: number | null;
       away_team_id: number | null;
     } | null;
@@ -71,7 +88,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   const { data, error } = await supabase
     .from("pitch_game_pitches")
     .select(
-      "batter_id, inning_topbot, pitch_games!inner(season, game_type, game_date, home_team_id, away_team_id)",
+      "batter_id, inning_topbot, pitch_games!inner(season, game_type, game_date, game_pk, home_team_id, away_team_id)",
     )
     .eq("pitcher_id", pitcherId)
     .eq("pitch_games.season", season)
@@ -82,39 +99,94 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
   const rows = (data ?? []) as unknown as PitchRow[];
 
-  // Per-batter aggregate: pitches-faced count + the most-recent
-  // (game_date, team_id) we saw them on. Top half = away batting,
-  // bottom = home batting; if inning_topbot is missing the row's
-  // team contribution is dropped.
+  // Per-batter aggregate: pitches-faced count, the most-recent
+  // (game_date, team_id) we saw them on, and the full set of teams
+  // they were on while facing this pitcher.
   interface BatterAgg {
     count: number;
     lastDate: string;
     lastTeamId: number | null;
+    teams: Set<number>;
   }
   const agg = new Map<number, BatterAgg>();
+
+  // Per-team aggregate for the suggestions sidebar: distinct games
+  // faced + most-recent date.
+  interface TeamAgg {
+    games: Set<number>;
+    lastDate: string;
+  }
+  const teamAgg = new Map<number, TeamAgg>();
+
   for (const r of rows) {
     const bid = r.batter_id;
     if (typeof bid !== "number") continue;
     const meta = r.pitch_games;
     const date = meta?.game_date ?? "";
-    let teamId: number | null = null;
-    if (r.inning_topbot === "Top") teamId = meta?.away_team_id ?? null;
-    else if (r.inning_topbot === "Bot") teamId = meta?.home_team_id ?? null;
+    const gamePk = meta?.game_pk;
+    let rowTeamId: number | null = null;
+    if (r.inning_topbot === "Top") rowTeamId = meta?.away_team_id ?? null;
+    else if (r.inning_topbot === "Bot") rowTeamId = meta?.home_team_id ?? null;
+
     const prior = agg.get(bid);
     if (!prior) {
-      agg.set(bid, { count: 1, lastDate: date, lastTeamId: teamId });
-      continue;
+      const teams = new Set<number>();
+      if (rowTeamId !== null) teams.add(rowTeamId);
+      agg.set(bid, {
+        count: 1,
+        lastDate: date,
+        lastTeamId: rowTeamId,
+        teams,
+      });
+    } else {
+      prior.count += 1;
+      if (rowTeamId !== null) prior.teams.add(rowTeamId);
+      if (date > prior.lastDate) {
+        prior.lastDate = date;
+        prior.lastTeamId = rowTeamId;
+      }
     }
-    prior.count += 1;
-    if (date > prior.lastDate) {
-      prior.lastDate = date;
-      prior.lastTeamId = teamId;
+
+    if (rowTeamId !== null && typeof gamePk === "number") {
+      const t = teamAgg.get(rowTeamId);
+      if (!t) {
+        teamAgg.set(rowTeamId, {
+          games: new Set([gamePk]),
+          lastDate: date,
+        });
+      } else {
+        t.games.add(gamePk);
+        if (date > t.lastDate) t.lastDate = date;
+      }
     }
   }
 
+  // Team-filter mode: list all batters who faced this pitcher while
+  // on the given team. Skips the q-search path entirely.
+  if (filterTeamId !== null && Number.isFinite(filterTeamId)) {
+    const matchingIds = Array.from(agg.entries())
+      .filter(([, a]) => a.teams.has(filterTeamId))
+      .map(([bid]) => bid);
+    const personMap = await fetchPersonsCached(matchingIds);
+    const batters: BatterResult[] = [];
+    for (const bid of matchingIds) {
+      const p = personMap.get(bid);
+      if (!p) continue;
+      batters.push({
+        id: bid,
+        fullName: p.fullName,
+        teamId: filterTeamId,
+      });
+    }
+    batters.sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return NextResponse.json(
+      { batters },
+      { headers: { "cache-control": "public, max-age=120" } },
+    );
+  }
+
   if (q.length === 0) {
-    // Suggestion mode: top-N most-faced. Ranking has natural ties; a
-    // secondary sort by id keeps the order stable across requests.
+    // Suggestion mode: top-N most-faced batters + the teams sidebar.
     const topIds = Array.from(agg.entries())
       .sort((a, b) => b[1].count - a[1].count || a[0] - b[0])
       .slice(0, SUGGESTION_LIMIT)
@@ -130,8 +202,41 @@ export async function GET(request: Request, { params }: RouteParams) {
         teamId: agg.get(bid)?.lastTeamId ?? null,
       });
     }
+
+    // Teams sidebar — resolve abbreviations + names in one query.
+    const teamIds = Array.from(teamAgg.keys());
+    let teams: TeamResult[] = [];
+    if (teamIds.length > 0) {
+      const { data: teamRows } = await supabase
+        .from("pitch_teams")
+        .select("mlb_id, abbreviation, name")
+        .in("mlb_id", teamIds);
+      const teamMeta = new Map<number, { abbr: string; name: string }>(
+        (teamRows ?? []).map((t) => [
+          t.mlb_id,
+          { abbr: t.abbreviation, name: t.name },
+        ]),
+      );
+      teams = teamIds.map((tid) => {
+        const meta = teamMeta.get(tid);
+        const a = teamAgg.get(tid)!;
+        return {
+          id: tid,
+          abbr: meta?.abbr ?? "?",
+          name: meta?.name ?? "?",
+          gameCount: a.games.size,
+          lastDate: a.lastDate,
+        };
+      });
+      // Most-recently-faced first; ties on date fall back to abbr.
+      teams.sort(
+        (a, b) =>
+          b.lastDate.localeCompare(a.lastDate) || a.abbr.localeCompare(b.abbr),
+      );
+    }
+
     return NextResponse.json(
-      { batters },
+      { batters, teams },
       { headers: { "cache-control": "public, max-age=120" } },
     );
   }

@@ -320,6 +320,14 @@ function DialogHeader({
   );
 }
 
+interface TeamResult {
+  id: number;
+  abbr: string;
+  name: string;
+  gameCount: number;
+  lastDate: string;
+}
+
 function BatterSearchBody({
   pitcherId,
   season,
@@ -332,6 +340,9 @@ function BatterSearchBody({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BatterResult[]>([]);
   const [suggestions, setSuggestions] = useState<BatterResult[]>([]);
+  const [teams, setTeams] = useState<TeamResult[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<TeamResult | null>(null);
+  const [teamBatters, setTeamBatters] = useState<BatterResult[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -339,8 +350,8 @@ function BatterSearchBody({
     inputRef.current?.focus();
   }, []);
 
-  // Pre-load the most-faced batters so the user has something to
-  // click before they start typing. Same endpoint, no `q` param.
+  // Pre-load the suggestions (top batters) and the teams sidebar.
+  // Same endpoint, no `q` and no `teamId`.
   useEffect(() => {
     if (pitcherId == null) return;
     const ctrl = new AbortController();
@@ -349,14 +360,41 @@ function BatterSearchBody({
     })
       .then(async (res) => {
         if (!res.ok) return;
-        const body = (await res.json()) as { batters: BatterResult[] };
+        const body = (await res.json()) as {
+          batters: BatterResult[];
+          teams?: TeamResult[];
+        };
         setSuggestions(body.batters ?? []);
+        setTeams(body.teams ?? []);
       })
       .catch(() => {
         /* ignore */
       });
     return () => ctrl.abort();
   }, [pitcherId, season]);
+
+  // Fetch the full batter roster for the selected team.
+  useEffect(() => {
+    if (pitcherId == null || selectedTeam == null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTeamBatters([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    fetch(
+      `/api/pitcher/${pitcherId}/batters?season=${season}&teamId=${selectedTeam.id}`,
+      { signal: ctrl.signal },
+    )
+      .then(async (res) => {
+        if (!res.ok) return;
+        const body = (await res.json()) as { batters: BatterResult[] };
+        setTeamBatters(body.batters ?? []);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+    return () => ctrl.abort();
+  }, [pitcherId, season, selectedTeam]);
 
   useEffect(() => {
     if (pitcherId == null) return;
@@ -391,8 +429,15 @@ function BatterSearchBody({
   }, [query, pitcherId, season]);
 
   const trimmed = query.trim();
-  const mode: "suggestions" | "hint" | "results" =
-    trimmed.length === 0 ? "suggestions" : trimmed.length === 1 ? "hint" : "results";
+  // Search overrides team filter; team filter overrides suggestions.
+  const mode: "suggestions" | "hint" | "results" | "team" =
+    trimmed.length >= 2
+      ? "results"
+      : trimmed.length === 1
+        ? "hint"
+        : selectedTeam
+          ? "team"
+          : "suggestions";
   const showEmpty = mode === "results" && !loading && results.length === 0;
 
   return (
@@ -401,19 +446,33 @@ function BatterSearchBody({
         ref={inputRef}
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          // Typing transitions out of team-filter mode — but keep the
+          // selection around so clearing the query restores the team
+          // view rather than the original suggestions screen.
+        }}
         placeholder="Type a batter name…"
         aria-label="Search a batter"
         className="w-full px-3 py-2 rounded bg-white/[0.04] border border-white/10 focus:border-white/30 focus:outline-none text-sm text-white/95 placeholder:text-white/35"
       />
 
-      {mode === "suggestions" && suggestions.length > 0 ? (
-        <>
-          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-            Most faced this season
-          </div>
-          <BatterPickList batters={suggestions} onPick={onPick} />
-        </>
+      {mode === "suggestions" ? (
+        <SuggestionsTwoColumn
+          batters={suggestions}
+          teams={teams}
+          onPickBatter={onPick}
+          onPickTeam={setSelectedTeam}
+        />
+      ) : null}
+
+      {mode === "team" && selectedTeam ? (
+        <TeamFilterBody
+          team={selectedTeam}
+          batters={teamBatters}
+          onPick={onPick}
+          onClear={() => setSelectedTeam(null)}
+        />
       ) : null}
 
       {mode === "hint" ? (
@@ -431,6 +490,137 @@ function BatterSearchBody({
       {mode === "results" && results.length > 0 ? (
         <BatterPickList batters={results} onPick={onPick} />
       ) : null}
+    </div>
+  );
+}
+
+// Suggestions screen: two columns. Batter picks on the left, teams
+// faced on the right. The team list is scoped to the season the
+// pitcher card is currently viewing.
+function SuggestionsTwoColumn({
+  batters,
+  teams,
+  onPickBatter,
+  onPickTeam,
+}: {
+  batters: BatterResult[];
+  teams: TeamResult[];
+  onPickBatter: (b: BatterResult) => void;
+  onPickTeam: (t: TeamResult) => void;
+}) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+          Most faced
+        </div>
+        {batters.length > 0 ? (
+          <BatterPickList batters={batters} onPick={onPickBatter} />
+        ) : (
+          <div className="text-[11px] text-white/45">No data yet.</div>
+        )}
+      </div>
+      {teams.length > 0 ? (
+        <div className="w-32 flex-shrink-0 space-y-2">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+            Teams faced
+          </div>
+          <TeamPickList teams={teams} onPick={onPickTeam} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TeamPickList({
+  teams,
+  onPick,
+}: {
+  teams: TeamResult[];
+  onPick: (t: TeamResult) => void;
+}) {
+  return (
+    <ul className="max-h-72 overflow-y-auto scrollbar-thin -mx-1">
+      {teams.map((t) => (
+        <li key={t.id}>
+          <button
+            type="button"
+            onClick={() => onPick(t)}
+            className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded hover:bg-white/[0.06] transition-colors"
+          >
+            <div className="relative w-6 h-6 flex-shrink-0 rounded-full bg-white border border-white/30 flex items-center justify-center overflow-hidden">
+              <Image
+                src={teamLogoUrl(t.id)}
+                alt=""
+                width={18}
+                height={18}
+                className="object-contain"
+                unoptimized
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] text-white/95 truncate font-medium">
+                {t.abbr}
+              </div>
+              <div className="text-[10px] text-white/45 tabular-nums truncate">
+                {t.lastDate}
+                {t.gameCount > 1 ? ` · ${t.gameCount}g` : ""}
+              </div>
+            </div>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function TeamFilterBody({
+  team,
+  batters,
+  onPick,
+  onClear,
+}: {
+  team: TeamResult;
+  batters: BatterResult[];
+  onPick: (b: BatterResult) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/[0.06] border border-white/10">
+        <div className="relative w-6 h-6 flex-shrink-0 rounded-full bg-white border border-white/30 flex items-center justify-center overflow-hidden">
+          <Image
+            src={teamLogoUrl(team.id)}
+            alt=""
+            width={18}
+            height={18}
+            className="object-contain"
+            unoptimized
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] text-white/95 truncate">{team.name}</div>
+          <div className="text-[10px] text-white/45 tabular-nums truncate">
+            {team.lastDate}
+            {team.gameCount > 1 ? ` · ${team.gameCount}g` : ""}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label="Clear team filter"
+          className="px-2 py-1 rounded text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white hover:bg-white/[0.06] flex-shrink-0"
+        >
+          Clear
+        </button>
+      </div>
+      {batters.length > 0 ? (
+        <BatterPickList batters={batters} onPick={onPick} />
+      ) : (
+        <div className="text-[11px] text-white/45">
+          No batters faced from this team yet.
+        </div>
+      )}
     </div>
   );
 }
