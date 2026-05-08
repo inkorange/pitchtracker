@@ -19,6 +19,13 @@ export const config: VercelConfig = {
     // downstream aggregate + notable-at-bats jobs see today's results.
     { path: "/api/cron/refresh-games", schedule: "0 11 * * *" },
 
+    // Walk every active pitcher and lazy-fetch their season pitches
+    // from Savant so the rankings + aggregates see the full league,
+    // not just pitchers whose pages have been visited.
+    // ensurePitcherSeasonCache short-circuits when data is already
+    // cached — re-runs are cheap.
+    { path: "/api/cron/precache-season-pitchers", schedule: "5 11 * * *" },
+
     // Recompute pitch_pitcher_aggregates from cached pitches. Reads
     // pitch_game_pitches, writes pitch_pitcher_aggregates.
     { path: "/api/cron/refresh-aggregates", schedule: "15 11 * * *" },
@@ -27,6 +34,12 @@ export const config: VercelConfig = {
     // Reads cached pitches; writes pitch_notable_at_bats and
     // pitch_daily_features. Depends on aggregates being up-to-date.
     { path: "/api/cron/refresh-notable-at-bats", schedule: "30 11 * * *" },
+
+    // Top-5-per-category leaderboards for the homepage Rankings
+    // strip. Reads pitch_pitcher_aggregates (velo / spin) and raw
+    // pitch_game_pitches (whiff%, csw%, K, VAA). Depends on
+    // refresh-aggregates having finished.
+    { path: "/api/cron/refresh-rankings", schedule: "45 11 * * *" },
 
     // Per-team pitcher rosters for the active season — picks up
     // call-ups, trades, IL moves announced overnight.

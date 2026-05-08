@@ -3,19 +3,34 @@ import Link from "next/link";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { FeaturedStrip } from "@/components/home/FeaturedStrip";
 import { DailyPickStrip } from "@/components/home/DailyPickStrip";
+import { RankingsStrip } from "@/components/home/RankingsStrip";
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90">
-      <div className="max-w-3xl mx-auto px-6 py-16 space-y-10">
-        <header className="space-y-8 text-center">
+      {/* Full-width field banner. Capped at 25vh with a min so it
+          doesn't squish on very short viewports. Logos + description
+          are flex-centered inside, so they always land ON the image
+          regardless of screen height. A bottom gradient softens the
+          edge into the page background. */}
+      <section className="relative w-full h-[25vh] min-h-[180px] overflow-hidden">
+        <Image
+          src="/field-background.jpg"
+          alt=""
+          fill
+          sizes="100vw"
+          className="object-cover object-center"
+          priority
+        />
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-b from-transparent to-[#0a0e14] pointer-events-none" />
+        <header className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
           <h1 className="flex items-center justify-center gap-4">
             <Image
               src="/Major_League_Baseball_logo.svg"
               alt=""
               width={75}
               height={40}
-              className="h-10 w-auto"
+              className="h-10 w-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
               priority
             />
             <Image
@@ -23,16 +38,18 @@ export default function Home() {
               alt="pitchtracker"
               width={290}
               height={50}
-              className="h-10 sm:h-24 w-auto"
+              className="h-10 sm:h-20 w-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
               priority
             />
           </h1>
-          <p className="text-sm text-white/55 leading-relaxed">
+          <p className="px-[60px] text-base sm:text-lg text-white/95 leading-relaxed max-w-prose drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
             MLB pitch trajectories in 3D. Search a pitcher, browse by team, or
             replay any at-bat pitch-by-pitch.
           </p>
         </header>
+      </section>
 
+      <div className="max-w-3xl mx-auto px-6 pt-8 pb-16 space-y-10">
         {/* Sticky so the search stays reachable as the user scrolls
             through the daily pick + featured strips. -mx-6 px-6
             extends the backdrop to the container edges so scrolled
@@ -96,6 +113,8 @@ export default function Home() {
         </div>
 
         <DailyPickStrip />
+
+        <RankingsStrip />
 
         <FeaturedStrip />
       </div>
