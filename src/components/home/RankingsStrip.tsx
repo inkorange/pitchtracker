@@ -48,14 +48,18 @@ export async function RankingsStrip() {
   const rankings = (rows ?? []) as RankingRow[];
   if (rankings.length === 0) return null;
 
-  // Resolve pitcher names in one round trip.
+  // Resolve pitcher names in one round trip. Format as "S. Ohtani"
+  // (first-initial + full last name) so the row width can fit names
+  // like "Garrett Crochet" or "Yoshinobu Yamamoto" without
+  // truncating the last name. Fall back to full_name when first /
+  // last aren't populated.
   const pitcherIds = Array.from(new Set(rankings.map((r) => r.pitcher_id)));
   const { data: pitcherRows } = await supabase
     .from("pitch_pitchers")
-    .select("mlb_id, full_name")
+    .select("mlb_id, full_name, first_name, last_name")
     .in("mlb_id", pitcherIds);
   const nameById = new Map<number, string>(
-    (pitcherRows ?? []).map((p) => [p.mlb_id, p.full_name]),
+    (pitcherRows ?? []).map((p) => [p.mlb_id, formatPitcherName(p)]),
   );
 
   // Group rows by category, preserve rank order.
@@ -155,4 +159,15 @@ function RankingsCard({
       </ol>
     </div>
   );
+}
+
+function formatPitcherName(p: {
+  first_name: string | null;
+  last_name: string | null;
+  full_name: string;
+}): string {
+  if (p.first_name && p.last_name) {
+    return `${p.first_name[0]}. ${p.last_name}`;
+  }
+  return p.full_name;
 }
