@@ -28,6 +28,12 @@ export const config: VercelConfig = {
     // pitch_daily_features. Depends on aggregates being up-to-date.
     { path: "/api/cron/refresh-notable-at-bats", schedule: "30 11 * * *" },
 
+    // Top-5-per-category leaderboards for the homepage Rankings
+    // strip. Reads pitch_pitcher_aggregates (velo / spin) and raw
+    // pitch_game_pitches (whiff%, csw%, K, VAA). Depends on
+    // refresh-aggregates having finished.
+    { path: "/api/cron/refresh-rankings", schedule: "45 11 * * *" },
+
     // Per-team pitcher rosters for the active season — picks up
     // call-ups, trades, IL moves announced overnight.
     { path: "/api/cron/refresh-rosters", schedule: "0 12 * * *" },

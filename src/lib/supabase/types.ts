@@ -768,6 +768,44 @@ export type Database = {
           },
         ]
       }
+      pitch_rankings: {
+        Row: {
+          category: string
+          computed_at: string
+          pitcher_id: number
+          pitches_sampled: number
+          rank: number
+          season: number
+          value: number
+        }
+        Insert: {
+          category: string
+          computed_at?: string
+          pitcher_id: number
+          pitches_sampled: number
+          rank: number
+          season: number
+          value: number
+        }
+        Update: {
+          category?: string
+          computed_at?: string
+          pitcher_id?: number
+          pitches_sampled?: number
+          rank?: number
+          season?: number
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_rankings_pitcher_id_fkey"
+            columns: ["pitcher_id"]
+            isOneToOne: false
+            referencedRelation: "pitch_pitchers"
+            referencedColumns: ["mlb_id"]
+          },
+        ]
+      }
       pitch_pitcher_games: {
         Row: {
           fetched_at: string
@@ -986,6 +1024,10 @@ export type Database = {
         Returns: number
       }
       pitch_recompute_aggregates: { Args: never; Returns: undefined }
+      pitch_recompute_rankings: {
+        Args: { p_season: number }
+        Returns: undefined
+      }
       reorder_view: {
         Args: { p_new_order: number; p_view_id: string }
         Returns: undefined

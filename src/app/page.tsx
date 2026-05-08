@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { FeaturedStrip } from "@/components/home/FeaturedStrip";
 import { DailyPickStrip } from "@/components/home/DailyPickStrip";
+import { RankingsStrip } from "@/components/home/RankingsStrip";
 
 export default function Home() {
   return (
@@ -96,6 +97,8 @@ export default function Home() {
         </div>
 
         <DailyPickStrip />
+
+        <RankingsStrip />
 
         <FeaturedStrip />
       </div>
