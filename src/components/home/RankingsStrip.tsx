@@ -114,11 +114,13 @@ function RankingsCard({
 }) {
   return (
     <div className="rounded-lg bg-white/[0.05] border border-white/10 px-3 py-4 space-y-3">
-      <div className="flex items-baseline justify-between gap-2 px-1">
-        <h3 className="text-sm text-white/95 font-medium">{title}</h3>
-        <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
+      <div className="px-1 space-y-0.5">
+        <h3 className="text-sm text-white/95 font-medium whitespace-nowrap">
+          {title}
+        </h3>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-white/40 whitespace-nowrap">
           {subtitle}
-        </span>
+        </div>
       </div>
       <ol className="space-y-1.5">
         {items.map((r) => (
