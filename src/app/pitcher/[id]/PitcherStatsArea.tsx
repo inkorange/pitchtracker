@@ -67,7 +67,7 @@ export function PitcherStatsArea() {
   return (
     <section
       style={isDesktop ? undefined : { top: mobileTopPx }}
-      className="absolute left-3 right-3 bottom-3 sm:top-28 sm:left-[23.5rem] sm:right-6 sm:bottom-6 z-10 overflow-y-auto pointer-events-auto pb-4"
+      className="absolute left-3 right-3 bottom-3 sm:top-28 sm:left-[23.5rem] sm:right-6 sm:bottom-6 z-10 overflow-y-auto pointer-events-auto pt-1 pb-4"
       aria-label="Pitcher stats"
     >
       <PitcherStatsView />
