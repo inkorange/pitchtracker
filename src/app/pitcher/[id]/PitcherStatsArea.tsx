@@ -4,14 +4,17 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { usePitcherView } from "./StatsModeToggle";
 import { PitcherStatsView } from "./PitcherStatsView";
 
-const DESKTOP_MQL = "(min-width: 1024px)";
+// Match Tailwind's `sm` breakpoint. Above sm the stats area sits to
+// the right of the pitcher card, so the dynamic mobile top doesn't
+// apply.
+const SM_MQL = "(min-width: 640px)";
 function subscribeIsDesktop(callback: () => void): () => void {
-  const mql = window.matchMedia(DESKTOP_MQL);
+  const mql = window.matchMedia(SM_MQL);
   mql.addEventListener("change", callback);
   return () => mql.removeEventListener("change", callback);
 }
 function getIsDesktopSnapshot(): boolean {
-  return window.matchMedia(DESKTOP_MQL).matches;
+  return window.matchMedia(SM_MQL).matches;
 }
 function getIsDesktopServerSnapshot(): boolean {
   return false;
@@ -56,13 +59,15 @@ export function PitcherStatsArea() {
 
   if (view !== "stats") return null;
 
-  // Desktop uses lg:top-28 from class; mobile uses inline-style top
-  // sourced from the ResizeObserver. The desktop top class wins at
-  // the lg breakpoint thanks to media-query specificity.
+  // Above sm the stats area docks to the right of the pitcher card
+  // at a fixed top — the card's height doesn't displace it. Below sm
+  // it stacks under the card with a dynamic top sourced from the
+  // ResizeObserver. (The two-column INSIDE the stats view is still
+  // gated at lg so cards have room before splitting columns.)
   return (
     <section
       style={isDesktop ? undefined : { top: mobileTopPx }}
-      className="absolute left-3 right-3 bottom-3 lg:top-28 lg:left-[23.5rem] lg:right-6 lg:bottom-6 z-10 overflow-y-auto pointer-events-auto pb-4"
+      className="absolute left-3 right-3 bottom-3 sm:top-28 sm:left-[23.5rem] sm:right-6 sm:bottom-6 z-10 overflow-y-auto pointer-events-auto pb-4"
       aria-label="Pitcher stats"
     >
       <PitcherStatsView />
