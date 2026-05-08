@@ -255,7 +255,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         <PitcherSearch placeholder="Search another pitcher…" />
       </div>
 
-      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section
+        data-pitcher-card
+        className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto"
+      >
         <PitcherCardCollapse
           header={
             <>
