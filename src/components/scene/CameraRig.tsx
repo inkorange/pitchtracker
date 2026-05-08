@@ -106,6 +106,10 @@ export function CameraRig({ preset, presetTick = 0, presetOverride }: CameraRigP
       // Dampen the wheel/pinch zoom further so a single scroll only nudges
       // the camera (default zoomSpeed is 1.0).
       zoomSpeed={0.18}
+      // Same idea for orbit drag — default rotateSpeed is 1.0, which
+      // felt too twitchy. 0.5 keeps movement responsive without
+      // overshooting on small drags.
+      rotateSpeed={0.5}
       // Allow ~0.85° below horizontal so the user can angle slightly up
       // from a low vantage point. A useFrame clamp on camera.y keeps the
       // camera from actually sinking under the field plane.
