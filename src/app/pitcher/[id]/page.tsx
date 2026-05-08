@@ -309,71 +309,71 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           body={
             <PitcherBody
               arsenal={
-                <>
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
-                    {(aggregates ?? []).length === 0 ? (
-                      <div className="text-xs text-white/55 leading-relaxed">
-                        No arsenal data for {season}.
-                      </div>
-                    ) : (
-                      <ul className="space-y-1.5">
-                        {aggregates!.map((a) => (
-                          <li key={a.pitch_type} className="space-y-0.5">
-                            <div className="flex items-center gap-2 text-xs tabular-nums">
-                              <span
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{ background: getPitchColor(a.pitch_type) }}
-                              />
-                              <span className="text-white/85 flex-1 truncate">
-                                {getPitchLabel(a.pitch_type)}
-                              </span>
-                              <span className="text-white/55">
-                                {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
-                              </span>
-                              <span className="text-white/45 w-16 text-right">
-                                {a.usage_pct != null
-                                  ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
-                                  : "—"}
-                              </span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  {/* Per-side filters live inside the FiltersGate so they
-                      collapse out of the way when at-bat mode is active. */}
-                  <FiltersGate>
-                    <div className="border-t border-white/[0.08] pt-3">
-                      <PitcherFilters
-                        arsenal={(aggregates ?? []).map((a) => ({
-                          pitch_type: a.pitch_type,
-                          pitch_count: a.pitch_count,
-                        }))}
-                        games={games}
-                        season={season}
-                      />
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
+                  {(aggregates ?? []).length === 0 ? (
+                    <div className="text-xs text-white/55 leading-relaxed">
+                      No arsenal data for {season}.
                     </div>
-
-                    {renderable.length > 0 && (
-                      <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
-                        Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
-                      </div>
-                    )}
-                    {(cachedPitches ?? []).length === 0 && (
-                      <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-                        No pitch trajectory data available for this filter.
-                      </div>
-                    )}
-                  </FiltersGate>
-
-                  {/* Pitcher-vs-batter matchups: typeahead → at-bat list → playback. */}
-                  <div className="border-t border-white/[0.08] pt-3 space-y-2">
-                    <MatchupsPanel season={season} />
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {aggregates!.map((a) => (
+                        <li key={a.pitch_type} className="space-y-0.5">
+                          <div className="flex items-center gap-2 text-xs tabular-nums">
+                            <span
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ background: getPitchColor(a.pitch_type) }}
+                            />
+                            <span className="text-white/85 flex-1 truncate">
+                              {getPitchLabel(a.pitch_type)}
+                            </span>
+                            <span className="text-white/55">
+                              {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
+                            </span>
+                            <span className="text-white/45 w-16 text-right">
+                              {a.usage_pct != null
+                                ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
+                                : "—"}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              }
+              filters={
+                /* Per-side filters live inside the FiltersGate so they
+                   collapse out of the way when at-bat mode is active. */
+                <FiltersGate>
+                  <div className="border-t border-white/[0.08] pt-3">
+                    <PitcherFilters
+                      arsenal={(aggregates ?? []).map((a) => ({
+                        pitch_type: a.pitch_type,
+                        pitch_count: a.pitch_count,
+                      }))}
+                      games={games}
+                      season={season}
+                    />
                   </div>
-                </>
+
+                  {renderable.length > 0 && (
+                    <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
+                      Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
+                    </div>
+                  )}
+                  {(cachedPitches ?? []).length === 0 && (
+                    <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
+                      No pitch trajectory data available for this filter.
+                    </div>
+                  )}
+                </FiltersGate>
+              }
+              matchups={
+                /* Pitcher-vs-batter matchups: typeahead → at-bat list → playback. */
+                <div className="border-t border-white/[0.08] pt-3 space-y-2">
+                  <MatchupsPanel season={season} />
+                </div>
               }
             />
           }
@@ -388,14 +388,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
 
       {/* Stats analytics view — sibling of the pitcher card, NOT
           inside it. Renders nothing in arsenal mode. */}
-      <PitcherStatsArea
-        arsenal={(aggregates ?? []).map((a) => ({
-          pitch_type: a.pitch_type,
-          pitch_count: a.pitch_count,
-        }))}
-        games={games}
-        season={season}
-      />
+      <PitcherStatsArea />
     </>
   );
 }
