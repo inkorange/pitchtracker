@@ -92,11 +92,11 @@ export function PitcherStatsView() {
     <div className="space-y-3">
       {/* Headline spans full width on every breakpoint. */}
       <StatsHeadline total={aggregated.total} />
-      {/* 2-col grid on desktop, single column on mobile. The cards
-          fill in row-major, which puts the highest-density panels
-          (per-pitch table + movement plot) at the top of the grid
-          so the most-scanned analytics are first. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* 2-col grid only at lg+ (1024px+). Below that, every card
+          stacks single-column so the small-multiples (velocity
+          histograms, heat maps) don't get cramped at narrow desktop
+          widths. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <PerPitchTable rows={aggregated.perPitch} />
         <LazyMount minHeight={340}>
           <MovementPlot pitches={pitches} />
