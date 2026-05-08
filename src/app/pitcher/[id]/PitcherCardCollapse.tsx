@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { parseAsInteger, useQueryStates } from "nuqs";
 import { MobileCollapse } from "@/components/chrome/MobileCollapse";
+import { usePitcherView } from "./StatsModeToggle";
 
 // Wraps the mobile-collapsing pitcher card so we can auto-close it
 // whenever the user picks an at-bat (`?abGame` + `?abNum` flip on or
@@ -21,6 +22,7 @@ export function PitcherCardCollapse({
   body: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [view] = usePitcherView();
   const [{ abGame, abNum }] = useQueryStates({
     abGame: parseAsInteger,
     abNum: parseAsInteger,
@@ -32,11 +34,15 @@ export function PitcherCardCollapse({
     setPrevAb(currentAb);
     if (currentAb != null) setOpen(false);
   }
+  // In Stats mode the body is just the filters — they need to be
+  // visible without the user fishing for the chevron, so force the
+  // collapse open. Arsenal mode keeps the user's manual choice.
+  const effectiveOpen = view === "stats" ? true : open;
   return (
     <MobileCollapse
       header={header}
       body={body}
-      open={open}
+      open={effectiveOpen}
       onOpenChange={setOpen}
     />
   );

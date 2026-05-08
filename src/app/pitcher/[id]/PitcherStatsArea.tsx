@@ -18,7 +18,13 @@ export function PitcherStatsArea() {
   if (view !== "stats") return null;
   return (
     <section
-      className="absolute top-[17.5rem] left-3 right-3 bottom-3 sm:top-16 sm:left-[23.5rem] sm:right-6 sm:bottom-6 z-10 overflow-y-auto pointer-events-auto pb-4"
+      // Mobile: dock under the (now-expanded) pitcher card. The card
+      // shows header + season picker + toggle + filters in stats
+      // mode; ~25rem covers all of that with a small gap.
+      // Desktop: jump to the right of the pitcher card. top-28 keeps
+      // the cards clear of the "Search another pitcher" input that's
+      // pinned at top-14 right-6.
+      className="absolute top-[25rem] left-3 right-3 bottom-3 sm:top-28 sm:left-[23.5rem] sm:right-6 sm:bottom-6 z-10 overflow-y-auto pointer-events-auto pb-4"
       aria-label="Pitcher stats"
     >
       <PitcherStatsView />
