@@ -47,7 +47,7 @@ export function ReleaseCluster({ pitches }: { pitches: StatPitch[] }) {
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           width="100%"
           style={{ aspectRatio: "1 / 1" }}
-          className="block"
+          className="block font-sans"
         >
           <rect width={SIZE} height={SIZE} fill="rgba(255,255,255,0.02)" rx={8} />
           {/* Grid: vertical lines at every foot, horizontal at every foot of height */}
@@ -73,7 +73,7 @@ export function ReleaseCluster({ pitches }: { pitches: StatPitch[] }) {
             />
           ))}
           {/* Y-axis ticks (height) */}
-          <g fill="rgba(255,255,255,0.4)" fontSize={8} fontFamily="ui-sans-serif">
+          <g fill="rgba(255,255,255,0.4)" fontSize={8}>
             {[3, 4, 5, 6, 7].map((v) => (
               <text key={`tz-${v}`} x={4} y={zToSvg(v) + 3}>
                 {v}ft

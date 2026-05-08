@@ -74,7 +74,7 @@ export function VelocityHistograms({
                 viewBox={`0 0 ${HIST_W} ${HIST_H}`}
                 width="100%"
                 style={{ aspectRatio: `${HIST_W} / ${HIST_H}` }}
-                className="block"
+                className="block font-sans"
               >
                 <rect width={HIST_W} height={HIST_H} fill="rgba(255,255,255,0.03)" rx={4} />
                 {bins.map((count, i) => {

@@ -86,7 +86,7 @@ export function HeatMapGrid({
                 viewBox={`0 0 ${W} ${H}`}
                 width="100%"
                 style={{ aspectRatio: `${W} / ${H}` }}
-                className="block"
+                className="block font-sans"
               >
                 <rect width={W} height={H} fill="rgba(255,255,255,0.02)" rx={4} />
                 {/* Cells */}

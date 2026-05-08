@@ -2,6 +2,7 @@
 
 import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
 import type { PerPitchStats } from "./aggregations";
+import { StatCard } from "./StatCard";
 
 // The arsenal table — one row per pitch type, columns mirror the
 // Savant scouting card: usage % first (sorted desc), then velo, then
@@ -11,15 +12,15 @@ import type { PerPitchStats } from "./aggregations";
 export function PerPitchTable({ rows }: { rows: PerPitchStats[] }) {
   if (rows.length === 0) {
     return (
-      <Card title="Arsenal">
+      <StatCard title="Arsenal">
         <div className="text-[11px] text-white/55 italic">
           No pitches in the current filter.
         </div>
-      </Card>
+      </StatCard>
     );
   }
   return (
-    <Card title="Arsenal">
+    <StatCard title="Arsenal">
       <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-1.5 items-center text-[11px] tabular-nums">
         <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
           Pitch
@@ -40,7 +41,7 @@ export function PerPitchTable({ rows }: { rows: PerPitchStats[] }) {
           <Row key={r.pitch_type} r={r} />
         ))}
       </div>
-    </Card>
+    </StatCard>
   );
 }
 
@@ -76,13 +77,3 @@ function Row({ r }: { r: PerPitchStats }) {
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-lg bg-white/[0.03] border border-white/10 p-4 space-y-3">
-      <h3 className="text-[10px] uppercase tracking-[0.16em] text-white/55">
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}

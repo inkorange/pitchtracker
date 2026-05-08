@@ -48,7 +48,7 @@ export function MovementPlot({ pitches }: { pitches: StatPitch[] }) {
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           width="100%"
           style={{ aspectRatio: "1 / 1" }}
-          className="block"
+          className="block font-sans"
         >
           {/* Background */}
           <rect width={SIZE} height={SIZE} fill="rgba(255,255,255,0.02)" rx={8} />
@@ -67,7 +67,7 @@ export function MovementPlot({ pitches }: { pitches: StatPitch[] }) {
             <line x1={ZERO} y1={PADDING} x2={ZERO} y2={SIZE - PADDING} />
           </g>
           {/* Axis labels */}
-          <g fill="rgba(255,255,255,0.45)" fontSize={9} fontFamily="ui-sans-serif">
+          <g fill="rgba(255,255,255,0.45)" fontSize={9}>
             <text x={SIZE - PADDING + 2} y={ZERO + 3}>+HB</text>
             <text x={ZERO + 3} y={PADDING - 4}>+iVB</text>
             <text x={PADDING - 16} y={ZERO + 3}>−HB</text>

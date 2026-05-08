@@ -12,7 +12,7 @@ export function StatCard({
   return (
     <section className="rounded-lg bg-white/[0.03] border border-white/10 p-4 space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-[10px] uppercase tracking-[0.16em] text-white/55">
+        <h3 className="text-xs uppercase tracking-[0.14em] text-white/75 font-medium">
           {title}
         </h3>
         {hint ? (

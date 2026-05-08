@@ -35,11 +35,11 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
         viewBox={`0 0 ${W} ${totalH}`}
         width="100%"
         style={{ aspectRatio: `${W} / ${totalH}` }}
-        className="block"
+        className="block font-sans"
       >
         {/* 0° axis on the right */}
         <line x1={W - 24} y1={0} x2={W - 24} y2={totalH} stroke="rgba(255,255,255,0.18)" />
-        <text x={W - 22} y={10} fill="rgba(255,255,255,0.45)" fontSize={9} fontFamily="ui-sans-serif">0°</text>
+        <text x={W - 22} y={10} fill="rgba(255,255,255,0.45)" fontSize={9}>0°</text>
         {usable.map((r, i) => {
           const vaa = r.vaa_mean!;
           const len = Math.min(W - 60, (Math.abs(vaa) / VAA_RANGE) * (W - 60));
@@ -62,7 +62,6 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
                 y={y + ROW_H / 2}
                 fill="rgba(255,255,255,0.85)"
                 fontSize={10}
-                fontFamily="ui-sans-serif"
                 dominantBaseline="middle"
               >
                 {getPitchLabel(r.pitch_type)}
@@ -73,7 +72,6 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
                 y={y + ROW_H / 2}
                 fill="rgba(255,255,255,0.85)"
                 fontSize={10}
-                fontFamily="ui-sans-serif"
                 dominantBaseline="middle"
               >
                 {vaa.toFixed(1)}°
