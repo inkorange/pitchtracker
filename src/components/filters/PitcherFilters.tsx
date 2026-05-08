@@ -27,21 +27,9 @@ interface PitcherFiltersProps {
   arsenal: ArsenalEntry[];
   games: GameEntry[];
   season: number;
-  /**
-   * "arsenal" (default) renders every filter row. "stats" hides the
-   * Pitch-type and Outcome rows because they defeat the analytics in
-   * Stats mode (single-type filtering kills cross-pitch comparisons,
-   * and outcome filtering biases the very distributions we measure).
-   */
-  mode?: "arsenal" | "stats";
 }
 
-export function PitcherFilters({
-  arsenal,
-  games,
-  season,
-  mode = "arsenal",
-}: PitcherFiltersProps) {
+export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -88,7 +76,7 @@ export function PitcherFilters({
   return (
     <div className="space-y-3">
       <TransitionOverlay isPending={isPending} />
-      {arsenal.length > 0 && mode === "arsenal" && (
+      {arsenal.length > 0 && (
         <div>
           <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
             Pitch type
@@ -120,7 +108,6 @@ export function PitcherFilters({
         </div>
       )}
 
-      {mode === "arsenal" && (
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
           Outcome
@@ -150,7 +137,6 @@ export function PitcherFilters({
           })}
         </div>
       </div>
-      )}
 
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">

@@ -21,7 +21,7 @@ import { AtBatHeader } from "./AtBatHeader";
 import { PitcherOutcomeLegend } from "./PitcherOutcomeLegend";
 import { PitcherBody } from "./PitcherBody";
 import { StatsModeToggle } from "./StatsModeToggle";
-import { PitcherFiltersWrapper } from "./PitcherFiltersWrapper";
+import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { PitcherStatsArea } from "./PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
 
@@ -360,7 +360,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                    wrapper toggles which rows show based on view. */
                 <FiltersGate>
                   <div className="border-t border-white/[0.08] pt-3">
-                    <PitcherFiltersWrapper
+                    <PitcherFilters
                       arsenal={(aggregates ?? []).map((a) => ({
                         pitch_type: a.pitch_type,
                         pitch_count: a.pitch_count,
