@@ -66,12 +66,37 @@ export function MovementPlot({ pitches }: { pitches: StatPitch[] }) {
             <line x1={PADDING} y1={ZERO} x2={SIZE - PADDING} y2={ZERO} />
             <line x1={ZERO} y1={PADDING} x2={ZERO} y2={SIZE - PADDING} />
           </g>
-          {/* Axis labels */}
+          {/* Axis direction labels (corners) */}
           <g fill="rgba(255,255,255,0.45)" fontSize={9}>
             <text x={SIZE - PADDING + 2} y={ZERO + 3}>+HB</text>
             <text x={ZERO + 3} y={PADDING - 4}>+iVB</text>
             <text x={PADDING - 16} y={ZERO + 3}>−HB</text>
             <text x={ZERO + 3} y={SIZE - PADDING + 10}>−iVB</text>
+          </g>
+          {/* Inch tick labels along each axis. Skip 0 (the axes
+              already mark it) and skip the value that would collide
+              with the +HB / +iVB / −HB / −iVB direction labels. */}
+          <g fill="rgba(255,255,255,0.55)" fontSize={8.5}>
+            {[-18, -12, -6, 6, 12, 18].map((v) => (
+              <text
+                key={`tx-${v}`}
+                x={ZERO + v * SCALE}
+                y={ZERO + 11}
+                textAnchor="middle"
+              >
+                {v > 0 ? `+${v}` : `${v}"`}
+              </text>
+            ))}
+            {[-18, -12, -6, 6, 12, 18].map((v) => (
+              <text
+                key={`ty-${v}`}
+                x={ZERO - 4}
+                y={ZERO - v * SCALE + 3}
+                textAnchor="end"
+              >
+                {v > 0 ? `+${v}` : `${v}"`}
+              </text>
+            ))}
           </g>
           {/* Per-pitch dots */}
           {usable.map((p, i) => {

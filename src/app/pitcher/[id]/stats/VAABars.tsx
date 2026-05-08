@@ -59,7 +59,7 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
               {/* Label on the left */}
               <text
                 x={4}
-                y={y + ROW_H / 2}
+                y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
                 fontSize={10}
                 dominantBaseline="middle"
@@ -69,7 +69,7 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
               {/* Value tag at the end of the bar */}
               <text
                 x={W - 28 - len + 4}
-                y={y + ROW_H / 2}
+                y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
                 fontSize={10}
                 dominantBaseline="middle"
