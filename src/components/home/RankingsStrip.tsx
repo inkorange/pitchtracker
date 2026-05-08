@@ -113,8 +113,8 @@ function RankingsCard({
   nameById: Map<number, string>;
 }) {
   return (
-    <div className="rounded-lg bg-white/[0.05] border border-white/10 p-4 space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
+    <div className="rounded-lg bg-white/[0.05] border border-white/10 px-3 py-4 space-y-3">
+      <div className="flex items-baseline justify-between gap-2 px-1">
         <h3 className="text-sm text-white/95 font-medium">{title}</h3>
         <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">
           {subtitle}
@@ -125,7 +125,7 @@ function RankingsCard({
           <li key={r.pitcher_id}>
             <Link
               href={`/pitcher/${r.pitcher_id}`}
-              className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
+              className="flex items-center gap-2.5 px-1 py-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
             >
               <span className="text-[10px] tabular-nums text-white/45 w-3 text-right">
                 {r.rank}
