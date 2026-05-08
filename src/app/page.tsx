@@ -42,7 +42,7 @@ export default function Home() {
               priority
             />
           </h1>
-          <p className="text-base sm:text-lg text-white/95 leading-relaxed max-w-prose drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+          <p className="px-[30px] text-base sm:text-lg text-white/95 leading-relaxed max-w-prose drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
             MLB pitch trajectories in 3D. Search a pitcher, browse by team, or
             replay any at-bat pitch-by-pitch.
           </p>
