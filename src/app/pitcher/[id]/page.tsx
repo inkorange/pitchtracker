@@ -22,6 +22,8 @@ import { PitcherOutcomeLegend } from "./PitcherOutcomeLegend";
 import { PitcherBody } from "./PitcherBody";
 import { StatsModeToggle } from "./StatsModeToggle";
 import { PitcherFiltersWrapper } from "./PitcherFiltersWrapper";
+import { PitcherStatsArea } from "./PitcherStatsArea";
+import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -230,7 +232,9 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           3D canvas stays mounted across pitcher swaps. This page
           owns only the panels + chrome that should rebuild on
           pitcher change. */}
-      <OutcomeLegend />
+      <PitcherOutcomeLegendGate>
+        <OutcomeLegend />
+      </PitcherOutcomeLegendGate>
       <PitcherOutcomeLegend />
 
       <TopNav
@@ -389,6 +393,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
             Renders nothing when not in at-bat mode. */}
         <AtBatHeader season={season} />
       </section>
+
+      {/* Stats analytics view — sibling of the pitcher card, NOT
+          inside it. Renders nothing in arsenal mode. */}
+      <PitcherStatsArea />
     </>
   );
 }

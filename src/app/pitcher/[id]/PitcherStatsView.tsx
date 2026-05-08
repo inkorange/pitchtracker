@@ -90,23 +90,30 @@ export function PitcherStatsView() {
 
   return (
     <div className="space-y-3">
+      {/* Headline spans full width on every breakpoint. */}
       <StatsHeadline total={aggregated.total} />
-      <PerPitchTable rows={aggregated.perPitch} />
-      <LazyMount minHeight={340}>
-        <MovementPlot pitches={pitches} />
-      </LazyMount>
-      <LazyMount minHeight={260}>
-        <VelocityHistograms pitches={pitches} perPitch={aggregated.perPitch} />
-      </LazyMount>
-      <LazyMount minHeight={340}>
-        <ReleaseCluster pitches={pitches} />
-      </LazyMount>
-      <LazyMount minHeight={300}>
-        <HeatMapGrid pitches={pitches} perPitch={aggregated.perPitch} />
-      </LazyMount>
-      <LazyMount minHeight={220}>
-        <VAABars rows={aggregated.perPitch} />
-      </LazyMount>
+      {/* 2-col grid on desktop, single column on mobile. The cards
+          fill in row-major, which puts the highest-density panels
+          (per-pitch table + movement plot) at the top of the grid
+          so the most-scanned analytics are first. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <PerPitchTable rows={aggregated.perPitch} />
+        <LazyMount minHeight={340}>
+          <MovementPlot pitches={pitches} />
+        </LazyMount>
+        <LazyMount minHeight={260}>
+          <VelocityHistograms pitches={pitches} perPitch={aggregated.perPitch} />
+        </LazyMount>
+        <LazyMount minHeight={340}>
+          <ReleaseCluster pitches={pitches} />
+        </LazyMount>
+        <LazyMount minHeight={300}>
+          <HeatMapGrid pitches={pitches} perPitch={aggregated.perPitch} />
+        </LazyMount>
+        <LazyMount minHeight={220}>
+          <VAABars rows={aggregated.perPitch} />
+        </LazyMount>
+      </div>
     </div>
   );
 }
