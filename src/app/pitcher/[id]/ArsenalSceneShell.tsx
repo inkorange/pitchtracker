@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { PitcherArsenalScene } from "./PitcherArsenalScene";
+import { usePitcherView } from "./StatsModeToggle";
 import type { ReplayPitch } from "@/app/at-bat/[gamePk]/[atBatNumber]/AtBatReplayScene";
 
 interface CachedPitch {
@@ -56,6 +57,7 @@ interface AtBatPitchesResponse {
 export function ArsenalSceneShell() {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
+  const [view] = usePitcherView();
   const id = params?.id;
 
   // Strip at-bat-mode params from the arsenal fetch — the per-side
@@ -132,6 +134,10 @@ export function ArsenalSceneShell() {
   }, [inAtBatMode, abGame, abNum]);
 
   if (!id) return null;
+  // Stats mode: drop the entire scene tree. Returning null unmounts
+  // the <Canvas>, releases the WebGL context, and frees the GPU
+  // while the user reads charts.
+  if (view === "stats") return null;
 
   return (
     <PitcherArsenalScene
