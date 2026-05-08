@@ -107,9 +107,9 @@ export function CameraRig({ preset, presetTick = 0, presetOverride }: CameraRigP
       // the camera (default zoomSpeed is 1.0).
       zoomSpeed={0.18}
       // Same idea for orbit drag — default rotateSpeed is 1.0, which
-      // felt too twitchy. 0.5 keeps movement responsive without
-      // overshooting on small drags.
-      rotateSpeed={0.5}
+      // felt too twitchy. 0.3 keeps small drags feeling deliberate
+      // and stops the camera whipping around on touch.
+      rotateSpeed={0.3}
       // Allow ~0.85° below horizontal so the user can angle slightly up
       // from a low vantage point. A useFrame clamp on camera.y keeps the
       // camera from actually sinking under the field plane.
