@@ -42,11 +42,11 @@ export function ReleaseCluster({ pitches }: { pitches: StatPitch[] }) {
 
   return (
     <StatCard title="Release point" hint="ft · catcher's POV">
-      <div className="flex justify-center">
+      <div className="w-full">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           width="100%"
-          style={{ maxWidth: SIZE, aspectRatio: "1 / 1" }}
+          style={{ aspectRatio: "1 / 1" }}
           className="block"
         >
           <rect width={SIZE} height={SIZE} fill="rgba(255,255,255,0.02)" rx={8} />

@@ -43,11 +43,11 @@ export function MovementPlot({ pitches }: { pitches: StatPitch[] }) {
 
   return (
     <StatCard title="Movement" hint="HB · iVB (in)">
-      <div className="flex justify-center">
+      <div className="w-full">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           width="100%"
-          style={{ maxWidth: SIZE, aspectRatio: "1 / 1" }}
+          style={{ aspectRatio: "1 / 1" }}
           className="block"
         >
           {/* Background */}
