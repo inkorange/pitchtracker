@@ -41,13 +41,17 @@ export function MatchupsCollapse({
     getIsMobileSnapshot,
     getIsMobileServerSnapshot,
   );
-  // First-render comparator — sets the closed-by-default state once
-  // on mount when the viewport is mobile. The flag prevents the
-  // user's manual toggle from being overwritten on subsequent
-  // resizes.
-  const [appliedMobileDefault, setAppliedMobileDefault] = useState(false);
-  if (!appliedMobileDefault) {
-    setAppliedMobileDefault(true);
+  // Whenever the viewport flips into mobile (from null→true on first
+  // hydration into a phone, or false→true on a window resize),
+  // collapse the matchups list. Tracking the previous value via the
+  // useState comparator pattern means we don't auto-close on every
+  // render, only on transitions — so the user's manual expand stays
+  // sticky once they've toggled. Initial null marker ensures the
+  // very first paint applies the rule even if isMobile is already
+  // true (no SSR / direct CSR navigation case).
+  const [prevIsMobile, setPrevIsMobile] = useState<boolean | null>(null);
+  if (prevIsMobile !== isMobile) {
+    setPrevIsMobile(isMobile);
     if (isMobile) setOpen(false);
   }
   return (
