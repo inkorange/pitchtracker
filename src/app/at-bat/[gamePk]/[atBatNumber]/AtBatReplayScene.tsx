@@ -258,6 +258,25 @@ export function AtBatReplayScene({
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
     null,
   );
+
+  // Reset playback to the first pitch whenever `pitches` flips
+  // identity (the user jumped to a different at-bat from the
+  // matchup selector and the [gamePk]/layout shell re-fetched the
+  // new AB's data). prevPrepared comparator pattern is React's
+  // documented idiom for prop-derived resets and sidesteps the
+  // React Compiler's setState-in-effect warning.
+  const [prevPrepared, setPrevPrepared] = useState(prepared);
+  if (prevPrepared !== prepared) {
+    setPrevPrepared(prepared);
+    setCurrentIdx(0);
+    setIntraProgress(0);
+    setPhase("flying");
+    setPlaying(true);
+    setSelectedDetailIdx(null);
+    // eslint-disable-next-line
+    settledTimerRef.current = 0;
+  }
+
   const detailIdx = selectedDetailIdx ?? currentIdx;
   const detailPitch = prepared[detailIdx];
   // Only surface the metrics overlay once the pitch has actually
@@ -352,7 +371,7 @@ export function AtBatReplayScene({
       <button
         type="button"
         onClick={() => setFollowMode((f) => !f)}
-        className={`absolute bottom-20 right-3 sm:right-6 z-20 px-3 py-1.5 rounded text-[10px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors pointer-events-auto ${
+        className={`absolute bottom-44 right-3 sm:bottom-20 sm:right-6 z-20 px-3 py-1.5 rounded text-[10px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors pointer-events-auto ${
           followMode
             ? "bg-white/15 border-white/25 text-white"
             : "bg-black/35 border-white/15 text-white/65 hover:text-white hover:bg-[#081a32]/80"
@@ -738,7 +757,7 @@ function PitchStepper({
     // sits with a 0.5rem breathing gap. Keeps the rest of the
     // screen free for the 3D scene.
     // sm+: revert to the canonical bottom-center transport bar.
-    <div className="absolute top-[15.5rem] sm:top-auto sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute bottom-20 left-3 right-3 sm:bottom-6 sm:left-1/2 sm:right-auto z-20 sm:-translate-x-1/2 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"
