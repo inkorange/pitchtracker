@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchPerson, fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, personHeadshotUrl } from "@/lib/viz/headshot";
 import { TopNav } from "@/components/chrome/TopNav";
+import { MobileCollapse } from "@/components/chrome/MobileCollapse";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { eventPillColor } from "@/lib/viz/colors";
 import type { ReplayPitch } from "./AtBatReplayScene";
@@ -205,12 +206,11 @@ export default async function AtBatPage({ params }: PageProps) {
         title="At-bat replay"
       />
 
-      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-7rem)] overflow-hidden flex flex-col">
-        {/* Top section pinned via flex-shrink-0 so the game header,
-            pitcher / batter row, prev/next, and HUD never scroll out
-            of view. The matchups list below absorbs flex-1 and
-            scrolls internally. */}
-        <div className="flex-shrink-0 space-y-2 sm:space-y-4">
+      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-17rem)] overflow-y-auto">
+        <MobileCollapse
+          ariaLabel="Toggle at-bat details"
+          header={
+            <>
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/75">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
@@ -346,6 +346,10 @@ export default async function AtBatPage({ params }: PageProps) {
             ) : null}
           </div>
         </div>
+            </>
+          }
+          body={
+            <>
 
         {/* Prev/next at-bat navigation within the game — visible on both
             mobile and desktop so users can step through ABs without
@@ -410,7 +414,6 @@ export default async function AtBatPage({ params }: PageProps) {
             />
           </div>
         </div>
-        </div>
 
         {/* Pitcher's full matchup list for this game — quick selector
             so the user doesn't have to bounce back to the game page
@@ -440,9 +443,9 @@ export default async function AtBatPage({ params }: PageProps) {
                       href={`/at-bat/${gamePkN}/${ab.at_bat_number}`}
                       aria-current={isCurrent ? "true" : undefined}
                       className={
-                        "flex items-center gap-2 px-2 py-1.5 rounded-md border transition-colors " +
+                        "flex items-center gap-2 px-2 py-1.5 rounded-md border-2 transition-colors " +
                         (isCurrent
-                          ? "bg-white/[0.14] border-white/30 text-white pointer-events-none"
+                          ? "bg-emerald-500/10 border-emerald-400/70 text-white pointer-events-none"
                           : "bg-white/[0.04] hover:bg-white/[0.1] border-white/10 text-white/85")
                       }
                     >
@@ -503,7 +506,9 @@ export default async function AtBatPage({ params }: PageProps) {
             </ul>
           </div>
         ) : null}
-
+            </>
+          }
+        />
       </section>
 
       <AtBatOutcomeLegend />
