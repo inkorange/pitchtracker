@@ -205,7 +205,12 @@ export default async function AtBatPage({ params }: PageProps) {
         title="At-bat replay"
       />
 
-      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto h-[11rem] sm:h-auto sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-7rem)] overflow-hidden flex flex-col">
+        {/* Top section pinned via flex-shrink-0 so the game header,
+            pitcher / batter row, prev/next, and HUD never scroll out
+            of view. The matchups list below absorbs flex-1 and
+            scrolls internally. */}
+        <div className="flex-shrink-0 space-y-2 sm:space-y-4">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/75">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
@@ -405,13 +410,16 @@ export default async function AtBatPage({ params }: PageProps) {
             />
           </div>
         </div>
+        </div>
 
         {/* Pitcher's full matchup list for this game — quick selector
             so the user doesn't have to bounce back to the game page
             to switch ABs. Current AB is highlighted; clicking any
-            other row navigates straight to that AB's replay. */}
+            other row navigates straight to that AB's replay.
+            flex-1 + min-h-0 + overflow-y-auto so this is the only
+            scrollable block — the top of the panel stays visible. */}
         {pitcherAbs.length > 1 ? (
-          <div className="pt-3 border-t border-white/[0.05] space-y-2">
+          <div className="flex-1 min-h-0 overflow-y-auto mt-2 sm:mt-4 pt-3 border-t border-white/[0.05] space-y-2">
             <div className="flex items-baseline justify-between">
               <h3 className="text-[10px] uppercase tracking-[0.14em] text-white/55">
                 Matchups this game
