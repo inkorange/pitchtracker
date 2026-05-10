@@ -206,7 +206,10 @@ export default async function AtBatPage({ params }: PageProps) {
         title="At-bat replay"
       />
 
-      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-17rem)] overflow-y-auto">
+      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-17rem)] overflow-hidden flex flex-col">
+        {/* Top portion stays pinned via flex-shrink-0 — only the
+            matchups list below absorbs flex-1 and scrolls. */}
+        <div className="flex-shrink-0 space-y-2 sm:space-y-4">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/75">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
@@ -406,14 +409,17 @@ export default async function AtBatPage({ params }: PageProps) {
             />
           </div>
         </div>
+        </div>
 
         {/* Pitcher's full matchup list for this game — quick selector
             so the user doesn't have to bounce back to the game page
             to switch ABs. Current AB is highlighted; clicking any
-            other row navigates straight to that AB's replay. Wrapped
-            in MatchupsCollapse so the user can fold the list away
-            on either viewport without losing the top of the panel. */}
+            other row navigates straight to that AB's replay. The
+            wrapper picks up flex-1 from the section so MatchupsCollapse
+            can size to the remaining height and scroll its list
+            independently. */}
         {pitcherAbs.length > 1 ? (
+          <div className="flex-1 min-h-0 flex flex-col mt-2 sm:mt-4">
           <MatchupsCollapse count={pitcherAbs.length}>
             <ul className="space-y-1">
               {pitcherAbs.map((ab) => {
@@ -489,6 +495,7 @@ export default async function AtBatPage({ params }: PageProps) {
               })}
             </ul>
           </MatchupsCollapse>
+          </div>
         ) : null}
       </section>
 

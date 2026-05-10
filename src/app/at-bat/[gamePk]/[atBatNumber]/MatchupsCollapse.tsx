@@ -51,12 +51,12 @@ export function MatchupsCollapse({
     if (isMobile) setOpen(false);
   }
   return (
-    <div className="pt-3 border-t border-white/[0.05] space-y-2">
+    <div className="pt-3 border-t border-white/[0.05] flex-1 min-h-0 flex flex-col">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="w-full flex items-baseline justify-between gap-2 text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white transition-colors"
+        className="flex-shrink-0 w-full flex items-baseline justify-between gap-2 text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white transition-colors cursor-pointer"
       >
         <span>Matchups this game</span>
         <span className="flex items-center gap-1.5 tabular-nums text-white/35">
@@ -78,10 +78,10 @@ export function MatchupsCollapse({
         </span>
       </button>
       <div
-        className="grid transition-[grid-template-rows] duration-[250ms] ease-out"
+        className="grid flex-1 min-h-0 mt-2 transition-[grid-template-rows] duration-[250ms] ease-out"
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >
-        <div className="overflow-hidden min-h-0">{children}</div>
+        <div className="overflow-y-auto min-h-0">{children}</div>
       </div>
     </div>
   );

@@ -21,7 +21,7 @@ const ITEMS: OutcomeCategory[] = ["whiff", "called", "ball", "foul", "inplay"];
 // view's inline at-bat playback overrides it (its mobile playback bar
 // already lives at bottom-20).
 export function AtBatOutcomeLegend({
-  className = "absolute bottom-20 sm:bottom-6 left-3 sm:left-6 z-20 flex flex-col items-start gap-2 pointer-events-auto",
+  className = "absolute bottom-44 sm:bottom-6 left-3 sm:left-6 z-20 flex flex-col items-start gap-2 pointer-events-auto",
 }: {
   className?: string;
 } = {}) {
