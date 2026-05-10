@@ -40,57 +40,6 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
   const teams = (teamsRaw ?? []) as TeamRow[];
   const teamById = new Map(teams.map((t) => [t.mlb_id, t]));
 
-  // Two modes for the games list below:
-  //   - sp.date set (date-only search): every regular-season game on
-  //     that date, sourced from the schedule table. Clicking into an
-  //     uncached game is safe — the destination /at-bat/[gamePk] page
-  //     calls ensureGameCache() to lazy-fetch from Savant on first
-  //     visit, so we no longer have to filter to pre-cached games.
-  //   - default: most-recently-cached games derived from
-  //     pitch_pitcher_games.
-  let games: GameRow[] = [];
-  if (sp.date) {
-    const { data: rows } = await supabase
-      .from("pitch_games")
-      .select("game_pk, game_date, home_team_id, away_team_id, season")
-      .eq("game_date", sp.date)
-      .eq("game_type", "R")
-      .order("game_pk", { ascending: true });
-    games = (rows ?? []) as GameRow[];
-  } else {
-    const { data: ppgRows } = await supabase
-      .from("pitch_pitcher_games")
-      .select("game_pk, fetched_at")
-      .order("fetched_at", { ascending: false })
-      .limit(500);
-
-    const seenGamePks = new Set<number>();
-    const orderedGamePks: number[] = [];
-    for (const row of ppgRows ?? []) {
-      if (seenGamePks.has(row.game_pk)) continue;
-      seenGamePks.add(row.game_pk);
-      orderedGamePks.push(row.game_pk);
-      if (orderedGamePks.length >= 30) break;
-    }
-
-    const { data: gamesRaw } =
-      orderedGamePks.length > 0
-        ? await supabase
-            .from("pitch_games")
-            .select("game_pk, game_date, home_team_id, away_team_id, season")
-            .in("game_pk", orderedGamePks)
-            .eq("game_type", "R")
-        : { data: [] };
-
-    const gameByPk = new Map<number, GameRow>();
-    for (const g of (gamesRaw ?? []) as GameRow[]) gameByPk.set(g.game_pk, g);
-
-    games = orderedGamePks
-      .map((pk) => gameByPk.get(pk))
-      .filter((g): g is GameRow => g !== undefined)
-      .sort((a, b) => b.game_date.localeCompare(a.game_date));
-  }
-
   // Default the date input to yesterday in America/New_York — the
   // canonical "baseball day" boundary regardless of where the user is.
   // en-CA locale outputs YYYY-MM-DD which is what <input type="date">
@@ -99,6 +48,19 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
     "en-CA",
     { timeZone: "America/New_York" },
   );
+
+  // Date-scoped games list: defaults to yesterday's slate when the
+  // user hasn't searched yet. The destination /at-bat/[gamePk] page
+  // lazy-fetches from Savant on first visit so we don't need to
+  // pre-filter to cached games.
+  const queryDate = sp.date ?? yesterdayIso;
+  const { data: gamesRaw } = await supabase
+    .from("pitch_games")
+    .select("game_pk, game_date, home_team_id, away_team_id, season")
+    .eq("game_date", queryDate)
+    .eq("game_type", "R")
+    .order("game_pk", { ascending: true });
+  const games = (gamesRaw ?? []) as GameRow[];
 
   const errorMessage = (() => {
     if (sp.error === "notfound") {
@@ -115,10 +77,10 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
     return null;
   })();
 
-  const listHeading = sp.date ? `Games on ${sp.date}` : "Recent games";
-  const emptyMessage = sp.date
-    ? `No regular-season games scheduled on ${sp.date}.`
-    : "No games available yet. Visit a pitcher's page to load their season data.";
+  const listHeading = sp.date
+    ? `Games on ${sp.date}`
+    : `Yesterday's games (${yesterdayIso})`;
+  const emptyMessage = `No regular-season games scheduled on ${queryDate}.`;
 
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
