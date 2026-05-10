@@ -6,10 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchPerson, fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, personHeadshotUrl } from "@/lib/viz/headshot";
 import { TopNav } from "@/components/chrome/TopNav";
-import { MobileCollapse } from "@/components/chrome/MobileCollapse";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { eventPillColor } from "@/lib/viz/colors";
 import type { ReplayPitch } from "./AtBatReplayScene";
+import { MatchupsCollapse } from "./MatchupsCollapse";
 import { AtBatOutcomeLegend } from "./AtBatOutcomeLegend";
 
 interface PageProps {
@@ -206,11 +206,7 @@ export default async function AtBatPage({ params }: PageProps) {
         title="At-bat replay"
       />
 
-      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-17rem)] overflow-y-auto">
-        <MobileCollapse
-          ariaLabel="Toggle at-bat details"
-          header={
-            <>
+      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 space-y-2 sm:space-y-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-17rem)] overflow-y-auto">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.14em] text-white/75">
           <span>
             {awayTeam?.abbreviation ?? "?"} @ {homeTeam?.abbreviation ?? "?"}
@@ -346,10 +342,6 @@ export default async function AtBatPage({ params }: PageProps) {
             ) : null}
           </div>
         </div>
-            </>
-          }
-          body={
-            <>
 
         {/* Prev/next at-bat navigation within the game — visible on both
             mobile and desktop so users can step through ABs without
@@ -418,19 +410,11 @@ export default async function AtBatPage({ params }: PageProps) {
         {/* Pitcher's full matchup list for this game — quick selector
             so the user doesn't have to bounce back to the game page
             to switch ABs. Current AB is highlighted; clicking any
-            other row navigates straight to that AB's replay.
-            flex-1 + min-h-0 + overflow-y-auto so this is the only
-            scrollable block — the top of the panel stays visible. */}
+            other row navigates straight to that AB's replay. Wrapped
+            in MatchupsCollapse so the user can fold the list away
+            on either viewport without losing the top of the panel. */}
         {pitcherAbs.length > 1 ? (
-          <div className="flex-1 min-h-0 overflow-y-auto mt-2 sm:mt-4 pt-3 border-t border-white/[0.05] space-y-2">
-            <div className="flex items-baseline justify-between">
-              <h3 className="text-[10px] uppercase tracking-[0.14em] text-white/55">
-                Matchups this game
-              </h3>
-              <span className="text-[10px] tabular-nums text-white/35">
-                {pitcherAbs.length}
-              </span>
-            </div>
+          <MatchupsCollapse count={pitcherAbs.length}>
             <ul className="space-y-1">
               {pitcherAbs.map((ab) => {
                 const isCurrent = ab.at_bat_number === atBatN;
@@ -504,11 +488,8 @@ export default async function AtBatPage({ params }: PageProps) {
                 );
               })}
             </ul>
-          </div>
+          </MatchupsCollapse>
         ) : null}
-            </>
-          }
-        />
       </section>
 
       <AtBatOutcomeLegend />
