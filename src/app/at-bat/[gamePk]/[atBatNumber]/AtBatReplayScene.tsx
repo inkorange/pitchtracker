@@ -258,6 +258,25 @@ export function AtBatReplayScene({
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
     null,
   );
+
+  // Reset playback to the first pitch whenever `pitches` flips
+  // identity (the user jumped to a different at-bat from the
+  // matchup selector and the [gamePk]/layout shell re-fetched the
+  // new AB's data). prevPrepared comparator pattern is React's
+  // documented idiom for prop-derived resets and sidesteps the
+  // React Compiler's setState-in-effect warning.
+  const [prevPrepared, setPrevPrepared] = useState(prepared);
+  if (prevPrepared !== prepared) {
+    setPrevPrepared(prepared);
+    setCurrentIdx(0);
+    setIntraProgress(0);
+    setPhase("flying");
+    setPlaying(true);
+    setSelectedDetailIdx(null);
+    // eslint-disable-next-line
+    settledTimerRef.current = 0;
+  }
+
   const detailIdx = selectedDetailIdx ?? currentIdx;
   const detailPitch = prepared[detailIdx];
   // Only surface the metrics overlay once the pitch has actually

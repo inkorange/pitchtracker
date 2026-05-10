@@ -5,11 +5,10 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPerson, fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, personHeadshotUrl } from "@/lib/viz/headshot";
-import type { CameraPreset } from "@/lib/viz/camera-presets";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { eventPillColor } from "@/lib/viz/colors";
-import { AtBatReplayScene, type ReplayPitch } from "./AtBatReplayScene";
+import type { ReplayPitch } from "./AtBatReplayScene";
 import { AtBatOutcomeLegend } from "./AtBatOutcomeLegend";
 
 interface PageProps {
@@ -34,9 +33,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function AtBatPage({ params, searchParams }: PageProps) {
+export default async function AtBatPage({ params }: PageProps) {
   const { gamePk, atBatNumber } = await params;
-  const sp = await searchParams;
 
   const gamePkN = Number(gamePk);
   const atBatN = Number(atBatNumber);
@@ -195,36 +193,13 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
       .pop() ?? null;
 
   // Default to the hitter's-eye view — the strike zone sits centrally
-  // in the frame on every aspect ratio, including mobile portrait
-  // where the side preset's narrow horizontal FOV clipped the plate.
-  // Users can still switch to side / back / top via the CameraPad.
-  const initialCamera: CameraPreset =
-    sp.camera === "front" ||
-    sp.camera === "back" ||
-    sp.camera === "top" ||
-    sp.camera === "side"
-      ? sp.camera
-      : "front";
-  // ?pitch=N highlights a specific pitch (used by the OG image link
-  // and the daily-features deep link), but it should NOT skip the
-  // playback past the preceding pitches — playback starts at pitch 1
-  // and animates through. The highlight is a separate concern handled
-  // by selectedDetailIdx in the scene component.
-  const initialHighlightPitch = (() => {
-    const n = Number(sp.pitch);
-    if (!Number.isFinite(n)) return null;
-    const idx = pitches.findIndex((p) => p.pitch_number === n);
-    return idx === -1 ? null : idx;
-  })();
+  // The 3D scene + the camera-preset / pitch-highlight URL params
+  // are owned by AtBatSceneShell (in /at-bat/[gamePk]/layout.tsx)
+  // now, so the page is panel + chrome only and the WebGL Canvas
+  // stays mounted across [atBatNumber] route changes.
 
   return (
-    <main className="fixed inset-0 bg-[#0a0e14] overflow-hidden">
-      <AtBatReplayScene
-        pitches={pitches}
-        initialCamera={initialCamera}
-        initialHighlightIdx={initialHighlightPitch}
-      />
-
+    <>
       <TopNav
         back={{ href: `/at-bat/${gamePkN}`, label: "Game" }}
         title="At-bat replay"
@@ -524,7 +499,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
       </section>
 
       <AtBatOutcomeLegend />
-    </main>
+    </>
   );
 }
 
@@ -598,22 +573,24 @@ function NotCachedState({
   game: GameRow | null;
 }) {
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+    <>
       <TopNav back={{ href: "/", label: "Home" }} title="At-bat replay" />
-      <div className="max-w-2xl mx-auto space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          At-bat not available
-        </h1>
-        <p className="text-sm text-white/55">
-          We don&apos;t have pitch data for at-bat #{atBatNumber} of game{" "}
-          {gamePk}
-          {game?.game_date ? ` (${game.game_date})` : ""} yet.
-        </p>
-        <p className="text-sm text-white/55">
-          Visit a pitcher&apos;s profile to load that season&apos;s pitches,
-          or come back once the at-bat lands in the daily notable feed.
-        </p>
+      <div className="absolute inset-0 flex items-center justify-center px-6 pointer-events-auto">
+        <div className="max-w-2xl space-y-6 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            At-bat not available
+          </h1>
+          <p className="text-sm text-white/55">
+            We don&apos;t have pitch data for at-bat #{atBatNumber} of game{" "}
+            {gamePk}
+            {game?.game_date ? ` (${game.game_date})` : ""} yet.
+          </p>
+          <p className="text-sm text-white/55">
+            Visit a pitcher&apos;s profile to load that season&apos;s pitches,
+            or come back once the at-bat lands in the daily notable feed.
+          </p>
+        </div>
       </div>
-    </main>
+    </>
   );
 }
