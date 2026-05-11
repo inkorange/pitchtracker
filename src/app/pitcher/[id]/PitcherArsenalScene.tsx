@@ -47,7 +47,6 @@ interface CachedPitch {
   at_bat_number: number;
   pitch_number: number;
   pitch_type: string | null;
-  pitch_name: string | null;
   description: string | null;
   release_pos_x: number | null;
   release_pos_y: number | null;
@@ -147,7 +146,6 @@ export function PitcherArsenalScene({
           pfx_x: p.pfx_x ?? undefined,
           pfx_z: p.pfx_z ?? undefined,
           pitch_type: p.pitch_type ?? "UN",
-          pitch_name: p.pitch_name ?? undefined,
         };
         try {
           const pitch = new Pitch(row);

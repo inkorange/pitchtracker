@@ -52,5 +52,12 @@ export const config: VercelConfig = {
     // 30 MLB teams. Essentially static; daily keeps it self-healing
     // without measurable cost.
     { path: "/api/cron/refresh-teams", schedule: "0 13 * * *" },
+
+    // Evict pitch_game_pitches / pitch_pitcher_games / aggregates
+    // rows for seasons older than (currentYear - PITCH_DATA_KEEP_YEARS).
+    // Runs last in the chain so today's analytics jobs above operate
+    // on the full set before we trim. Lazy re-fetch on demand
+    // handles old-season pageviews via ensurePitcherSeasonCache.
+    { path: "/api/cron/evict-old-seasons", schedule: "30 13 * * *" },
   ],
 };

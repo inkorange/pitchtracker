@@ -24,7 +24,6 @@ const SKUBAL_FASTBALL: StatcastRow = {
   plate_z: 3.18,
   release_speed: 97.2,
   pitch_type: "FF",
-  pitch_name: "4-Seam Fastball",
   pfx_x: -0.81,
   pfx_z: 1.49,
 };
@@ -43,7 +42,6 @@ const COLE_SLIDER: StatcastRow = {
   plate_z: 2.05,
   release_speed: 87.6,
   pitch_type: "SL",
-  pitch_name: "Slider",
   pfx_x: 0.32,
   pfx_z: 0.18,
 };

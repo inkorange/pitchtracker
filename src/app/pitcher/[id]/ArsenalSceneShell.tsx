@@ -11,7 +11,6 @@ interface CachedPitch {
   at_bat_number: number;
   pitch_number: number;
   pitch_type: string | null;
-  pitch_name: string | null;
   description: string | null;
   release_pos_x: number | null;
   release_pos_y: number | null;

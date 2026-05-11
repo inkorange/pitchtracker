@@ -43,7 +43,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       let q = supabase
         .from("pitch_game_pitches")
         .select(
-          "game_pk, at_bat_number, pitch_number, pitch_type, pitch_name, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type)",
+          "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type)",
         )
         .eq("pitcher_id", pitcherId)
         .eq("pitch_games.season", season)

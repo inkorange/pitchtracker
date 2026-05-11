@@ -1,9 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { FeaturedStrip } from "@/components/home/FeaturedStrip";
 import { DailyPickStrip } from "@/components/home/DailyPickStrip";
 import { RankingsStrip } from "@/components/home/RankingsStrip";
+import { StripFallback } from "@/components/home/StripFallback";
 
 export default function Home() {
   return (
@@ -112,11 +114,20 @@ export default function Home() {
           </Link>
         </div>
 
-        <DailyPickStrip />
+        {/* Each strip streams in independently via Suspense — Next.js
+            sends the rest of the page first, then patches each strip
+            in when its Supabase query resolves. */}
+        <Suspense fallback={<StripFallback title="Today" rows={2} />}>
+          <DailyPickStrip />
+        </Suspense>
 
-        <RankingsStrip />
+        <Suspense fallback={<StripFallback title="Leaders" rows={6} grid />}>
+          <RankingsStrip />
+        </Suspense>
 
-        <FeaturedStrip />
+        <Suspense fallback={<StripFallback title="Featured" rows={6} grid />}>
+          <FeaturedStrip />
+        </Suspense>
       </div>
     </main>
   );

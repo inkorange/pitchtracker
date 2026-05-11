@@ -1,7 +1,7 @@
 "use client";
 
 import type { SearchAggregates } from "@/lib/savant/aggregates";
-import { getPitchColor } from "@/lib/viz/colors";
+import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
 
 interface AggregatePanelProps {
   aggregates: SearchAggregates;
@@ -66,7 +66,7 @@ export function AggregatePanel({ aggregates }: AggregatePanelProps) {
                     aria-hidden
                   />
                   <span className="text-sm text-white/95 w-28 truncate">
-                    {pt.pitchName ?? pt.pitchType}
+                    {pt.pitchName ?? getPitchLabel(pt.pitchType)}
                   </span>
                   <span className="text-[11px] text-white/55 tabular-nums w-16">
                     {fmtInt(pt.count)}

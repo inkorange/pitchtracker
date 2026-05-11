@@ -50,7 +50,6 @@ export async function GET(request: Request) {
         pitcher_id: knownPitcherIds.has(p.pitcher) ? p.pitcher : null,
         batter_id: p.batter,
         pitch_type: p.pitch_type ?? null,
-        pitch_name: p.pitch_name ?? null,
         description: p.description ?? null,
         events: p.events ?? null,
         balls: p.balls,
@@ -59,7 +58,6 @@ export async function GET(request: Request) {
         inning: p.inning,
         inning_topbot: p.inning_topbot,
         stand: (p as unknown as { stand?: string }).stand ?? null,
-        p_throws: (p as unknown as { p_throws?: string }).p_throws ?? null,
         on_1b: p.on_1b,
         on_2b: p.on_2b,
         on_3b: p.on_3b,
@@ -79,10 +77,8 @@ export async function GET(request: Request) {
         spin_axis: p.spin_axis ?? null,
         pfx_x: p.pfx_x ?? null,
         pfx_z: p.pfx_z ?? null,
-        effective_speed: p.effective_speed,
         release_extension: p.release_extension,
         delta_run_exp: p.delta_run_exp,
-        delta_home_win_exp: p.delta_home_win_exp,
       }));
       const { error: upsertErr } = await supabase
         .from("pitch_game_pitches")

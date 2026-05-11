@@ -35,11 +35,14 @@ export function AtBatSceneShell() {
     : "front";
 
   const [pitches, setPitches] = useState<ReplayPitch[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!gamePk || !atBatNumber) return;
     let cancelled = false;
     const ctrl = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
     fetch(`/api/at-bat/${gamePk}/${atBatNumber}/pitches`, {
       signal: ctrl.signal,
     })
@@ -52,6 +55,10 @@ export function AtBatSceneShell() {
       .catch(() => {
         if (cancelled) return;
         setPitches([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -71,7 +78,25 @@ export function AtBatSceneShell() {
   })();
 
   if (!gamePk || !atBatNumber) return null;
-  if (pitches.length === 0) return null;
+
+  if (pitches.length === 0) {
+    // Visible feedback while the client-side fetch is in flight, and
+    // a graceful "no data" landing if the AB simply has no cached
+    // pitches yet. Sits centered in the layout's fixed-inset main.
+    return (
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="flex items-center gap-3 px-4 py-2 rounded-md bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg pointer-events-auto">
+          <span
+            className="inline-block w-2 h-2 rounded-full bg-white/60 animate-pulse"
+            aria-hidden
+          />
+          <span className="text-[11px] uppercase tracking-[0.16em] text-white/85">
+            {loading ? "Loading at-bat…" : "No pitch data"}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <AtBatReplayScene
