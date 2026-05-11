@@ -28,7 +28,6 @@ export interface StatcastRow {
   pfx_x?: number;
   pfx_z?: number;
   pitch_type: string;
-  pitch_name?: string;
   description?: string;
   events?: string;
 }

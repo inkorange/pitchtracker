@@ -456,10 +456,8 @@ export type Database = {
           az: number | null
           balls: number | null
           batter_id: number | null
-          delta_home_win_exp: number | null
           delta_run_exp: number | null
           description: string | null
-          effective_speed: number | null
           events: string | null
           fetched_at: string
           game_pk: number
@@ -469,10 +467,8 @@ export type Database = {
           on_2b: number | null
           on_3b: number | null
           outs_when_up: number | null
-          p_throws: string | null
           pfx_x: number | null
           pfx_z: number | null
-          pitch_name: string | null
           pitch_number: number
           pitch_type: string | null
           pitcher_id: number | null
@@ -498,10 +494,8 @@ export type Database = {
           az?: number | null
           balls?: number | null
           batter_id?: number | null
-          delta_home_win_exp?: number | null
           delta_run_exp?: number | null
           description?: string | null
-          effective_speed?: number | null
           events?: string | null
           fetched_at?: string
           game_pk: number
@@ -511,10 +505,8 @@ export type Database = {
           on_2b?: number | null
           on_3b?: number | null
           outs_when_up?: number | null
-          p_throws?: string | null
           pfx_x?: number | null
           pfx_z?: number | null
-          pitch_name?: string | null
           pitch_number: number
           pitch_type?: string | null
           pitcher_id?: number | null
@@ -540,10 +532,8 @@ export type Database = {
           az?: number | null
           balls?: number | null
           batter_id?: number | null
-          delta_home_win_exp?: number | null
           delta_run_exp?: number | null
           description?: string | null
-          effective_speed?: number | null
           events?: string | null
           fetched_at?: string
           game_pk?: number
@@ -553,10 +543,8 @@ export type Database = {
           on_2b?: number | null
           on_3b?: number | null
           outs_when_up?: number | null
-          p_throws?: string | null
           pfx_x?: number | null
           pfx_z?: number | null
-          pitch_name?: string | null
           pitch_number?: number
           pitch_type?: string | null
           pitcher_id?: number | null
@@ -1027,6 +1015,14 @@ export type Database = {
       pitch_recompute_rankings: {
         Args: { p_season: number }
         Returns: undefined
+      }
+      pitch_evict_old_seasons: {
+        Args: { p_keep_through: number }
+        Returns: {
+          pitches_deleted: number
+          pitcher_games_deleted: number
+          aggregates_deleted: number
+        }[]
       }
       reorder_view: {
         Args: { p_new_order: number; p_view_id: string }

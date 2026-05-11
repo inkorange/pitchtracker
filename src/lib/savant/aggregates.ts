@@ -126,10 +126,9 @@ export function computeAggregates(rows: SavantPitchRow[]): SearchAggregates {
     }
 
     const pt = r.pitch_type ?? "UN";
-    const bucket = byType.get(pt) ?? { count: 0, vel: [], name: r.pitch_name ?? null };
+    const bucket = byType.get(pt) ?? { count: 0, vel: [], name: null };
     bucket.count++;
     if (typeof r.release_speed === "number") bucket.vel.push(r.release_speed);
-    if (!bucket.name && r.pitch_name) bucket.name = r.pitch_name;
     byType.set(pt, bucket);
   }
 

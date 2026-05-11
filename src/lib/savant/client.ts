@@ -29,9 +29,7 @@ export interface SavantPitchRow extends StatcastRow {
   on_2b: number | null;
   on_3b: number | null;
   release_extension: number | null;
-  effective_speed: number | null;
   delta_run_exp: number | null;
-  delta_home_win_exp: number | null;
   home_team: string | null;
   away_team: string | null;
 }
@@ -66,9 +64,7 @@ const NUMERIC_FIELDS = [
   "on_2b",
   "on_3b",
   "release_extension",
-  "effective_speed",
   "delta_run_exp",
-  "delta_home_win_exp",
 ] as const;
 
 function parseNum(v: string): number | null {

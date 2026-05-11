@@ -26,7 +26,6 @@ export interface ReplayPitch {
   pitcher_id: number | null;
   batter_id: number | null;
   pitch_type: string | null;
-  pitch_name: string | null;
   description: string | null;
   events: string | null;
   balls: number | null;
@@ -35,7 +34,6 @@ export interface ReplayPitch {
   inning: number | null;
   inning_topbot: string | null;
   stand: string | null;
-  p_throws: string | null;
   on_1b: number | null;
   on_2b: number | null;
   on_3b: number | null;

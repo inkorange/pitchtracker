@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const { data, error } = await supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, at_bat_number, pitch_number, pitcher_id, batter_id, pitch_type, pitch_name, description, events, balls, strikes, outs_when_up, inning, inning_topbot, stand, p_throws, on_1b, on_2b, on_3b, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
+      "game_pk, at_bat_number, pitch_number, pitcher_id, batter_id, pitch_type, description, events, balls, strikes, outs_when_up, inning, inning_topbot, stand, on_1b, on_2b, on_3b, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
     )
     .eq("game_pk", gamePkN)
     .eq("at_bat_number", atBatN)

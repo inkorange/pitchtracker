@@ -385,7 +385,6 @@ const CSV_COLUMNS: Array<{
   { key: "pitcher", label: "pitcher_id" },
   { key: "batter", label: "batter_id" },
   { key: "pitch_type", label: "pitch_type" },
-  { key: "pitch_name", label: "pitch_name" },
   { key: "description", label: "description" },
   { key: "events", label: "events" },
   { key: "balls", label: "balls" },
