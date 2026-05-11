@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -34,6 +35,60 @@ interface PageProps {
     game?: string;
     outcome?: string;
   }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const pitcherId = Number(id);
+  if (!Number.isFinite(pitcherId)) {
+    return { title: "Pitcher" };
+  }
+  const supabase = await createClient();
+  const { data: pitcher } = await supabase
+    .from("pitch_pitchers")
+    .select("full_name, throws, current_team_id, debut_year")
+    .eq("mlb_id", pitcherId)
+    .maybeSingle();
+  if (!pitcher) {
+    return { title: "Pitcher" };
+  }
+  let teamName: string | null = null;
+  if (pitcher.current_team_id) {
+    const { data: team } = await supabase
+      .from("pitch_teams")
+      .select("name")
+      .eq("mlb_id", pitcher.current_team_id)
+      .maybeSingle();
+    teamName = team?.name ?? null;
+  }
+  const throwsLabel = pitcher.throws === "L" ? "left-handed" : pitcher.throws === "R" ? "right-handed" : null;
+  const descParts: string[] = [];
+  if (throwsLabel) descParts.push(throwsLabel);
+  if (teamName) descParts.push(teamName);
+  if (pitcher.debut_year) descParts.push(`MLB debut ${pitcher.debut_year}`);
+  const description = descParts.length
+    ? `${pitcher.full_name} — ${descParts.join(", ")}. Pitch-by-pitch 3D arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.`
+    : `${pitcher.full_name}'s pitch arsenal rendered in 3D — movement, velocity, and at-bat replay on pitchtracker.`;
+  const headshotUrl = pitcherHeadshotUrl(pitcherId, 360);
+  const canonical = `/pitcher/${pitcherId}`;
+  return {
+    title: pitcher.full_name,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "profile",
+      url: canonical,
+      title: `${pitcher.full_name} · pitchtracker`,
+      description,
+      images: [{ url: headshotUrl, alt: pitcher.full_name }],
+    },
+    twitter: {
+      card: "summary",
+      title: `${pitcher.full_name} · pitchtracker`,
+      description,
+      images: [headshotUrl],
+    },
+  };
 }
 
 export default async function PitcherPage({ params, searchParams }: PageProps) {
@@ -226,12 +281,28 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         .then((r) => r.data)
     : null;
 
+  // Schema.org Person markup — helps Google generate richer SERP
+  // entries (sidebar card with image, "Plays for: <team>", etc.).
+  const personJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: pitcher.full_name,
+    jobTitle: "Baseball Pitcher",
+    image: pitcherHeadshotUrl(pitcher.mlb_id, 480),
+    affiliation: team ? { "@type": "SportsTeam", name: team.name } : undefined,
+    sameAs: [`https://www.mlb.com/player/${pitcher.mlb_id}`],
+  };
+
   return (
     <>
       {/* Scene + <main> wrapper live in /pitcher/layout.tsx so the
           3D canvas stays mounted across pitcher swaps. This page
           owns only the panels + chrome that should rebuild on
           pitcher change. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+      />
       <PitcherOutcomeLegendGate>
         <OutcomeLegend />
       </PitcherOutcomeLegendGate>
