@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -8,6 +9,41 @@ import { TopNav } from "@/components/chrome/TopNav";
 interface PageProps {
   params: Promise<{ teamId: string }>;
   searchParams: Promise<{ season?: string }>;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { teamId: teamIdParam } = await params;
+  const teamId = Number(teamIdParam);
+  if (!Number.isFinite(teamId)) return { title: "Team" };
+  const supabase = await createClient();
+  const { data: team } = await supabase
+    .from("pitch_teams")
+    .select("name, abbreviation")
+    .eq("mlb_id", teamId)
+    .maybeSingle();
+  if (!team) return { title: "Team" };
+  const canonical = `/browse/${teamId}`;
+  const title = `${team.name} pitchers`;
+  const description = `Every active pitcher on the ${team.name}. Browse rosters, compare arsenals, and watch pitch-by-pitch 3D at-bat replays on pitchtracker.`;
+  const ogImage = teamLogoUrl(teamId);
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      url: canonical,
+      title: `${title} · pitchtracker`,
+      description,
+      images: [{ url: ogImage, alt: team.name }],
+    },
+    twitter: {
+      card: "summary",
+      title: `${title} · pitchtracker`,
+      description,
+      images: [ogImage],
+    },
+  };
 }
 
 export default async function TeamRosterPage({ params, searchParams }: PageProps) {
