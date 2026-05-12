@@ -39,8 +39,13 @@ export async function GET(request: Request) {
   }
   const rows = Array.from(byPk.values()).map((g) => ({
     game_pk: g.gamePk,
-    game_date: g.gameDate.slice(0, 10),
-    season: Number(g.gameDate.slice(0, 4)),
+    // Use officialDate (MLB's canonical baseball-day field) so games
+    // starting late in West / Central time zones — which roll past
+    // midnight UTC — get filed under the correct calendar day. The
+    // gameDate field is the first-pitch UTC timestamp and was
+    // silently bucketing those games into the following day.
+    game_date: (g.officialDate ?? g.gameDate.slice(0, 10)),
+    season: Number((g.officialDate ?? g.gameDate).slice(0, 4)),
     home_team_id: g.teams.home.team.id,
     away_team_id: g.teams.away.team.id,
     status: g.status.detailedState ?? g.status.abstractGameState ?? "Unknown",
