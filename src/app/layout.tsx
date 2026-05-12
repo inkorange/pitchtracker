@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { SiteFooter } from "@/components/chrome/SiteFooter";
 import "./globals.css";
+
+const GA_MEASUREMENT_ID =
+  process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-LWQ9HE34Y6";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -77,6 +81,7 @@ export default function RootLayout({
           {children}
           <SiteFooter />
         </NuqsAdapter>
+        <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
       </body>
     </html>
   );
