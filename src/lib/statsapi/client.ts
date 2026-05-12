@@ -24,7 +24,14 @@ export interface MlbPlayer {
 
 export interface MlbScheduleGame {
   gamePk: number;
+  // First-pitch UTC timestamp. Note: late-evening games in the
+  // West / Central time zones can roll past midnight UTC, so the
+  // date portion of this is NOT the canonical baseball day —
+  // prefer `officialDate` for that.
   gameDate: string;
+  // YYYY-MM-DD string in MLB's own canonical baseball-day timezone.
+  // This is the field every baseball-day-based UI/query should use.
+  officialDate?: string;
   // Single-letter code: R, S, E, F, D, L, W, A. Used to filter out
   // spring training / exhibition games at the schedule layer.
   gameType?: string;
