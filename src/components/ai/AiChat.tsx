@@ -22,16 +22,28 @@ interface AiResponse {
 
 // SpeechRecognition typings are nonstandard across browsers and aren't in
 // the default lib.dom; lightweight any-typing here keeps it portable.
+interface SpeechRecognitionResultLike {
+  isFinal: boolean;
+  0: { transcript: string };
+}
+interface SpeechRecognitionEventLike {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike> & { length: number };
+}
 type SpeechRecognitionLike = {
   start: () => void;
   stop: () => void;
-  onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult: ((ev: SpeechRecognitionEventLike) => void) | null;
   onerror: ((ev: unknown) => void) | null;
   onend: (() => void) | null;
   continuous: boolean;
   interimResults: boolean;
   lang: string;
 };
+
+// How long the recognizer waits with no new speech before auto-stopping
+// and submitting whatever was transcribed so far.
+const VOICE_SILENCE_MS = 2000;
 
 function getSpeechRecognitionCtor():
   | (new () => SpeechRecognitionLike)
@@ -56,6 +68,14 @@ export function AiChat() {
   const searchParams = useSearchParams();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Auto-submit only when the silence timer ended recording, not when
+  // the user manually clicked mic-off (they may be planning to edit
+  // the transcript before sending).
+  const autoSubmitOnEndRef = useRef(false);
+  // Stable refs so the speech callbacks don't capture stale state.
+  const inputRef = useRef("");
+  const sendRef = useRef<(text: string) => void>(() => {});
 
   const speechSupported = useMemo(() => getSpeechRecognitionCtor() !== null, []);
 
@@ -68,6 +88,12 @@ export function AiChat() {
     if (!open) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, open, pending]);
+
+  // Keep input ref in sync so the SpeechRecognition callbacks can read
+  // the latest typed/transcribed value without stale-closure bugs.
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
 
   const send = useCallback(
     async (text: string) => {
@@ -113,27 +139,91 @@ export function AiChat() {
     [currentUrl, messages, pending, router],
   );
 
+  // Mirror the latest send into a ref so voice-recognition callbacks
+  // (configured once per session) can invoke the current closure.
+  useEffect(() => {
+    sendRef.current = (text: string) => {
+      void send(text);
+    };
+  }, [send]);
+
   const toggleRecording = useCallback(() => {
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) return;
     if (recording) {
+      // Manual stop — don't auto-submit; the user might want to edit
+      // the transcript before sending.
+      autoSubmitOnEndRef.current = false;
       recognitionRef.current?.stop();
       return;
     }
     const rec = new Ctor();
     rec.lang = "en-US";
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onresult = (ev) => {
-      const transcript = ev.results[0]?.[0]?.transcript ?? "";
-      if (transcript) {
-        setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
-      }
+    // Continuous + interim so we can detect pauses and accumulate text
+    // across multiple utterances within a single session.
+    rec.continuous = true;
+    rec.interimResults = true;
+    // Default to auto-submit when silence ends the session; flipped to
+    // false if the user clicks the mic to stop manually.
+    autoSubmitOnEndRef.current = true;
+
+    const armSilenceTimer = () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        try {
+          rec.stop();
+        } catch {
+          // Already stopped — ignore.
+        }
+      }, VOICE_SILENCE_MS);
     };
-    rec.onerror = () => setRecording(false);
-    rec.onend = () => setRecording(false);
+
+    rec.onresult = (ev) => {
+      // Append only the results that just transitioned to final. Interim
+      // results fire continuously while speaking; we use them to keep
+      // the silence timer alive, not to mutate the input (which would
+      // jitter).
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const res = ev.results[i];
+        if (res?.isFinal) {
+          const transcript = res[0]?.transcript ?? "";
+          if (transcript) {
+            const merged = inputRef.current
+              ? `${inputRef.current} ${transcript}`.trim()
+              : transcript.trim();
+            inputRef.current = merged;
+            setInput(merged);
+          }
+        }
+      }
+      armSilenceTimer();
+    };
+
+    rec.onerror = () => {
+      autoSubmitOnEndRef.current = false;
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      setRecording(false);
+    };
+
+    rec.onend = () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      setRecording(false);
+      if (autoSubmitOnEndRef.current) {
+        const text = inputRef.current.trim();
+        if (text.length > 0) sendRef.current(text);
+      }
+      autoSubmitOnEndRef.current = false;
+    };
+
     recognitionRef.current = rec;
     setRecording(true);
+    armSilenceTimer();
     rec.start();
   }, [recording]);
 
