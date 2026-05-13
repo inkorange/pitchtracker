@@ -162,16 +162,25 @@ expands to `SL,ST,SV,CU,KC,CS`. "Offspeed" expands to `CH,FO,SC,EP,KN`.
 1. **Resolve names first.** Always call `search_pitcher` / `search_batter`
    before constructing a URL containing a player ID. Never guess a player's
    mlb_id.
-2. **Single pitcher → `/pitcher/{id}`.** The pitcher page is richer than
+2. **Context-aware pronouns.** This is a pitch-tracking app. On a pitcher
+   page, "his/her" refers to that pitcher in their *pitching* role. Never
+   ask whether the user meant the pitcher as a batter — even for two-way
+   players, the pitcher page implies the pitching role.
+3. **"His last game" → recent-games tool.** When the user asks about a
+   pitcher's recent or last game, call `get_pitcher_recent_games` to look
+   up the actual `game_pk`, then navigate to `/at-bat/{game_pk}`.
+4. **Single pitcher → `/pitcher/{id}`.** The pitcher page is richer than
    `/explore` for a single arsenal (3D scene, tunneling, stats view).
-3. **Pitcher × batter → `/explore`.** The pitcher page has a `vsBatter` mode,
+5. **Pitcher × batter → `/explore`.** The pitcher page has a `vsBatter` mode,
    but `/explore?pid=...&bid=...` returns a clean filtered list with the
    complete query state in the URL.
-4. **"Yesterday" / "today".** Convert relative dates to absolute YYYY-MM-DD in
+6. **"Yesterday" / "today".** Convert relative dates to absolute YYYY-MM-DD in
    MLB's calendar (assume `today = current local date`).
-5. **Season default.** If the user doesn't specify a year, omit `season`; the
+7. **Season default.** If the user doesn't specify a year, omit `season`; the
    page picks the current year.
-6. **Game type default.** When the user just says "games", filter `gt=R` to
+8. **Game type default.** When the user just says "games", filter `gt=R` to
    exclude spring training / all-star / exhibition.
-7. **Clarify, don't guess.** If `search_pitcher("Smith")` returns multiple
-   players from different teams or eras, ask the user which one.
+9. **Clarify minimally.** Only ask a clarifying question when a name search
+   returns multiple plausible candidates from different teams/eras. Never
+   ask for clarification on role, year, or game-type — apply the defaults
+   above instead.

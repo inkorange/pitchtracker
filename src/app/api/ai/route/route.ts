@@ -131,6 +131,36 @@ export async function POST(request: Request) {
             return { batters: data ?? [] };
           },
         }),
+        get_pitcher_recent_games: tool({
+          description:
+            "Look up a pitcher's most recent games they pitched in. Returns game_pk, date, and opponent team IDs ordered by date desc. Use this to resolve 'his last game' / 'his most recent start' on a pitcher page.",
+          inputSchema: z.object({
+            pitcher_id: z.number().int(),
+            limit: z.number().int().min(1).max(20).default(5),
+          }),
+          execute: async ({ pitcher_id, limit }) => {
+            // Use pitch_pitcher_games to filter for games this pitcher
+            // actually pitched in (vs every game his team played), then
+            // join pitch_games for date + opponent metadata.
+            const { data: mappings, error: mErr } = await supabase
+              .from("pitch_pitcher_games")
+              .select("game_pk")
+              .eq("pitcher_id", pitcher_id);
+            if (mErr) return { games: [], error: mErr.message };
+            const gamePks = (mappings ?? []).map((m) => m.game_pk);
+            if (gamePks.length === 0) return { games: [] };
+            const { data, error } = await supabase
+              .from("pitch_games")
+              .select(
+                "game_pk, game_date, home_team_id, away_team_id, status, venue_name",
+              )
+              .in("game_pk", gamePks)
+              .order("game_date", { ascending: false })
+              .limit(limit);
+            if (error) return { games: [], error: error.message };
+            return { games: data ?? [] };
+          },
+        }),
         navigate: tool({
           description:
             "Send the user to a URL on pitchtracker. Always a relative path starting with /.",
