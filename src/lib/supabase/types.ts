@@ -1043,6 +1043,9 @@ export type Database = {
     }
     Functions: {
       aff_to_date: { Args: { ts: string }; Returns: string }
+      daitch_mokotoff: { Args: { "": string }; Returns: string[] }
+      dmetaphone: { Args: { "": string }; Returns: string }
+      dmetaphone_alt: { Args: { "": string }; Returns: string }
       get_next_view_order: { Args: { p_table_id: string }; Returns: number }
       pitch_evict_old_seasons: {
         Args: { p_keep_through: number }
@@ -1068,10 +1071,36 @@ export type Database = {
         Args: { p_season: number }
         Returns: undefined
       }
+      pitch_search_batters: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          bats: string
+          current_team_id: number
+          debut_year: number
+          full_name: string
+          last_active_year: number
+          match_kind: string
+          mlb_id: number
+        }[]
+      }
+      pitch_search_pitchers: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          current_team_id: number
+          debut_year: number
+          full_name: string
+          last_active_year: number
+          match_kind: string
+          mlb_id: number
+          throws: string
+        }[]
+      }
       reorder_view: {
         Args: { p_new_order: number; p_view_id: string }
         Returns: undefined
       }
+      soundex: { Args: { "": string }; Returns: string }
+      text_soundex: { Args: { "": string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

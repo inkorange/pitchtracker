@@ -30,17 +30,15 @@ export async function GET(request: Request) {
   }
 
   // Text query → name search. Two-character minimum so we don't fan
-  // out a wildcard scan on every keystroke.
+  // out a wildcard scan on every keystroke. Uses the phonetic-aware
+  // RPC so speech-to-text spellings (e.g. "McClain") still resolve.
   if (q.length < 2) {
     return NextResponse.json({ pitchers: [] });
   }
-  const pattern = `%${q}%`;
-  const { data, error } = await supabase
-    .from("pitch_pitchers")
-    .select("mlb_id, full_name, throws, current_team_id, last_active_year, debut_year")
-    .or(`full_name.ilike.${pattern},last_name.ilike.${pattern}`)
-    .order("last_active_year", { ascending: false, nullsFirst: false })
-    .limit(10);
+  const { data, error } = await supabase.rpc("pitch_search_pitchers", {
+    p_query: q,
+    p_limit: 10,
+  });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

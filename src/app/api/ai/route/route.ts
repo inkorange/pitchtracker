@@ -97,44 +97,34 @@ export async function POST(request: Request) {
       tools: {
         search_pitcher: tool({
           description:
-            "Resolve a pitcher's name to one or more candidate mlb_ids. Returns up to 10 matches.",
+            "Resolve a pitcher's name to one or more candidate mlb_ids. Uses phonetic matching so misspellings and speech-to-text errors (e.g. 'McClain' → 'McLean') still resolve. Each result has a `match_kind` of 'exact' or 'phonetic'. Returns up to 10 matches.",
           inputSchema: z.object({
             name: z.string().describe("Full name, last name, or partial name"),
           }),
           execute: async ({ name }) => {
             const trimmed = name.trim();
             if (trimmed.length < 2) return { pitchers: [] };
-            const pattern = `%${trimmed}%`;
-            const { data, error } = await supabase
-              .from("pitch_pitchers")
-              .select(
-                "mlb_id, full_name, throws, current_team_id, last_active_year, debut_year",
-              )
-              .or(`full_name.ilike.${pattern},last_name.ilike.${pattern}`)
-              .order("last_active_year", { ascending: false, nullsFirst: false })
-              .limit(10);
+            const { data, error } = await supabase.rpc("pitch_search_pitchers", {
+              p_query: trimmed,
+              p_limit: 10,
+            });
             if (error) return { pitchers: [], error: error.message };
             return { pitchers: data ?? [] };
           },
         }),
         search_batter: tool({
           description:
-            "Resolve a batter's name to one or more candidate mlb_ids. Returns up to 10 matches.",
+            "Resolve a batter's name to one or more candidate mlb_ids. Uses phonetic matching so misspellings still resolve. Each result has a `match_kind` of 'exact' or 'phonetic'. Returns up to 10 matches.",
           inputSchema: z.object({
             name: z.string().describe("Full name, last name, or partial name"),
           }),
           execute: async ({ name }) => {
             const trimmed = name.trim();
             if (trimmed.length < 2) return { batters: [] };
-            const pattern = `%${trimmed}%`;
-            const { data, error } = await supabase
-              .from("pitch_batters")
-              .select(
-                "mlb_id, full_name, bats, current_team_id, last_active_year, debut_year",
-              )
-              .or(`full_name.ilike.${pattern},last_name.ilike.${pattern}`)
-              .order("last_active_year", { ascending: false, nullsFirst: false })
-              .limit(10);
+            const { data, error } = await supabase.rpc("pitch_search_batters", {
+              p_query: trimmed,
+              p_limit: 10,
+            });
             if (error) return { batters: [], error: error.message };
             return { batters: data ?? [] };
           },

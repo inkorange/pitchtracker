@@ -31,13 +31,10 @@ export async function GET(request: Request) {
   if (q.length < 2) {
     return NextResponse.json({ batters: [] });
   }
-  const pattern = `%${q}%`;
-  const { data, error } = await supabase
-    .from("pitch_batters")
-    .select("mlb_id, full_name, bats, current_team_id, last_active_year, debut_year")
-    .or(`full_name.ilike.${pattern},last_name.ilike.${pattern}`)
-    .order("last_active_year", { ascending: false, nullsFirst: false })
-    .limit(10);
+  const { data, error } = await supabase.rpc("pitch_search_batters", {
+    p_query: q,
+    p_limit: 10,
+  });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
