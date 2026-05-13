@@ -71,13 +71,21 @@ export async function POST(request: Request) {
 
   let navigateUrl: string | null = null;
 
-  // Compose a contextual addition to the system prompt so the model can
-  // do "now add fastballs to this" by combining the current URL state
-  // with the new instruction.
+  // Resolve the "active pitcher" from the URL so the model has a strong
+  // grounding for pronouns like "his last game" without needing to
+  // re-derive it from chat history. /pitcher/{id} parses directly; for
+  // /at-bat/{game_pk}/{atBat} we look up the actual pitcher_id from
+  // pitch_game_pitches because the at-bat URL alone doesn't name them.
   const today = new Date().toISOString().slice(0, 10);
-  const contextLine = body.currentUrl
-    ? `Current page the user is on: ${body.currentUrl}`
-    : "User is not currently on a specific page.";
+  const pageContext = await derivePageContext(body.currentUrl ?? null, supabase);
+  const contextLine = [
+    body.currentUrl
+      ? `Current page the user is on: ${body.currentUrl}`
+      : "User is not currently on a specific page.",
+    pageContext,
+  ]
+    .filter(Boolean)
+    .join("\n");
   const system = `${AI_SYSTEM_PROMPT}\n\nToday's date is ${today}.\n${contextLine}`;
 
   try {
@@ -187,4 +195,81 @@ export async function POST(request: Request) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+// Given the URL the user is currently on, look up the "active pitcher"
+// (if any) and surface their name + mlb_id to the model. This is the
+// strongest anti-clarification signal we can pass — pronouns like "his
+// last game" resolve immediately without needing chat-history inference.
+async function derivePageContext(
+  currentUrl: string | null,
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<string> {
+  if (!currentUrl) return "";
+  const pathname = currentUrl.split("?")[0] ?? currentUrl;
+
+  // /pitcher/{id} — pitcher_id is right there in the URL.
+  const pitcherMatch = pathname.match(/^\/pitcher\/(\d+)/);
+  if (pitcherMatch) {
+    const pitcherId = Number(pitcherMatch[1]);
+    const { data } = await supabase
+      .from("pitch_pitchers")
+      .select("mlb_id, full_name")
+      .eq("mlb_id", pitcherId)
+      .maybeSingle();
+    if (data) {
+      return `Active pitcher in context: ${data.full_name} (mlb_id: ${data.mlb_id}). When the user says "his/her", they mean this pitcher.`;
+    }
+  }
+
+  // /at-bat/{game_pk}/{atBatNumber} — pitcher_id lives on the at-bat's
+  // pitch rows. We just need any pitch in that AB to find them.
+  const atBatMatch = pathname.match(/^\/at-bat\/(\d+)\/(\d+)/);
+  if (atBatMatch) {
+    const gamePk = Number(atBatMatch[1]);
+    const atBatNumber = Number(atBatMatch[2]);
+    const { data: pitch } = await supabase
+      .from("pitch_game_pitches")
+      .select("pitcher_id, batter_id")
+      .eq("game_pk", gamePk)
+      .eq("at_bat_number", atBatNumber)
+      .limit(1)
+      .maybeSingle();
+    if (pitch?.pitcher_id) {
+      const { data: p } = await supabase
+        .from("pitch_pitchers")
+        .select("mlb_id, full_name")
+        .eq("mlb_id", pitch.pitcher_id)
+        .maybeSingle();
+      const { data: b } = pitch.batter_id
+        ? await supabase
+            .from("pitch_batters")
+            .select("mlb_id, full_name")
+            .eq("mlb_id", pitch.batter_id)
+            .maybeSingle()
+        : { data: null };
+      const parts: string[] = [];
+      if (p) {
+        parts.push(
+          `Active pitcher in context: ${p.full_name} (mlb_id: ${p.mlb_id}). When the user says "his/her" without naming someone else, they mean this pitcher.`,
+        );
+      }
+      if (b) {
+        parts.push(
+          `Active batter in this at-bat: ${b.full_name} (mlb_id: ${b.mlb_id}).`,
+        );
+      }
+      parts.push(`Game pk in context: ${gamePk}.`);
+      return parts.join("\n");
+    }
+  }
+
+  // /at-bat/{game_pk} — at-bat list for the game. We don't surface a
+  // single pitcher (the game has multiple), but the game_pk is useful.
+  const gameMatch = pathname.match(/^\/at-bat\/(\d+)$/);
+  if (gameMatch) {
+    return `Game pk in context: ${gameMatch[1]}.`;
+  }
+
+  return "";
 }
