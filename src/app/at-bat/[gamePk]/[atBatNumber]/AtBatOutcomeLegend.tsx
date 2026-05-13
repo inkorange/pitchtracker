@@ -9,19 +9,18 @@ import {
 
 const ITEMS: OutcomeCategory[] = ["whiff", "called", "ball", "foul", "inplay"];
 
-// Outcome legend pinned to the bottom-left of the viewport.
-// Desktop (sm+): always-expanded panel, same look as the rest of the
-// dark glass UI.
-// Mobile: a compact "Outcome Legend ↑" chip sits at the bottom; tap it
-// to expand the panel upwards. Anchoring to bottom-6 lets the panel
-// grow up from the chip without colliding with the CameraPad on the
-// right side of the screen.
+// Outcome legend pinned to the viewport edge.
+// Desktop (sm+): always-expanded panel anchored to bottom-right, sitting
+// above the Follow toggle (which lives at sm:bottom-20). The AI chat
+// icon sits at bottom-left so the legend has to clear that corner.
+// Mobile: a compact "Outcome Legend ↑" chip sits at the bottom-left;
+// tap it to expand the panel upwards.
 //
 // Default `className` works for the at-bat replay page; the pitcher
 // view's inline at-bat playback overrides it (its mobile playback bar
 // already lives at bottom-20).
 export function AtBatOutcomeLegend({
-  className = "absolute bottom-44 sm:bottom-6 left-3 sm:left-6 z-20 flex flex-col items-start gap-2 pointer-events-auto",
+  className = "absolute bottom-44 left-3 sm:bottom-32 sm:left-auto sm:right-6 z-20 flex flex-col items-start sm:items-end gap-2 pointer-events-auto",
 }: {
   className?: string;
 } = {}) {
