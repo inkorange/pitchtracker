@@ -397,6 +397,50 @@ export type Database = {
         }
         Relationships: []
       }
+      pitch_batters: {
+        Row: {
+          bats: string | null
+          current_team_id: number | null
+          debut_year: number | null
+          first_name: string | null
+          full_name: string
+          last_active_year: number | null
+          last_name: string | null
+          mlb_id: number
+          updated_at: string
+        }
+        Insert: {
+          bats?: string | null
+          current_team_id?: number | null
+          debut_year?: number | null
+          first_name?: string | null
+          full_name: string
+          last_active_year?: number | null
+          last_name?: string | null
+          mlb_id: number
+          updated_at?: string
+        }
+        Update: {
+          bats?: string | null
+          current_team_id?: number | null
+          debut_year?: number | null
+          first_name?: string | null
+          full_name?: string
+          last_active_year?: number | null
+          last_name?: string | null
+          mlb_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_batters_current_team_id_fkey"
+            columns: ["current_team_id"]
+            isOneToOne: false
+            referencedRelation: "pitch_teams"
+            referencedColumns: ["mlb_id"]
+          },
+        ]
+      }
       pitch_daily_features: {
         Row: {
           at_bat_number: number
@@ -756,44 +800,6 @@ export type Database = {
           },
         ]
       }
-      pitch_rankings: {
-        Row: {
-          category: string
-          computed_at: string
-          pitcher_id: number
-          pitches_sampled: number
-          rank: number
-          season: number
-          value: number
-        }
-        Insert: {
-          category: string
-          computed_at?: string
-          pitcher_id: number
-          pitches_sampled: number
-          rank: number
-          season: number
-          value: number
-        }
-        Update: {
-          category?: string
-          computed_at?: string
-          pitcher_id?: number
-          pitches_sampled?: number
-          rank?: number
-          season?: number
-          value?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pitch_rankings_pitcher_id_fkey"
-            columns: ["pitcher_id"]
-            isOneToOne: false
-            referencedRelation: "pitch_pitchers"
-            referencedColumns: ["mlb_id"]
-          },
-        ]
-      }
       pitch_pitcher_games: {
         Row: {
           fetched_at: string
@@ -867,6 +873,44 @@ export type Database = {
             columns: ["current_team_id"]
             isOneToOne: false
             referencedRelation: "pitch_teams"
+            referencedColumns: ["mlb_id"]
+          },
+        ]
+      }
+      pitch_rankings: {
+        Row: {
+          category: string
+          computed_at: string
+          pitcher_id: number
+          pitches_sampled: number
+          rank: number
+          season: number
+          value: number
+        }
+        Insert: {
+          category: string
+          computed_at?: string
+          pitcher_id: number
+          pitches_sampled: number
+          rank: number
+          season: number
+          value: number
+        }
+        Update: {
+          category?: string
+          computed_at?: string
+          pitcher_id?: number
+          pitches_sampled?: number
+          rank?: number
+          season?: number
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pitch_rankings_pitcher_id_fkey"
+            columns: ["pitcher_id"]
+            isOneToOne: false
+            referencedRelation: "pitch_pitchers"
             referencedColumns: ["mlb_id"]
           },
         ]
@@ -1000,6 +1044,14 @@ export type Database = {
     Functions: {
       aff_to_date: { Args: { ts: string }; Returns: string }
       get_next_view_order: { Args: { p_table_id: string }; Returns: number }
+      pitch_evict_old_seasons: {
+        Args: { p_keep_through: number }
+        Returns: {
+          aggregates_deleted: number
+          pitcher_games_deleted: number
+          pitches_deleted: number
+        }[]
+      }
       pitch_late_break_in: {
         Args: {
           p_ax: number
@@ -1015,14 +1067,6 @@ export type Database = {
       pitch_recompute_rankings: {
         Args: { p_season: number }
         Returns: undefined
-      }
-      pitch_evict_old_seasons: {
-        Args: { p_keep_through: number }
-        Returns: {
-          pitches_deleted: number
-          pitcher_games_deleted: number
-          aggregates_deleted: number
-        }[]
       }
       reorder_view: {
         Args: { p_new_order: number; p_view_id: string }

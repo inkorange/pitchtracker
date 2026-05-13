@@ -18,12 +18,14 @@
     "@react-three/postprocessing": "^3.0.4",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
+    "ai": "^6.0.180",
     "next": "16.2.4",
     "nuqs": "^2.8.9",
     "papaparse": "^5.5.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "three": "^0.184.0"
+    "three": "^0.184.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

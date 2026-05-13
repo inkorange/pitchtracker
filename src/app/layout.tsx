@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { SiteFooter } from "@/components/chrome/SiteFooter";
+import { AiChat } from "@/components/ai/AiChat";
 import "./globals.css";
 
 const GA_MEASUREMENT_ID =
@@ -80,6 +82,9 @@ export default function RootLayout({
         <NuqsAdapter>
           {children}
           <SiteFooter />
+          <Suspense fallback={null}>
+            <AiChat />
+          </Suspense>
         </NuqsAdapter>
         <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />
       </body>
