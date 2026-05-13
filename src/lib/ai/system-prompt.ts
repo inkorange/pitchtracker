@@ -57,7 +57,8 @@ Params (all optional, comma-separate multi-values):
 - \`pitch\` — pitch codes: FF, SI, FC, FS, FA, SL, ST, SV, CU, KC, CS, CH, FO, SC, EP, KN
 - \`hand\` — L or R (batter handedness)
 - \`game\` — game_pk for a single-game filter
-- \`outcome\` — comma list of: whiff, called, ball, foul, inplay
+- \`outcome\` — per-pitch result, comma list of: whiff, called, ball, foul, inplay
+- \`event\` — at-bat result, comma list of MLB event values: strikeout, walk, single, double, triple, home_run, hit_by_pitch, field_out, etc. Use when the user asks for "pitches that resulted in a strikeout/walk/HR/etc" — shows every pitch in any AB ending in one of these events. (Currently the chip UI only exposes strikeout + walk; URL accepts any MLB event value.)
 - \`tun\` — true (show pitch tunneling envelope)
 - \`view\` — arsenal or stats
 - \`vsBatter\` — batter mlb_id for the matchup panel

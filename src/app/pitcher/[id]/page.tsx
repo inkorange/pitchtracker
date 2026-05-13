@@ -34,6 +34,10 @@ interface PageProps {
     hand?: string;
     game?: string;
     outcome?: string;
+    // Comma-separated MLB at-bat event values (e.g. "strikeout", "walk").
+    // Applied at the at-bat level: filters to all pitches in any AB whose
+    // terminating pitch had `events` in this set.
+    event?: string;
   }>;
 }
 
@@ -140,7 +144,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   let pitchQuery = supabase
     .from("pitch_game_pitches")
     .select(
-      "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id, game_type)",
+      "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id, game_type)",
     )
     .eq("pitcher_id", pitcherId)
     .eq("pitch_games.season", season)
@@ -169,9 +173,33 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       ["whiff", "called", "ball", "foul", "inplay", "other"].includes(s),
     );
   const outcomeSet = new Set(outcomes);
-  const arsenalPitches = (cachedPitches ?? []).filter(
-    (p) => outcomeSet.size === 0 || outcomeSet.has(categorizeDescription(p.description)),
-  );
+  // At-bat-level event filter (e.g. "show me every pitch in a strikeout
+  // at-bat"). The `events` column is non-null only on the terminating
+  // pitch of each AB, so we build a key → final-event map once, then
+  // join every pitch back to its AB's outcome.
+  const atBatEvents = (sp.event ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const atBatEventSet = new Set(atBatEvents);
+  const finalEventByAtBat = new Map<string, string>();
+  if (atBatEventSet.size > 0) {
+    for (const p of cachedPitches ?? []) {
+      if (p.events) {
+        finalEventByAtBat.set(`${p.game_pk}-${p.at_bat_number}`, p.events);
+      }
+    }
+  }
+  const arsenalPitches = (cachedPitches ?? []).filter((p) => {
+    if (outcomeSet.size > 0 && !outcomeSet.has(categorizeDescription(p.description))) {
+      return false;
+    }
+    if (atBatEventSet.size > 0) {
+      const finalEvent = finalEventByAtBat.get(`${p.game_pk}-${p.at_bat_number}`);
+      if (!finalEvent || !atBatEventSet.has(finalEvent)) return false;
+    }
+    return true;
+  });
   const pitchTypes = (sp.pitch ?? "").split(",").filter(Boolean);
   const pitchTypeSet = new Set(pitchTypes);
   const filteredPitches =

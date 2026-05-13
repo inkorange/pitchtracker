@@ -54,6 +54,7 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
   const activeHand = params.get("hand") ?? "";
   const activeGame = params.get("game") ?? "";
   const activeOutcomes = (params.get("outcome") ?? "").split(",").filter(Boolean);
+  const activeAtBatEvents = (params.get("event") ?? "").split(",").filter(Boolean);
 
   const togglePitch = (type: string) => {
     const current = new Set(activePitchTypes);
@@ -67,6 +68,13 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
     if (current.has(cat)) current.delete(cat);
     else current.add(cat);
     update({ outcome: current.size > 0 ? Array.from(current).join(",") : null });
+  };
+
+  const toggleAtBatEvent = (ev: string) => {
+    const current = new Set(activeAtBatEvents);
+    if (current.has(ev)) current.delete(ev);
+    else current.add(ev);
+    update({ event: current.size > 0 ? Array.from(current).join(",") : null });
   };
 
   const setHand = (hand: string) => {
@@ -140,6 +148,38 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
 
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
+          At-bat result
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              { key: "strikeout", label: "Strikeout" },
+              { key: "walk", label: "Walk" },
+            ] as const
+          ).map((opt) => {
+            const active =
+              activeAtBatEvents.length === 0 || activeAtBatEvents.includes(opt.key);
+            const dim = activeAtBatEvents.length > 0 && !active;
+            return (
+              <button
+                key={opt.key}
+                onClick={() => toggleAtBatEvent(opt.key)}
+                className={`px-2 py-1 rounded text-[11px] transition-colors ${
+                  dim
+                    ? "bg-white/[0.02] text-white/35 border border-white/5"
+                    : "bg-white/[0.06] text-white/85 border border-white/10 hover:bg-white/[0.1]"
+                }`}
+                aria-pressed={!dim}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-1.5">
           Batter side
         </div>
         <div className="flex gap-1">
@@ -184,10 +224,17 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
       {(activePitchTypes.length > 0 ||
         activeHand ||
         activeGame ||
-        activeOutcomes.length > 0) && (
+        activeOutcomes.length > 0 ||
+        activeAtBatEvents.length > 0) && (
         <button
           onClick={() =>
-            update({ pitch: null, hand: null, game: null, outcome: null })
+            update({
+              pitch: null,
+              hand: null,
+              game: null,
+              outcome: null,
+              event: null,
+            })
           }
           className="text-[10px] uppercase tracking-[0.14em] text-white/40 hover:text-white/80 transition-colors"
         >

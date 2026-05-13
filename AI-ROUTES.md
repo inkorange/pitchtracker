@@ -20,7 +20,8 @@ corresponding URL parameter here and document the enum values it accepts.
 | `pitch`   | comma list of pitch codes     | all           | Filter to pitch types. See PITCH_TYPES below                       |
 | `hand`    | `L` \| `R`                    | both          | Batter handedness filter                                            |
 | `game`    | integer (game_pk)             | (off)         | Filter to a single game's pitches                                   |
-| `outcome` | comma list                    | all           | One or more of `whiff`, `called`, `ball`, `foul`, `inplay`         |
+| `outcome` | comma list                    | all           | Per-pitch result: one or more of `whiff`, `called`, `ball`, `foul`, `inplay` |
+| `event`   | comma list                    | all           | At-bat result: comma list of MLB event values (e.g. `strikeout`, `walk`). Shows every pitch in any AB ending in one of these events. |
 | `tun`     | `true` \| (omit)              | off           | Show the pitch-tunneling envelope around the visible pitches       |
 | `view`    | `arsenal` \| `stats`          | `arsenal`     | Switch between the 3D arsenal scene and the analytics-cards view  |
 | `vsBatter`| integer (mlb_id)              | (off)         | When set, opens the matchups panel filtered to that batter         |
@@ -37,6 +38,10 @@ corresponding URL parameter here and document the enum values it accepts.
   `/pitcher/694973?pitch=FF,SL&tun=true`
 - Pitcher's stats-card view:
   `/pitcher/694973?view=stats`
+- Every pitch in his strikeout at-bats:
+  `/pitcher/694973?event=strikeout`
+- Strikeouts AND walks combined:
+  `/pitcher/694973?event=strikeout,walk`
 
 ### `/at-bat` — at-bat index
 
