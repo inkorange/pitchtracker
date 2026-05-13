@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { parseAsBoolean, useQueryState } from "nuqs";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Scene } from "@/components/scene/Scene";
@@ -105,7 +106,12 @@ export function PitcherArsenalScene({
   };
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tunnelOn, setTunnelOn] = useState(false);
+  // Persisted to the URL (?tun=true) so the AI chat / shared links can
+  // toggle tunneling without a custom client-side handshake.
+  const [tunnelOn, setTunnelOn] = useQueryState(
+    "tun",
+    parseAsBoolean.withDefault(false),
+  );
 
   const tunnelEnvelope = useMemo<TunnelEnvelope | null>(() => {
     if (!tunnelOn) return null;

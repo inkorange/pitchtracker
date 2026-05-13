@@ -49,6 +49,10 @@ export const config: VercelConfig = {
     // Less volatile than rosters but still worth a daily sync.
     { path: "/api/cron/refresh-pitchers", schedule: "30 12 * * *" },
 
+    // Per-batter metadata for the AI chat resolver. Same shape as
+    // refresh-pitchers — walks team rosters for position players.
+    { path: "/api/cron/refresh-batters", schedule: "45 12 * * *" },
+
     // 30 MLB teams. Essentially static; daily keeps it self-healing
     // without measurable cost.
     { path: "/api/cron/refresh-teams", schedule: "0 13 * * *" },

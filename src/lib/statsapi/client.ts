@@ -18,6 +18,7 @@ export interface MlbPlayer {
   lastName?: string;
   primaryPosition?: { code: string; abbreviation: string };
   pitchHand?: { code: string }; // "L" | "R"
+  batSide?: { code: string }; // "L" | "R" | "S" (switch)
   mlbDebutDate?: string;
   active?: boolean;
 }
@@ -71,6 +72,7 @@ interface RawPersonResponse {
     lastName?: string;
     primaryPosition?: { code: string; abbreviation: string };
     pitchHand?: { code: string };
+    batSide?: { code: string };
     mlbDebutDate?: string;
     active?: boolean;
   }>;
@@ -133,6 +135,27 @@ export async function fetchTeamPitchers(
     .map((entry) => ({ id: entry.person.id, fullName: entry.person.fullName }));
 }
 
+// Fetch the full-season position-player roster for a team and season.
+// Mirrors fetchTeamPitchers but inverts the position filter: everyone
+// except "1" (pitcher) counts as a batter. Two-way players ("Y") are
+// included in both lists, so e.g. Ohtani resolves from either index.
+export async function fetchTeamBatters(
+  teamId: number,
+  season: number,
+): Promise<Array<{ id: number; fullName: string }>> {
+  const data = await fetchJson<RawRosterResponse>(
+    `${BASE}/teams/${teamId}/roster?rosterType=fullSeason&season=${season}`,
+  );
+  return data.roster
+    .filter((entry) => {
+      const code = entry.position?.code;
+      // Drop pitchers (1). Keep two-way (Y) and every position-player
+      // code (2=C, 3=1B, ... 10=DH, etc.).
+      return code !== "1";
+    })
+    .map((entry) => ({ id: entry.person.id, fullName: entry.person.fullName }));
+}
+
 // Fetch detail for a single player (handedness, debut, etc.).
 export async function fetchPerson(playerId: number): Promise<MlbPlayer | null> {
   const data = await fetchJson<RawPersonResponse>(`${BASE}/people/${playerId}`);
@@ -145,6 +168,7 @@ export async function fetchPerson(playerId: number): Promise<MlbPlayer | null> {
     lastName: person.lastName,
     primaryPosition: person.primaryPosition,
     pitchHand: person.pitchHand,
+    batSide: person.batSide,
     mlbDebutDate: person.mlbDebutDate,
     active: person.active,
   };
@@ -176,6 +200,7 @@ export async function fetchPersonsCached(
           lastName: p.lastName,
           primaryPosition: p.primaryPosition,
           pitchHand: p.pitchHand,
+          batSide: p.batSide,
           mlbDebutDate: p.mlbDebutDate,
           active: p.active,
         });
