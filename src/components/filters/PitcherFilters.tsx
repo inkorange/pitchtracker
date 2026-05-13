@@ -10,6 +10,7 @@ import {
   type OutcomeCategory,
 } from "@/lib/viz/colors";
 import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
+import { AT_BAT_EVENT_CHIPS } from "@/lib/at-bat-events";
 
 interface ArsenalEntry {
   pitch_type: string;
@@ -71,10 +72,15 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
   };
 
   const toggleAtBatEvent = (ev: string) => {
-    const current = new Set(activeAtBatEvents);
-    if (current.has(ev)) current.delete(ev);
-    else current.add(ev);
-    update({ event: current.size > 0 ? Array.from(current).join(",") : null });
+    // Single-select: a pitch's at-bat is either a strikeout or a walk
+    // (or neither), never both. Clicking the active chip clears it;
+    // clicking another replaces. URL accepts a comma list for AI-set
+    // deep links, but the UI exposes one value at a time.
+    if (activeAtBatEvents.length === 1 && activeAtBatEvents[0] === ev) {
+      update({ event: null });
+    } else {
+      update({ event: ev });
+    }
   };
 
   const setHand = (hand: string) => {
@@ -151,12 +157,7 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
           At-bat result
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {(
-            [
-              { key: "strikeout", label: "Strikeout" },
-              { key: "walk", label: "Walk" },
-            ] as const
-          ).map((opt) => {
+          {AT_BAT_EVENT_CHIPS.map((opt) => {
             const active =
               activeAtBatEvents.length === 0 || activeAtBatEvents.includes(opt.key);
             const dim = activeAtBatEvents.length > 0 && !active;

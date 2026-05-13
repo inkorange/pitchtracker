@@ -21,7 +21,9 @@ corresponding URL parameter here and document the enum values it accepts.
 | `hand`    | `L` \| `R`                    | both          | Batter handedness filter                                            |
 | `game`    | integer (game_pk)             | (off)         | Filter to a single game's pitches                                   |
 | `outcome` | comma list                    | all           | Per-pitch result: one or more of `whiff`, `called`, `ball`, `foul`, `inplay` |
-| `event`   | comma list                    | all           | At-bat result: comma list of MLB event values (e.g. `strikeout`, `walk`). Shows every pitch in any AB ending in one of these events. |
+| `event`   | comma list                    | all           | At-bat result. Chip keys (`strikeout`, `walk`, `hit`, `home_run`, `out`, `hit_by_pitch`) expand to event groups. Raw MLB event values also accepted. |
+| `veloMin` | number (mph)                  | none          | Lower bound on `release_speed`. e.g. `veloMin=95` → fastballs over 95 |
+| `veloMax` | number (mph)                  | none          | Upper bound on `release_speed`. e.g. `veloMax=85` → offspeed under 85 |
 | `tun`     | `true` \| (omit)              | off           | Show the pitch-tunneling envelope around the visible pitches       |
 | `view`    | `arsenal` \| `stats`          | `arsenal`     | Switch between the 3D arsenal scene and the analytics-cards view  |
 | `vsBatter`| integer (mlb_id)              | (off)         | When set, opens the matchups panel filtered to that batter         |
@@ -40,8 +42,14 @@ corresponding URL parameter here and document the enum values it accepts.
   `/pitcher/694973?view=stats`
 - Every pitch in his strikeout at-bats:
   `/pitcher/694973?event=strikeout`
-- Strikeouts AND walks combined:
-  `/pitcher/694973?event=strikeout,walk`
+- All pitches that resulted in a hit (single/double/triple/HR):
+  `/pitcher/694973?event=hit`
+- Just home runs:
+  `/pitcher/694973?event=home_run`
+- Every pitch over 95 mph:
+  `/pitcher/694973?veloMin=95`
+- Offspeed slow stuff between 75 and 85:
+  `/pitcher/694973?veloMin=75&veloMax=85`
 
 ### `/at-bat` — at-bat index
 

@@ -25,6 +25,7 @@ import { StatsModeToggle } from "./StatsModeToggle";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { PitcherStatsArea } from "./PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
+import { expandAtBatEvents } from "@/lib/at-bat-events";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -34,10 +35,16 @@ interface PageProps {
     hand?: string;
     game?: string;
     outcome?: string;
-    // Comma-separated MLB at-bat event values (e.g. "strikeout", "walk").
-    // Applied at the at-bat level: filters to all pitches in any AB whose
-    // terminating pitch had `events` in this set.
+    // Comma-separated chip keys (strikeout, walk, hit, home_run, out,
+    // hit_by_pitch) or raw MLB event values. Expanded into the full
+    // event set in `expandAtBatEvents`. Applied at the at-bat level:
+    // keeps every pitch in any AB whose terminating pitch's `events`
+    // is in the expanded set.
     event?: string;
+    // Velocity range in mph (release_speed). Either bound may be omitted
+    // for a one-sided filter. Used for "show me pitches over 95" queries.
+    veloMin?: string;
+    veloMax?: string;
   }>;
 }
 
@@ -176,12 +183,14 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // At-bat-level event filter (e.g. "show me every pitch in a strikeout
   // at-bat"). The `events` column is non-null only on the terminating
   // pitch of each AB, so we build a key → final-event map once, then
-  // join every pitch back to its AB's outcome.
-  const atBatEvents = (sp.event ?? "")
+  // join every pitch back to its AB's outcome. Chip keys like
+  // "strikeout" expand to ["strikeout", "strikeout_double_play"] so
+  // viewers get the natural-language behavior.
+  const atBatEventInputs = (sp.event ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const atBatEventSet = new Set(atBatEvents);
+  const atBatEventSet = expandAtBatEvents(atBatEventInputs);
   const finalEventByAtBat = new Map<string, string>();
   if (atBatEventSet.size > 0) {
     for (const p of cachedPitches ?? []) {
@@ -190,6 +199,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       }
     }
   }
+  // Velocity bounds in mph. Either side may be unset for an open-ended
+  // range. Applied at the same level as outcome/event so the arsenal
+  // aggregates and pitch-type chip counts respect it.
+  const veloMin = sp.veloMin && !Number.isNaN(Number(sp.veloMin)) ? Number(sp.veloMin) : null;
+  const veloMax = sp.veloMax && !Number.isNaN(Number(sp.veloMax)) ? Number(sp.veloMax) : null;
   const arsenalPitches = (cachedPitches ?? []).filter((p) => {
     if (outcomeSet.size > 0 && !outcomeSet.has(categorizeDescription(p.description))) {
       return false;
@@ -197,6 +211,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     if (atBatEventSet.size > 0) {
       const finalEvent = finalEventByAtBat.get(`${p.game_pk}-${p.at_bat_number}`);
       if (!finalEvent || !atBatEventSet.has(finalEvent)) return false;
+    }
+    if (veloMin != null) {
+      if (p.release_speed == null || p.release_speed < veloMin) return false;
+    }
+    if (veloMax != null) {
+      if (p.release_speed == null || p.release_speed > veloMax) return false;
     }
     return true;
   });

@@ -129,6 +129,30 @@ export async function POST(request: Request) {
             return { batters: data ?? [] };
           },
         }),
+        get_pitcher_stats: tool({
+          description:
+            "Look up a pitcher's aggregate stats per pitch type for a season — avg velocity, avg spin rate, whiff rate, called-strike rate, batting average against, run value, usage %. Returns one row per (pitch_type, batter_hand) pair. To produce an overall figure across both batter handedness, take a pitch_count-weighted average. Use this when the user asks 'what's his average X' / 'how hard does he throw his fastball' / 'whiff rate on his slider' etc.",
+          inputSchema: z.object({
+            pitcher_id: z.number().int(),
+            season: z
+              .number()
+              .int()
+              .optional()
+              .describe("Defaults to the current MLB season."),
+          }),
+          execute: async ({ pitcher_id, season }) => {
+            const s = season ?? new Date().getFullYear();
+            const { data, error } = await supabase
+              .from("pitch_pitcher_aggregates")
+              .select(
+                "pitch_type, batter_hand, pitch_count, usage_pct, avg_velocity, avg_spin_rate, avg_vertical_break, avg_horizontal_break, avg_induced_vertical_break, whiff_rate, called_strike_rate, batting_avg_against, run_value_per_100",
+              )
+              .eq("pitcher_id", pitcher_id)
+              .eq("season", s);
+            if (error) return { stats: [], error: error.message };
+            return { season: s, stats: data ?? [] };
+          },
+        }),
         get_pitcher_recent_games: tool({
           description:
             "Look up a pitcher's most recent games they pitched in. Returns game_pk, date, and opponent team IDs ordered by date desc. Use this to resolve 'his last game' / 'his most recent start' on a pitcher page.",
