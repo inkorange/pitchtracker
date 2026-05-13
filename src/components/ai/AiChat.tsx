@@ -99,7 +99,9 @@ export function AiChat() {
           ]);
         }
         if (data.url) {
-          setOpen(false);
+          // Keep the panel open so the user can keep refining ("now add
+          // fastballs to this", "go to his last game") without re-opening
+          // the chat after every navigation.
           router.push(data.url);
         }
       } catch (e) {
