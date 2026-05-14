@@ -26,6 +26,7 @@ import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { PitcherStatsArea } from "./PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
+import { buildFilterSummary } from "@/lib/filter-summary";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -180,25 +181,16 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       ["whiff", "called", "ball", "foul", "inplay", "other"].includes(s),
     );
   const outcomeSet = new Set(outcomes);
-  // At-bat-level event filter (e.g. "show me every pitch in a strikeout
-  // at-bat"). The `events` column is non-null only on the terminating
-  // pitch of each AB, so we build a key → final-event map once, then
-  // join every pitch back to its AB's outcome. Chip keys like
-  // "strikeout" expand to ["strikeout", "strikeout_double_play"] so
-  // viewers get the natural-language behavior.
+  // At-bat-result filter. Narrows to the TERMINATING pitch of each AB
+  // (the one whose Statcast `events` column is set) — i.e., the actual
+  // pitch that resulted in the strikeout / walk / hit / etc. Chip keys
+  // like "strikeout" expand to ["strikeout", "strikeout_double_play"]
+  // so viewers get natural-language behavior.
   const atBatEventInputs = (sp.event ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   const atBatEventSet = expandAtBatEvents(atBatEventInputs);
-  const finalEventByAtBat = new Map<string, string>();
-  if (atBatEventSet.size > 0) {
-    for (const p of cachedPitches ?? []) {
-      if (p.events) {
-        finalEventByAtBat.set(`${p.game_pk}-${p.at_bat_number}`, p.events);
-      }
-    }
-  }
   // Velocity bounds in mph. Either side may be unset for an open-ended
   // range. Applied at the same level as outcome/event so the arsenal
   // aggregates and pitch-type chip counts respect it.
@@ -209,8 +201,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       return false;
     }
     if (atBatEventSet.size > 0) {
-      const finalEvent = finalEventByAtBat.get(`${p.game_pk}-${p.at_bat_number}`);
-      if (!finalEvent || !atBatEventSet.has(finalEvent)) return false;
+      if (!p.events || !atBatEventSet.has(p.events)) return false;
     }
     if (veloMin != null) {
       if (p.release_speed == null || p.release_speed < veloMin) return false;
@@ -305,11 +296,16 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     teamIds.size > 0
       ? await supabase
           .from("pitch_teams")
-          .select("mlb_id, abbreviation")
+          .select("mlb_id, abbreviation, name")
           .in("mlb_id", Array.from(teamIds))
       : { data: [] };
   const teamAbbr = new Map<number, string>(
     (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
+  );
+  // Full names for the filter-summary banner — "vs Boston Red Sox"
+  // reads better than "vs BOS" when the user expands the URL.
+  const teamFullName = new Map<number, string>(
+    (teamRows ?? []).map((t) => [t.mlb_id, t.name]),
   );
   const games = gameMetaRows
     .map((g) => ({
@@ -328,6 +324,38 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         .maybeSingle()
         .then((r) => r.data)
     : null;
+
+  // Resolve the currently-filtered game (if any) to a date + opponent
+  // name for the filter-summary banner.
+  let activeGameInfo: { game_date: string; opponentName: string | null } | null = null;
+  if (sp.game) {
+    const activeGamePk = Number(sp.game);
+    const meta = gameByPk.get(activeGamePk);
+    if (meta) {
+      const pitcherTeamId = pitcher.current_team_id ?? null;
+      const opponentId =
+        pitcherTeamId != null && meta.home_team_id === pitcherTeamId
+          ? meta.away_team_id
+          : pitcherTeamId != null && meta.away_team_id === pitcherTeamId
+            ? meta.home_team_id
+            : (meta.home_team_id ?? meta.away_team_id);
+      activeGameInfo = {
+        game_date: meta.game_date,
+        opponentName: opponentId ? (teamFullName.get(opponentId) ?? null) : null,
+      };
+    }
+  }
+
+  const filterSummary = buildFilterSummary({
+    season,
+    pitchTypes,
+    outcomes,
+    events: atBatEventInputs,
+    hand: sp.hand === "L" || sp.hand === "R" ? sp.hand : null,
+    game: activeGameInfo,
+    veloMin,
+    veloMax,
+  });
 
   // Schema.org Person markup — helps Google generate richer SERP
   // entries (sidebar card with image, "Plays for: <team>", etc.).
@@ -359,6 +387,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       <TopNav
         back={{ href: "/", label: "Home" }}
         title="Pitcher"
+        summary={filterSummary}
         rightSlot={
           <Link
             href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
@@ -374,9 +403,15 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         <PitcherSearch placeholder="Search another pitcher…" />
       </div>
 
+
+      {/* Card column. Absolute wrapper that holds the pitcher card AND
+          the mobile-only summary banner stacked below it. Flex-col so
+          the summary sits right beneath the card regardless of whether
+          the card is collapsed (short) or expanded (tall + scrolling). */}
+      <div className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] pointer-events-auto flex flex-col gap-2 max-h-[calc(100vh-5rem)]">
       <section
         data-pitcher-card
-        className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 pointer-events-auto max-h-[calc(100vh-7rem)] overflow-y-auto"
+        className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 overflow-y-auto min-h-0"
       >
         <PitcherCardCollapse
           header={
@@ -401,12 +436,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                   </div>
                 </div>
                 {team ? (
-                  <div className="hidden sm:block relative w-10 h-10 flex-shrink-0">
+                  <div className="hidden sm:block relative w-14 h-14 flex-shrink-0">
                     <Image
                       src={teamLogoUrl(team.mlb_id)}
                       alt={team.name}
                       fill
-                      sizes="40px"
+                      sizes="56px"
                       className="object-contain"
                       unoptimized
                     />
@@ -507,6 +542,17 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
             Renders nothing when not in at-bat mode. */}
         <AtBatHeader season={season} />
       </section>
+
+      {/* Mobile-only filter-summary banner. Lives in the top nav on
+          desktop. Anchored just below the card via the flex-col
+          wrapper so it tracks the card's bottom edge whether the body
+          is collapsed or expanded. */}
+      {filterSummary ? (
+        <div className="sm:hidden flex-shrink-0 text-[12px] leading-snug text-white/85 italic bg-[#081a32]/70 backdrop-blur-md border border-white/10 rounded-md px-3 py-1.5 shadow-lg">
+          {filterSummary}
+        </div>
+      ) : null}
+      </div>
 
       {/* Stats analytics view — sibling of the pitcher card, NOT
           inside it. Renders nothing in arsenal mode. */}

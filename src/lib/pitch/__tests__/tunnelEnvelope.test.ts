@@ -108,17 +108,35 @@ describe("buildTunnelEnvelope", () => {
 
   it("ignores pitch types that fall under the min-pitch-count filter", () => {
     // A stray "EP" eephus (n=2) shouldn't show up in the type list
-    // even though the input technically has three labels.
+    // even though the input technically has three labels. The
+    // explicit minPitchesPerType=3 mirrors the season-scale default
+    // (the algorithm now adapts down to 1 for small filtered inputs).
     const EP: typeof FF = { ...FF, pitch_type: "EP", vy0: -90 };
-    const env = buildTunnelEnvelope([
-      ...bunch(FF, 6),
-      ...bunch(SL, 6),
-      ...bunch(EP, 2),
-    ]);
+    const env = buildTunnelEnvelope(
+      [...bunch(FF, 6), ...bunch(SL, 6), ...bunch(EP, 2)],
+      { minPitchesPerType: 3 },
+    );
     expect(env).not.toBeNull();
     if (!env) return;
     expect(env.stats.types).toEqual(["FF", "SL"]);
     expect(env.stats.n).toBe(12); // EP excluded from the count
+  });
+
+  it("keeps sparse pitch types when the input is a small filtered set", () => {
+    // Mirrors the "show me all my home runs allowed" filter — only 3
+    // pitches total, one of each type. The user expects to see the
+    // tunneling between those 3 pitches; the algorithm should NOT
+    // gate them out by the season-scale minPitchesPerType default.
+    const CU: typeof FF = { ...FF, pitch_type: "CU", vz0: -7 };
+    const env = buildTunnelEnvelope([
+      ...bunch(FF, 1),
+      ...bunch(SL, 1),
+      ...bunch(CU, 1),
+    ]);
+    expect(env).not.toBeNull();
+    if (!env) return;
+    expect(env.stats.types.sort()).toEqual(["CU", "FF", "SL"]);
+    expect(env.stats.n).toBe(3);
   });
 
   it("a wider deviation threshold pushes the tunnel end closer to the plate", () => {

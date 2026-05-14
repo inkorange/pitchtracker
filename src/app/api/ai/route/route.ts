@@ -153,6 +153,27 @@ export async function POST(request: Request) {
             return { season: s, stats: data ?? [] };
           },
         }),
+        get_at_bats_in_game: tool({
+          description:
+            "List every at-bat in a game with its terminating event (strikeout / strikeout_double_play / walk / single / home_run / field_out / etc.), batter_id, and inning. Use to answer 'show me all the strikeouts in this game' — call this with the game_pk, filter the result to ABs whose events match the user's intent, then navigate to /at-bat/{game_pk}/{first_match.at_bat_number}?event=<chip_key> so the replay sidebar arrives pre-filtered. Chip keys: strikeout, walk, hit, home_run, out, hit_by_pitch.",
+          inputSchema: z.object({
+            game_pk: z.number().int(),
+          }),
+          execute: async ({ game_pk }) => {
+            // Terminating pitches only — `events` is non-null only on
+            // the last pitch of each AB. One row per at-bat.
+            const { data, error } = await supabase
+              .from("pitch_game_pitches")
+              .select(
+                "at_bat_number, events, batter_id, pitcher_id, inning, inning_topbot",
+              )
+              .eq("game_pk", game_pk)
+              .not("events", "is", null)
+              .order("at_bat_number", { ascending: true });
+            if (error) return { at_bats: [], error: error.message };
+            return { at_bats: data ?? [] };
+          },
+        }),
         get_pitcher_recent_games: tool({
           description:
             "Look up a pitcher's most recent games they pitched in. Returns game_pk, date, and opponent team IDs ordered by date desc. Use this to resolve 'his last game' / 'his most recent start' on a pitcher page.",

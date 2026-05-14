@@ -21,7 +21,7 @@ corresponding URL parameter here and document the enum values it accepts.
 | `hand`    | `L` \| `R`                    | both          | Batter handedness filter                                            |
 | `game`    | integer (game_pk)             | (off)         | Filter to a single game's pitches                                   |
 | `outcome` | comma list                    | all           | Per-pitch result: one or more of `whiff`, `called`, `ball`, `foul`, `inplay` |
-| `event`   | comma list                    | all           | At-bat result. Chip keys (`strikeout`, `walk`, `hit`, `home_run`, `out`, `hit_by_pitch`) expand to event groups. Raw MLB event values also accepted. |
+| `event`   | comma list                    | all           | At-bat result. Narrows to the **terminating pitch** of each matching at-bat (the pitch that *resulted in* the K / BB / hit). Chip keys (`strikeout`, `walk`, `hit`, `home_run`, `out`, `hit_by_pitch`) expand to event groups. Raw MLB event values also accepted. Combine with `outcome` to refine (e.g. `event=strikeout&outcome=whiff` → only the K-swinging pitches). |
 | `veloMin` | number (mph)                  | none          | Lower bound on `release_speed`. e.g. `veloMin=95` → fastballs over 95 |
 | `veloMax` | number (mph)                  | none          | Upper bound on `release_speed`. e.g. `veloMax=85` → offspeed under 85 |
 | `tun`     | `true` \| (omit)              | off           | Show the pitch-tunneling envelope around the visible pitches       |
@@ -60,14 +60,17 @@ corresponding URL parameter here and document the enum values it accepts.
 
 ### `/at-bat/{game_pk}` — game at-bat list
 
-(No optional params; lists every at-bat in the game.)
+| Param    | Type   | Description                                                              |
+| -------- | ------ | ------------------------------------------------------------------------ |
+| `event`  | string | At-bat result chip key (`strikeout`, `walk`, `hit`, `home_run`, `out`, `hit_by_pitch`). Narrows the list to ABs ending in that result. |
 
 ### `/at-bat/{game_pk}/{at_bat_number}` — at-bat replay
 
-| Param    | Type     | Description                                       |
-| -------- | -------- | ------------------------------------------------- |
-| `camera` | string   | Camera preset (`front`, `pitcher`, `batter`)      |
-| `pitch`  | integer  | Highlight this pitch index inside the at-bat      |
+| Param    | Type     | Description                                                                                |
+| -------- | -------- | ------------------------------------------------------------------------------------------ |
+| `camera` | string   | Camera preset (`front`, `pitcher`, `batter`)                                                |
+| `pitch`  | integer  | Highlight this pitch index inside the at-bat                                                |
+| `event`  | string   | At-bat result chip key. Filters the sidebar list of sibling ABs and the Prev/Next stepper. |
 
 ### `/explore` — advanced pitch search
 

@@ -167,6 +167,13 @@ export function AiChat() {
     // false if the user clicks the mic to stop manually.
     autoSubmitOnEndRef.current = true;
 
+    // Whatever was in the input box when the user tapped mic acts as a
+    // prefix; new speech is appended to it. Captured once at session
+    // start because onresult rebuilds the full transcript from
+    // ev.results every event (see below) — without a stable base, the
+    // typed prefix would be duplicated or lost.
+    const baseInput = inputRef.current;
+
     const armSilenceTimer = () => {
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = setTimeout(() => {
@@ -179,23 +186,28 @@ export function AiChat() {
     };
 
     rec.onresult = (ev) => {
-      // Append only the results that just transitioned to final. Interim
-      // results fire continuously while speaking; we use them to keep
-      // the silence timer alive, not to mutate the input (which would
-      // jitter).
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      // ev.results is cumulative — it grows across events to contain
+      // every result for the current session. Some engines (notably
+      // Android Chrome) re-emit the same result as `isFinal=true`
+      // multiple times with progressively more content; appending on
+      // each event would stack partials ("show me show me Mason show
+      // me Mason Miller's..."). Rebuild the transcript from scratch
+      // every event instead — idempotent and engine-agnostic.
+      let final = "";
+      for (let i = 0; i < ev.results.length; i++) {
         const res = ev.results[i];
         if (res?.isFinal) {
-          const transcript = res[0]?.transcript ?? "";
-          if (transcript) {
-            const merged = inputRef.current
-              ? `${inputRef.current} ${transcript}`.trim()
-              : transcript.trim();
-            inputRef.current = merged;
-            setInput(merged);
-          }
+          final += res[0]?.transcript ?? "";
         }
       }
+      const transcript = final.trim();
+      const combined = baseInput
+        ? transcript
+          ? `${baseInput} ${transcript}`
+          : baseInput
+        : transcript;
+      inputRef.current = combined;
+      setInput(combined);
       armSilenceTimer();
     };
 

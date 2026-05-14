@@ -9,12 +9,15 @@ import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { eventPillColor } from "@/lib/viz/colors";
 import type { ReplayPitch } from "./AtBatReplayScene";
-import { MatchupsCollapse } from "./MatchupsCollapse";
 import { AtBatOutcomeLegend } from "./AtBatOutcomeLegend";
+import {
+  PitcherMatchupsSidebar,
+  type PitcherAbDisplay,
+} from "./PitcherMatchupsSidebar";
 
 interface PageProps {
   params: Promise<{ gamePk: string; atBatNumber: string }>;
-  searchParams: Promise<{ camera?: string; pitch?: string }>;
+  searchParams: Promise<{ camera?: string; pitch?: string; event?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -34,8 +37,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function AtBatPage({ params }: PageProps) {
+export default async function AtBatPage({ params, searchParams }: PageProps) {
   const { gamePk, atBatNumber } = await params;
+  const sp = await searchParams;
 
   const gamePkN = Number(gamePk);
   const atBatN = Number(atBatNumber);
@@ -161,13 +165,14 @@ export default async function AtBatPage({ params }: PageProps) {
     bucket.final_events = r.events;
     bucket.final_description = r.description;
   }
-  const pitcherAbs = Array.from(pitcherAbMap.values());
+  const allPitcherAbs = Array.from(pitcherAbMap.values());
 
   // Resolve every batter's name in one batch (Stats API caches
-  // long-term, so re-renders are cheap).
+  // long-term, so re-renders are cheap). The sidebar is now client-
+  // side so we pass it a pre-resolved name string per AB.
   const abBatterIds = Array.from(
     new Set(
-      pitcherAbs
+      allPitcherAbs
         .map((a) => a.batter_id)
         .filter((id): id is number => typeof id === "number"),
     ),
@@ -176,9 +181,27 @@ export default async function AtBatPage({ params }: PageProps) {
     ? await fetchPersonsCached(abBatterIds)
     : await fetchPersonsCached([]);
 
+  // Pre-resolved sidebar rows for the client sidebar component.
+  const pitcherAbDisplay: PitcherAbDisplay[] = allPitcherAbs.map((ab) => ({
+    at_bat_number: ab.at_bat_number,
+    batter_id: ab.batter_id,
+    batter_name: ab.batter_id
+      ? abBatterMap.get(ab.batter_id)?.fullName ?? `Batter #${ab.batter_id}`
+      : "—",
+    inning: ab.inning,
+    inning_topbot: ab.inning_topbot,
+    pitch_count: ab.pitch_count,
+    final_events: ab.final_events,
+    final_description: ab.final_description,
+  }));
+
   // Prev/next at-bat — restricted to this pitcher's matchups so
   // stepping doesn't jump to the other team's pitcher mid-game.
-  const pitcherAbNumbers = pitcherAbs.map((a) => a.at_bat_number);
+  // (Server-side prev/next is unaware of the client-side `?event=`
+  // filter; that's fine for v1 because the sidebar's own row links
+  // are filter-aware and the buttons are mostly used in unfiltered
+  // mode.)
+  const pitcherAbNumbers = allPitcherAbs.map((a) => a.at_bat_number);
   const currentAbIdx = pitcherAbNumbers.indexOf(atBatN);
   const prevAb = currentAbIdx > 0 ? pitcherAbNumbers[currentAbIdx - 1] : null;
   const nextAb =
@@ -241,7 +264,7 @@ export default async function AtBatPage({ params }: PageProps) {
               </div>
               {pitcher ? (
                 <Link
-                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
+                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}&game=${gamePkN}`}
                   className="text-sm font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
                 >
                   {pitcher.full_name}
@@ -304,7 +327,7 @@ export default async function AtBatPage({ params }: PageProps) {
             <div className="min-w-0 flex-1">
               {pitcher ? (
                 <Link
-                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}`}
+                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}&game=${gamePkN}`}
                   className="text-xs font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
                 >
                   {pitcher.full_name}
@@ -354,7 +377,11 @@ export default async function AtBatPage({ params }: PageProps) {
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/[0.05]">
             {prevAb !== null ? (
               <Link
-                href={`/at-bat/${gamePkN}/${prevAb}`}
+                href={
+                  sp.event
+                    ? `/at-bat/${gamePkN}/${prevAb}?event=${encodeURIComponent(sp.event)}`
+                    : `/at-bat/${gamePkN}/${prevAb}`
+                }
                 className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.14em] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-white/75 hover:text-white transition-colors"
               >
                 ← Prev AB
@@ -364,7 +391,11 @@ export default async function AtBatPage({ params }: PageProps) {
             )}
             {nextAb !== null ? (
               <Link
-                href={`/at-bat/${gamePkN}/${nextAb}`}
+                href={
+                  sp.event
+                    ? `/at-bat/${gamePkN}/${nextAb}?event=${encodeURIComponent(sp.event)}`
+                    : `/at-bat/${gamePkN}/${nextAb}`
+                }
                 className="px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.14em] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-white/75 hover:text-white transition-colors"
               >
                 Next AB →
@@ -411,92 +442,16 @@ export default async function AtBatPage({ params }: PageProps) {
         </div>
         </div>
 
-        {/* Pitcher's full matchup list for this game — quick selector
-            so the user doesn't have to bounce back to the game page
-            to switch ABs. Current AB is highlighted; clicking any
-            other row navigates straight to that AB's replay. The
-            wrapper picks up flex-1 from the section so MatchupsCollapse
-            can size to the remaining height and scroll its list
-            independently. */}
-        {pitcherAbs.length > 1 ? (
-          <div className="flex-1 min-h-0 flex flex-col mt-2 sm:mt-4">
-          <MatchupsCollapse count={pitcherAbs.length}>
-            <ul className="space-y-1">
-              {pitcherAbs.map((ab) => {
-                const isCurrent = ab.at_bat_number === atBatN;
-                const finalStr = ab.final_events && ab.final_events.length > 0
-                  ? ab.final_events
-                  : ab.final_description ?? "";
-                return (
-                  <li key={ab.at_bat_number}>
-                    <Link
-                      href={`/at-bat/${gamePkN}/${ab.at_bat_number}`}
-                      aria-current={isCurrent ? "true" : undefined}
-                      className={
-                        "flex items-center gap-2 px-2 py-1.5 rounded-md border-2 transition-colors " +
-                        (isCurrent
-                          ? "bg-emerald-500/10 border-emerald-400/70 text-white pointer-events-none"
-                          : "bg-white/[0.04] hover:bg-white/[0.1] border-white/10 text-white/85")
-                      }
-                    >
-                      {ab.batter_id ? (
-                        <div className="relative w-7 h-7 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                          <Image
-                            src={personHeadshotUrl(ab.batter_id, 64)}
-                            alt=""
-                            fill
-                            sizes="28px"
-                            className="object-cover"
-                            unoptimized
-                          />
-                        </div>
-                      ) : null}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[12px] truncate">
-                          {ab.batter_id
-                            ? abBatterMap.get(ab.batter_id)?.fullName ??
-                              `Batter #${ab.batter_id}`
-                            : "—"}
-                        </div>
-                        <div
-                          className={
-                            "text-[10px] tabular-nums truncate " +
-                            (isCurrent ? "text-white/70" : "text-white/45")
-                          }
-                        >
-                          {ab.inning != null ? (
-                            <>
-                              {ab.inning_topbot === "Bot" ? "Bot" : "Top"}{" "}
-                              {ab.inning}
-                            </>
-                          ) : null}
-                          {" · "}
-                          {ab.pitch_count}p
-                        </div>
-                      </div>
-                      <span
-                        className={
-                          "inline-flex items-center px-2 py-0.5 rounded-full border text-white text-[9.5px] font-semibold uppercase tracking-[0.08em] shadow-sm flex-shrink-0 " +
-                          eventPillColor(finalStr)
-                        }
-                      >
-                        {finalStr
-                          ? finalStr
-                              .split("_")
-                              .map(
-                                (w) => w.charAt(0).toUpperCase() + w.slice(1),
-                              )
-                              .join(" ")
-                          : "—"}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </MatchupsCollapse>
-          </div>
-        ) : null}
+        {/* Pitcher's full matchup list for this game. Rendered as a
+            client component so the chip filter does shallow URL
+            updates (no server re-fetch) when the current AB still
+            matches, and a hard router.push to the first matching AB
+            when it doesn't. */}
+        <PitcherMatchupsSidebar
+          gamePk={gamePkN}
+          currentAbN={atBatN}
+          allPitcherAbs={pitcherAbDisplay}
+        />
       </section>
 
       <AtBatOutcomeLegend />

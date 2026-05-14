@@ -10,7 +10,10 @@ import {
   type OutcomeCategory,
 } from "@/lib/viz/colors";
 import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
-import { AT_BAT_EVENT_CHIPS } from "@/lib/at-bat-events";
+import {
+  AT_BAT_EVENT_CHIPS,
+  compatibleOutcomesForAtBatEvents,
+} from "@/lib/at-bat-events";
 
 interface ArsenalEntry {
   pitch_type: string;
@@ -56,6 +59,11 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
   const activeGame = params.get("game") ?? "";
   const activeOutcomes = (params.get("outcome") ?? "").split(",").filter(Boolean);
   const activeAtBatEvents = (params.get("event") ?? "").split(",").filter(Boolean);
+  // When an at-bat result is active, only certain per-pitch outcomes
+  // can physically be the terminating pitch (e.g. a strikeout's
+  // terminating pitch is whiff or called — never ball/foul/inplay).
+  // The Outcome chips that aren't in this set are disabled.
+  const compatibleOutcomes = compatibleOutcomesForAtBatEvents(activeAtBatEvents);
 
   const togglePitch = (type: string) => {
     const current = new Set(activePitchTypes);
@@ -65,6 +73,10 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
   };
 
   const toggleOutcome = (cat: OutcomeCategory) => {
+    // Block clicks on chips that are incompatible with the active
+    // at-bat result. The visual disables them too, but defending here
+    // means a keyboard-tab+enter can't sneak past.
+    if (compatibleOutcomes && !compatibleOutcomes.has(cat)) return;
     const current = new Set(activeOutcomes);
     if (current.has(cat)) current.delete(cat);
     else current.add(cat);
@@ -76,11 +88,28 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
     // (or neither), never both. Clicking the active chip clears it;
     // clicking another replaces. URL accepts a comma list for AI-set
     // deep links, but the UI exposes one value at a time.
-    if (activeAtBatEvents.length === 1 && activeAtBatEvents[0] === ev) {
-      update({ event: null });
-    } else {
-      update({ event: ev });
+    const nextEvent =
+      activeAtBatEvents.length === 1 && activeAtBatEvents[0] === ev ? null : ev;
+
+    // Auto-prune incompatible outcomes when an at-bat result becomes
+    // active. e.g. if the user had outcome=whiff,ball and picks
+    // Strikeout, ball is dropped (a K can't terminate on a ball)
+    // while whiff persists. This is the chained-filter behavior the
+    // user expects: "show me all the strikeouts that ended in
+    // swinging strikes" with two clicks.
+    const updates: Record<string, string | null> = { event: nextEvent };
+    if (nextEvent) {
+      const nextCompatible = compatibleOutcomesForAtBatEvents(
+        nextEvent.split(",").filter(Boolean),
+      );
+      if (nextCompatible && activeOutcomes.length > 0) {
+        const kept = activeOutcomes.filter((o) =>
+          nextCompatible.has(o as OutcomeCategory),
+        );
+        updates.outcome = kept.length > 0 ? kept.join(",") : null;
+      }
     }
+    update(updates);
   };
 
   const setHand = (hand: string) => {
@@ -128,22 +157,35 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
         </div>
         <div className="flex flex-wrap gap-1.5">
           {(["whiff", "called", "ball", "foul", "inplay"] as const).map((cat) => {
+            const disabled = compatibleOutcomes != null && !compatibleOutcomes.has(cat);
             const active = activeOutcomes.length === 0 || activeOutcomes.includes(cat);
-            const dim = activeOutcomes.length > 0 && !active;
+            const dim = !disabled && activeOutcomes.length > 0 && !active;
             return (
               <button
                 key={cat}
                 onClick={() => toggleOutcome(cat)}
+                disabled={disabled}
+                title={
+                  disabled
+                    ? "Not possible for the selected at-bat result"
+                    : undefined
+                }
                 className={`flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors ${
-                  dim
-                    ? "bg-white/[0.02] text-white/35 border border-white/5"
-                    : "bg-white/[0.06] text-white/85 border border-white/10 hover:bg-white/[0.1]"
+                  disabled
+                    ? "bg-white/[0.015] text-white/20 border border-white/[0.03] cursor-not-allowed"
+                    : dim
+                      ? "bg-white/[0.02] text-white/35 border border-white/5"
+                      : "bg-white/[0.06] text-white/85 border border-white/10 hover:bg-white/[0.1]"
                 }`}
-                aria-pressed={!dim}
+                aria-pressed={!disabled && !dim}
+                aria-disabled={disabled}
               >
                 <span
                   className="w-1.5 h-1.5 rounded-full"
-                  style={{ background: OUTCOME_COLORS[cat], opacity: dim ? 0.3 : 1 }}
+                  style={{
+                    background: OUTCOME_COLORS[cat],
+                    opacity: disabled ? 0.15 : dim ? 0.3 : 1,
+                  }}
                 />
                 {OUTCOME_LABELS[cat]}
               </button>

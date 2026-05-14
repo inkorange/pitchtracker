@@ -5,9 +5,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
-import { categorizeDescription, OUTCOME_COLORS } from "@/lib/viz/colors";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
+import { AtBatGameList, type AtBatDisplay } from "./AtBatGameList";
 
 interface PageProps {
   params: Promise<{ gamePk: string }>;
@@ -112,17 +112,17 @@ export default async function GameAtBatsPage({ params }: PageProps) {
     if (p.description) ab.last_description = p.description;
   }
 
-  const atBats = Array.from(byAb.values()).sort(
+  const allAtBats = Array.from(byAb.values()).sort(
     (a, b) => a.at_bat_number - b.at_bat_number,
   );
 
   // Resolve player names. Pitchers are in our table; batters require an
   // MLB Stats API roundtrip but the response is cached aggressively.
   const pitcherIds = Array.from(
-    new Set(atBats.map((a) => a.pitcher_id).filter((id): id is number => id != null)),
+    new Set(allAtBats.map((a) => a.pitcher_id).filter((id): id is number => id != null)),
   );
   const batterIds = Array.from(
-    new Set(atBats.map((a) => a.batter_id).filter((id): id is number => id != null)),
+    new Set(allAtBats.map((a) => a.batter_id).filter((id): id is number => id != null)),
   );
 
   const [{ data: pitchersRaw }, batterMap, { data: teamsRaw }] = await Promise.all([
@@ -156,23 +156,27 @@ export default async function GameAtBatsPage({ params }: PageProps) {
   const homeTeam = game?.home_team_id ? teamById.get(game.home_team_id) : null;
   const awayTeam = game?.away_team_id ? teamById.get(game.away_team_id) : null;
 
-  // Group at-bats by half-inning so the page reads chronologically and
-  // the user can scan inning-by-inning the way they'd watch a game.
-  const groups: Array<{
-    key: string;
-    inning: number;
-    half: "Top" | "Bot";
-    atBats: AtBatSummary[];
-  }> = [];
-  for (const ab of atBats) {
-    const key = `${ab.inning}-${ab.inning_topbot}`;
-    let g = groups[groups.length - 1];
-    if (!g || g.key !== key) {
-      g = { key, inning: ab.inning, half: ab.inning_topbot, atBats: [] };
-      groups.push(g);
-    }
-    g.atBats.push(ab);
-  }
+  // Pre-resolve display strings on the server so the client list can
+  // re-filter without re-fetching MLB Stats / Supabase data.
+  const allAtBatsDisplay: AtBatDisplay[] = allAtBats.map((ab) => ({
+    at_bat_number: ab.at_bat_number,
+    pitch_count: ab.pitch_count,
+    inning: ab.inning,
+    inning_topbot: ab.inning_topbot,
+    pitcher_id: ab.pitcher_id,
+    batter_id: ab.batter_id,
+    pitcher_name: ab.pitcher_id
+      ? pitcherById.get(ab.pitcher_id)?.lastName ?? `Pitcher #${ab.pitcher_id}`
+      : "—",
+    batter_name: ab.batter_id
+      ? batterMap.get(ab.batter_id)?.fullName ?? `Batter #${ab.batter_id}`
+      : "—",
+    outs_when_up: ab.outs_when_up,
+    final_balls: ab.final_balls,
+    final_strikes: ab.final_strikes,
+    events: ab.events,
+    last_description: ab.last_description,
+  }));
 
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
@@ -213,131 +217,16 @@ export default async function GameAtBatsPage({ params }: PageProps) {
               {game?.game_date}
             </span>
           </div>
-          <p className="text-[11px] text-white/45 tabular-nums">
-            {atBats.length} at-bats · {pitches.length} pitches
-          </p>
         </div>
 
-        <div className="space-y-6">
-          {groups.map((g) => (
-            <section key={g.key} className="space-y-2">
-              <h2 className="text-[10px] uppercase tracking-[0.18em] text-white/45 sticky top-0 bg-[#0a0e14]/95 backdrop-blur-sm py-1">
-                {g.half} {g.inning}
-              </h2>
-              <ul className="grid grid-cols-1 gap-1.5">
-                {g.atBats.map((ab) => (
-                  <AtBatRow
-                    key={ab.at_bat_number}
-                    gamePk={gamePkN}
-                    ab={ab}
-                    pitcherName={
-                      ab.pitcher_id
-                        ? pitcherById.get(ab.pitcher_id)?.lastName ??
-                          `Pitcher #${ab.pitcher_id}`
-                        : "—"
-                    }
-                    batterName={
-                      ab.batter_id
-                        ? batterMap.get(ab.batter_id)?.fullName ??
-                          `Batter #${ab.batter_id}`
-                        : "—"
-                    }
-                  />
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+        <AtBatGameList
+          gamePk={gamePkN}
+          allAtBats={allAtBatsDisplay}
+          totalPitches={pitches.length}
+        />
       </div>
     </main>
   );
-}
-
-function AtBatRow({
-  gamePk,
-  ab,
-  pitcherName,
-  batterName,
-}: {
-  gamePk: number;
-  ab: AtBatSummary;
-  pitcherName: string;
-  batterName: string;
-}) {
-  const cat = categorizeDescription(ab.last_description);
-  const dotColor = OUTCOME_COLORS[cat];
-  const outcome = formatEvent(ab.events) ?? "In progress";
-  return (
-    <li>
-      <Link
-        href={`/at-bat/${gamePk}/${ab.at_bat_number}`}
-        className="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors"
-      >
-        {ab.pitcher_id ? (
-          <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-            <Image
-              src={pitcherHeadshotUrl(ab.pitcher_id, 60)}
-              alt=""
-              fill
-              sizes="32px"
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-        ) : null}
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="text-sm text-white/95 flex items-center gap-1.5 min-w-0">
-            <span className="truncate">{pitcherName}</span>
-            <span className="text-white/40 flex-shrink-0">vs</span>
-            <span className="truncate flex-1 text-right">{batterName}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-[11px] text-white/55 tabular-nums truncate">
-              AB #{ab.at_bat_number} · {ab.pitch_count} pitch
-              {ab.pitch_count === 1 ? "" : "es"} · final{" "}
-              {ab.final_balls}-{ab.final_strikes} · {ab.outs_when_up}{" "}
-              {ab.outs_when_up === 1 ? "out" : "outs"}
-            </div>
-            <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="flex items-center gap-1.5 text-[11px]">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: dotColor }}
-                  aria-hidden
-                />
-                <span className="text-white/85 truncate max-w-[10rem]">
-                  {outcome}
-                </span>
-              </div>
-              <span className="text-[10px] uppercase tracking-[0.14em] text-white/35">
-                Replay →
-              </span>
-            </div>
-          </div>
-        </div>
-        {ab.batter_id ? (
-          <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-            <Image
-              src={pitcherHeadshotUrl(ab.batter_id, 60)}
-              alt=""
-              fill
-              sizes="32px"
-              className="object-cover"
-              unoptimized
-            />
-          </div>
-        ) : null}
-      </Link>
-    </li>
-  );
-}
-
-function formatEvent(events: string | null): string | null {
-  if (!events || events.length === 0) return null;
-  return events
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
 }
 
 function NotCachedState({ gamePk }: { gamePk: number }) {

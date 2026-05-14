@@ -72,21 +72,14 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     );
   const outcomeSet = new Set(outcomes);
 
-  // At-bat result filter. Chip keys like "strikeout" expand into the
-  // full set of MLB event values that mean the same thing to a viewer.
+  // At-bat result filter. Narrows to the TERMINATING pitch of each AB
+  // (the one whose `events` column is set). Chip keys like "strikeout"
+  // expand into the full set of MLB event values for that result.
   const atBatEventInputs = eventParam
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   const atBatEventSet = expandAtBatEvents(atBatEventInputs);
-  const finalEventByAtBat = new Map<string, string>();
-  if (atBatEventSet.size > 0) {
-    for (const p of cached) {
-      if (p.events) {
-        finalEventByAtBat.set(`${p.game_pk}-${p.at_bat_number}`, p.events);
-      }
-    }
-  }
 
   const veloMin =
     veloMinParam && !Number.isNaN(Number(veloMinParam)) ? Number(veloMinParam) : null;
@@ -98,8 +91,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       return false;
     }
     if (atBatEventSet.size > 0) {
-      const finalEvent = finalEventByAtBat.get(`${p.game_pk}-${p.at_bat_number}`);
-      if (!finalEvent || !atBatEventSet.has(finalEvent)) return false;
+      if (!p.events || !atBatEventSet.has(p.events)) return false;
     }
     if (veloMin != null && (p.release_speed == null || p.release_speed < veloMin)) {
       return false;
