@@ -41,9 +41,6 @@ type SpeechRecognitionLike = {
   lang: string;
 };
 
-// How long the recognizer waits with no new speech before auto-stopping
-// and submitting whatever was transcribed so far.
-const VOICE_SILENCE_MS = 2000;
 
 function getSpeechRecognitionCtor():
   | (new () => SpeechRecognitionLike)
@@ -68,10 +65,9 @@ export function AiChat() {
   const searchParams = useSearchParams();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Auto-submit only when the silence timer ended recording, not when
-  // the user manually clicked mic-off (they may be planning to edit
-  // the transcript before sending).
+  // Auto-submit only when the engine ends the session on its own.
+  // Flipped to false when the user manually taps mic-off, since they
+  // may want to edit the transcript before sending.
   const autoSubmitOnEndRef = useRef(false);
   // Stable refs so the speech callbacks don't capture stale state.
   const inputRef = useRef("");
@@ -159,72 +155,48 @@ export function AiChat() {
     }
     const rec = new Ctor();
     rec.lang = "en-US";
-    // Continuous + interim so we can detect pauses and accumulate text
-    // across multiple utterances within a single session.
-    rec.continuous = true;
-    rec.interimResults = true;
-    // Default to auto-submit when silence ends the session; flipped to
-    // false if the user clicks the mic to stop manually.
+    // Single-shot recognition. Continuous mode interacts badly with
+    // Android Chrome — it re-emits the same utterance as multiple
+    // `isFinal=true` results, each one a progressively-longer
+    // superset of the previous, producing stacked partials like
+    // "show me show me Mason show me Mason Miller's...". Letting the
+    // engine handle end-of-speech detection itself sidesteps that:
+    // one tap = one recognition session = one final transcript.
+    rec.continuous = false;
+    rec.interimResults = false;
+    // The engine ends the session on its own when the user stops
+    // speaking, so we always want to submit whatever it produced
+    // unless the user manually canceled by tapping mic-off.
     autoSubmitOnEndRef.current = true;
 
-    // Whatever was in the input box when the user tapped mic acts as a
-    // prefix; new speech is appended to it. Captured once at session
-    // start because onresult rebuilds the full transcript from
-    // ev.results every event (see below) — without a stable base, the
-    // typed prefix would be duplicated or lost.
+    // Whatever was in the input box when the user tapped mic acts as
+    // a prefix; the engine-recognized text is appended to it.
     const baseInput = inputRef.current;
 
-    const armSilenceTimer = () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = setTimeout(() => {
-        try {
-          rec.stop();
-        } catch {
-          // Already stopped — ignore.
-        }
-      }, VOICE_SILENCE_MS);
-    };
-
     rec.onresult = (ev) => {
-      // ev.results is cumulative — it grows across events to contain
-      // every result for the current session. Some engines (notably
-      // Android Chrome) re-emit the same result as `isFinal=true`
-      // multiple times with progressively more content; appending on
-      // each event would stack partials ("show me show me Mason show
-      // me Mason Miller's..."). Rebuild the transcript from scratch
-      // every event instead — idempotent and engine-agnostic.
-      let final = "";
+      // Single-shot mode usually emits one final result. Walk the
+      // list defensively in case the engine produces a couple of
+      // disjoint chunks; the highest-index final has the engine's
+      // best transcript so far.
+      let finalText = "";
       for (let i = 0; i < ev.results.length; i++) {
         const res = ev.results[i];
         if (res?.isFinal) {
-          final += res[0]?.transcript ?? "";
+          finalText = (res[0]?.transcript ?? "").trim();
         }
       }
-      const transcript = final.trim();
-      const combined = baseInput
-        ? transcript
-          ? `${baseInput} ${transcript}`
-          : baseInput
-        : transcript;
+      if (!finalText) return;
+      const combined = baseInput ? `${baseInput} ${finalText}` : finalText;
       inputRef.current = combined;
       setInput(combined);
-      armSilenceTimer();
     };
 
     rec.onerror = () => {
       autoSubmitOnEndRef.current = false;
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
       setRecording(false);
     };
 
     rec.onend = () => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
       setRecording(false);
       if (autoSubmitOnEndRef.current) {
         const text = inputRef.current.trim();
@@ -235,7 +207,6 @@ export function AiChat() {
 
     recognitionRef.current = rec;
     setRecording(true);
-    armSilenceTimer();
     rec.start();
   }, [recording]);
 
