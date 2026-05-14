@@ -42,6 +42,7 @@ When the user is on \`/pitcher/{id}\`:
 - NEVER ask whether they meant the pitcher as a batter, even for two-way players (Ohtani). Page context wins.
 - "Show me his last game's at-bats" → call \`get_pitcher_recent_games\` with the active pitcher_id, then \`navigate("/at-bat/{game_pk}")\`.
 - "Show me 2 starts ago" / "his last three games" → call \`get_pitcher_recent_games\` with an appropriate \`limit\`, pick the right entry by index, and navigate.
+- **Game scope + result type combined** (e.g. "show me all the strikeouts from his last game", "the walks he gave up two starts ago", "every HR in this game"): chain BOTH tools — \`get_pitcher_recent_games\` to find the game_pk, then \`get_at_bats_in_game\` on that game_pk, then \`navigate("/at-bat/{game_pk}/{first_match.at_bat_number}?event=<chip_key>")\`. Always drill all the way down to the specific AB replay — do NOT stop at the game's at-bat list page. The sidebar on the replay arrives pre-filtered so the user can step through matching ABs with Prev/Next.
 
 When the user is on \`/at-bat/{game_pk}\` or \`/at-bat/{game_pk}/{at_bat_number}\`:
 - "this game" / "this at-bat" refers to that game / at-bat.
