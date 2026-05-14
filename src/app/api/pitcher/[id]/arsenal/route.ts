@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
+import { expandAtBatEvents } from "@/lib/at-bat-events";
 
 // JSON arsenal endpoint backing the persistent Scene shell on the
 // pitcher route. Mirrors the pitch-fetch + filter logic that lived
@@ -26,6 +27,9 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   const game = sp.get("game");
   const pitchTypesParam = sp.get("pitch") ?? "";
   const outcomesParam = sp.get("outcome") ?? "";
+  const eventParam = sp.get("event") ?? "";
+  const veloMinParam = sp.get("veloMin");
+  const veloMaxParam = sp.get("veloMax");
 
   const supabase = await createClient();
 
@@ -43,7 +47,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       let q = supabase
         .from("pitch_game_pitches")
         .select(
-          "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type)",
+          "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type)",
         )
         .eq("pitcher_id", pitcherId)
         .eq("pitch_games.season", season)
@@ -67,9 +71,36 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       ["whiff", "called", "ball", "foul", "inplay", "other"].includes(s),
     );
   const outcomeSet = new Set(outcomes);
-  const arsenal = cached.filter(
-    (p) => outcomeSet.size === 0 || outcomeSet.has(categorizeDescription(p.description)),
-  );
+
+  // At-bat result filter. Narrows to the TERMINATING pitch of each AB
+  // (the one whose `events` column is set). Chip keys like "strikeout"
+  // expand into the full set of MLB event values for that result.
+  const atBatEventInputs = eventParam
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const atBatEventSet = expandAtBatEvents(atBatEventInputs);
+
+  const veloMin =
+    veloMinParam && !Number.isNaN(Number(veloMinParam)) ? Number(veloMinParam) : null;
+  const veloMax =
+    veloMaxParam && !Number.isNaN(Number(veloMaxParam)) ? Number(veloMaxParam) : null;
+
+  const arsenal = cached.filter((p) => {
+    if (outcomeSet.size > 0 && !outcomeSet.has(categorizeDescription(p.description))) {
+      return false;
+    }
+    if (atBatEventSet.size > 0) {
+      if (!p.events || !atBatEventSet.has(p.events)) return false;
+    }
+    if (veloMin != null && (p.release_speed == null || p.release_speed < veloMin)) {
+      return false;
+    }
+    if (veloMax != null && (p.release_speed == null || p.release_speed > veloMax)) {
+      return false;
+    }
+    return true;
+  });
   const pitchTypes = pitchTypesParam.split(",").filter(Boolean);
   const pitchTypeSet = new Set(pitchTypes);
   const filtered =

@@ -129,6 +129,51 @@ export async function POST(request: Request) {
             return { batters: data ?? [] };
           },
         }),
+        get_pitcher_stats: tool({
+          description:
+            "Look up a pitcher's aggregate stats per pitch type for a season — avg velocity, avg spin rate, whiff rate, called-strike rate, batting average against, run value, usage %. Returns one row per (pitch_type, batter_hand) pair. To produce an overall figure across both batter handedness, take a pitch_count-weighted average. Use this when the user asks 'what's his average X' / 'how hard does he throw his fastball' / 'whiff rate on his slider' etc.",
+          inputSchema: z.object({
+            pitcher_id: z.number().int(),
+            season: z
+              .number()
+              .int()
+              .optional()
+              .describe("Defaults to the current MLB season."),
+          }),
+          execute: async ({ pitcher_id, season }) => {
+            const s = season ?? new Date().getFullYear();
+            const { data, error } = await supabase
+              .from("pitch_pitcher_aggregates")
+              .select(
+                "pitch_type, batter_hand, pitch_count, usage_pct, avg_velocity, avg_spin_rate, avg_vertical_break, avg_horizontal_break, avg_induced_vertical_break, whiff_rate, called_strike_rate, batting_avg_against, run_value_per_100",
+              )
+              .eq("pitcher_id", pitcher_id)
+              .eq("season", s);
+            if (error) return { stats: [], error: error.message };
+            return { season: s, stats: data ?? [] };
+          },
+        }),
+        get_at_bats_in_game: tool({
+          description:
+            "List every at-bat in a game with its terminating event (strikeout / strikeout_double_play / walk / single / home_run / field_out / etc.), batter_id, and inning. Use to answer 'show me all the strikeouts in this game' — call this with the game_pk, filter the result to ABs whose events match the user's intent, then navigate to /at-bat/{game_pk}/{first_match.at_bat_number}?event=<chip_key> so the replay sidebar arrives pre-filtered. Chip keys: strikeout, walk, hit, home_run, out, hit_by_pitch.",
+          inputSchema: z.object({
+            game_pk: z.number().int(),
+          }),
+          execute: async ({ game_pk }) => {
+            // Terminating pitches only — `events` is non-null only on
+            // the last pitch of each AB. One row per at-bat.
+            const { data, error } = await supabase
+              .from("pitch_game_pitches")
+              .select(
+                "at_bat_number, events, batter_id, pitcher_id, inning, inning_topbot",
+              )
+              .eq("game_pk", game_pk)
+              .not("events", "is", null)
+              .order("at_bat_number", { ascending: true });
+            if (error) return { at_bats: [], error: error.message };
+            return { at_bats: data ?? [] };
+          },
+        }),
         get_pitcher_recent_games: tool({
           description:
             "Look up a pitcher's most recent games they pitched in. Returns game_pk, date, and opponent team IDs ordered by date desc. Use this to resolve 'his last game' / 'his most recent start' on a pitcher page.",

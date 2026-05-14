@@ -156,10 +156,17 @@ export function PitcherArsenalScene({
         try {
           const pitch = new Pitch(row);
           const path = pitch.path(40);
-          const platePosition: [number, number, number] | null =
-            p.plate_x != null && p.plate_z != null
-              ? statcastToThree([p.plate_x, 0, p.plate_z])
-              : null;
+          // Anchor the sphere at the ribbon's actual terminal point
+          // (the integrated physics endpoint) rather than Statcast's
+          // reported plate_x/plate_z. The two can diverge by a few
+          // inches — physics-integration vs. direct measurement — and
+          // any divergence visibly offsets the sphere above/below the
+          // tube's end. Using the same source as the tube guarantees
+          // they stay glued.
+          const last = path[path.length - 1];
+          const platePosition: [number, number, number] | null = last
+            ? statcastToThree(last)
+            : null;
           return {
             id: `${p.game_pk}-${p.at_bat_number}-${p.pitch_number}`,
             path,

@@ -14,13 +14,17 @@ interface TopNavProps {
   back?: { href: string; label: string };
   // Right-aligned page title — short label like "At-bat replay".
   title?: string;
+  // Contextual summary string rendered to the LEFT of the title on
+  // desktop only (e.g. "All strikeouts from 2026-04-27 vs Boston Red Sox").
+  // Hidden on mobile; pages should render their own mobile variant.
+  summary?: ReactNode;
   // Optional right-side slot for a contextual action (e.g., the
   // compare page's Copy-link button). Sits between the title and the
   // right edge.
   rightSlot?: ReactNode;
 }
 
-export function TopNav({ back, title, rightSlot }: TopNavProps) {
+export function TopNav({ back, title, summary, rightSlot }: TopNavProps) {
   return (
     <header className="fixed top-0 inset-x-0 z-30 flex items-center justify-between gap-3 px-3 sm:px-6 h-12 bg-black/75 backdrop-blur-md border-b border-white/10 pointer-events-auto">
       <div className="flex items-center gap-4 sm:gap-5 min-w-0">
@@ -47,6 +51,11 @@ export function TopNav({ back, title, rightSlot }: TopNavProps) {
         </Link>
       </div>
       <div className="flex items-center gap-3 min-w-0">
+        {summary ? (
+          <div className="hidden sm:block text-[12px] text-white/70 italic truncate max-w-[36rem]">
+            {summary}
+          </div>
+        ) : null}
         {title ? (
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/60 truncate">
             {title}

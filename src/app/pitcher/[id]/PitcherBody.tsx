@@ -11,9 +11,9 @@ import { usePitcherView } from "./StatsModeToggle";
 //   - matchups: pitcher-vs-batter matchups panel (only meaningful in
 //     arsenal mode where AB picks land in 3D playback)
 //
-// In stats mode only the filters render. The arsenal aggregate would
-// duplicate the per-pitch table that leads the stats grid, and the
-// matchups panel doesn't apply to season-aggregate analytics.
+// In stats mode the arsenal aggregate would duplicate the per-pitch
+// table that leads the stats grid, and matchups don't apply to
+// season-aggregate analytics — so only filters render.
 export function PitcherBody({
   arsenal,
   filters,

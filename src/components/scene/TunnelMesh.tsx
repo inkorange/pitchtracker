@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   BackSide,
   BufferGeometry,
@@ -31,6 +31,14 @@ export function TunnelMesh({ envelope, opacity = 0.4 }: TunnelMeshProps) {
     () => buildVariableTube(envelope.spine, envelope.radii, RADIAL_SEGMENTS),
     [envelope],
   );
+  // Free the prior tube's GPU buffers when the envelope changes or
+  // this component unmounts. Without this, every filter change that
+  // recomputes the envelope would leak a BufferGeometry on the GPU.
+  useEffect(() => {
+    return () => {
+      tubeGeometry.dispose();
+    };
+  }, [tubeGeometry]);
 
   const commitRing = useMemo(() => {
     const ring = interpolateAtY(envelope.spine, envelope.radii, COMMIT_Y_FT);
@@ -114,6 +122,11 @@ function CommitRing({
     () => new TorusGeometry(Math.max(0.05, radius), 0.025, 8, 48),
     [radius],
   );
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
   // Build a quaternion that rotates the torus's default axis (+Z) onto
   // the desired axis. Use a target Vector3 we copy into via lookAt
   // mirror — easier to just compute the rotation imperatively at

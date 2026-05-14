@@ -90,8 +90,15 @@ export function buildTunnelEnvelope(
 ): TunnelEnvelope | null {
   const thresholdFt = options.thresholdFt ?? BALL_DIAMETER_FT;
   const commitY = options.commitY ?? COMMIT_Y_FT;
+  // The DEFAULT_MIN_PITCHES_PER_TYPE gate exists to keep one-off
+  // outliers (a single stray eephus in a season) from skewing the
+  // per-type centroid. But when the user has filtered down to a small
+  // set — e.g. "every pitch that resulted in a home run" — they want
+  // to see tunneling across exactly those pitches, even if each type
+  // has only one or two examples. Drop the gate adaptively for small
+  // inputs so the visualization still renders.
   const minPitchesPerType =
-    options.minPitchesPerType ?? DEFAULT_MIN_PITCHES_PER_TYPE;
+    options.minPitchesPerType ?? (pitches.length < 30 ? 1 : DEFAULT_MIN_PITCHES_PER_TYPE);
 
   // Bucket by pitch type, dropping rows with missing kinematics.
   const byType = new Map<string, Pitch[]>();

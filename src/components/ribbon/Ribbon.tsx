@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { CatmullRomCurve3, DoubleSide, TubeGeometry, Vector3 } from "three";
 import type { ThreeEvent } from "@react-three/fiber";
 import { statcastToThree } from "@/lib/viz/coords";
@@ -60,6 +60,16 @@ export function Ribbon({
       false,
     );
   }, [path, radius]);
+
+  // Free the prior GPU buffers when path/radius changes or this ribbon
+  // unmounts. Without this, every filter chip click would leak the old
+  // TubeGeometry's vertex/index buffers — death by a thousand allocations
+  // on mobile WebGL after a handful of filter toggles.
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
 
   const visibleSegments = Math.max(
     0,
