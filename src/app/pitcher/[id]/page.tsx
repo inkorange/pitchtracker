@@ -455,8 +455,15 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       {/* Card column. Absolute wrapper that holds the pitcher card AND
           the mobile-only summary banner stacked below it. Flex-col so
           the summary sits right beneath the card regardless of whether
-          the card is collapsed (short) or expanded (tall + scrolling). */}
-      <div className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] pointer-events-auto flex flex-col gap-2 max-h-[calc(100vh-5rem)]">
+          the card is collapsed (short) or expanded (tall + scrolling).
+          `data-pitcher-card-column` marks the wrapper so PitcherStatsArea
+          can anchor below the WHOLE column (card + summary), not just
+          the card section — otherwise the summary banner overlaps the
+          stat cards on mobile in stats mode. */}
+      <div
+        data-pitcher-card-column
+        className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] pointer-events-auto flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
+      >
       <section
         data-pitcher-card
         className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 overflow-y-auto min-h-0"
