@@ -16,6 +16,19 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-white/[0.06] px-6 py-6 text-[10px] leading-relaxed tracking-[0.04em] text-white/40">
       <div className="max-w-3xl mx-auto space-y-2">
+        {/* Crawlable link to the AI landing page. Necessary because the
+            chat lives behind a floating icon + JS, which Google can't
+            see — the link in the footer is what makes the /ai route
+            discoverable to search crawlers. */}
+        <p className="text-[11px] text-white/55">
+          <a
+            href="/ai"
+            className="hover:text-white/85 underline-offset-2 hover:underline transition-colors"
+          >
+            Ask pitchtracker
+          </a>{" "}
+          — natural-language pitch analysis (voice or text).
+        </p>
         <p>
           Not affiliated with or endorsed by Major League Baseball, MLB
           Advanced Media, or any of its clubs. All MLB and Club marks,
