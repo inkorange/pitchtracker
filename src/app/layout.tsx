@@ -66,6 +66,13 @@ export const metadata: Metadata = {
       "Compare arsenals, replay at-bats in 3D, and browse season leaderboards.",
     images: ["/logo.png"],
   },
+  // Google Search Console verification. Set GOOGLE_SITE_VERIFICATION in
+  // Vercel env (value comes from GSC's "HTML tag" verification method).
+  // Renders <meta name="google-site-verification" content="..."> in
+  // every page's <head>. Safe to omit on preview deploys.
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
 };
 
 export default function RootLayout({

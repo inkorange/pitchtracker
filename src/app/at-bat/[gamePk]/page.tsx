@@ -178,8 +178,54 @@ export default async function GameAtBatsPage({ params }: PageProps) {
     last_description: ab.last_description,
   }));
 
+  // Schema.org markup so Google can render this page as a sports
+  // event rich result (date, teams, venue). BreadcrumbList helps the
+  // SERP show the back-path. Both are inlined as application/ld+json
+  // because we want them in the initial HTML, not appended later.
+  const eventJsonLd = game
+    ? {
+        "@context": "https://schema.org",
+        "@type": "SportsEvent",
+        name: `${awayTeam?.name ?? "Away"} @ ${homeTeam?.name ?? "Home"}`,
+        startDate: game.game_date,
+        eventStatus: "https://schema.org/EventScheduled",
+        sport: "Baseball",
+        homeTeam: homeTeam
+          ? { "@type": "SportsTeam", name: homeTeam.name }
+          : undefined,
+        awayTeam: awayTeam
+          ? { "@type": "SportsTeam", name: awayTeam.name }
+          : undefined,
+        url: `/at-bat/${gamePkN}`,
+      }
+    : null;
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "/" },
+      { "@type": "ListItem", position: 2, name: "Games", item: "/at-bat" },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: game?.game_date ?? `Game ${gamePkN}`,
+        item: `/at-bat/${gamePkN}`,
+      },
+    ],
+  };
+
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      {eventJsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }}
+        />
+      ) : null}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <TopNav back={{ href: "/at-bat", label: "All games" }} title="Game" />
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="space-y-2">

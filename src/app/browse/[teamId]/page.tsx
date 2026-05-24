@@ -87,8 +87,47 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
     : { data: [] };
   const sortedPitchers = (pitchers ?? []).slice().sort((a, b) => a.full_name.localeCompare(b.full_name));
 
+  // SportsTeam markup with the active roster of pitchers as athletes.
+  // Helps Google build a knowledge-panel-style result for the team
+  // page. Breadcrumb gives SERP the back-path.
+  const teamJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SportsTeam",
+    name: team.name,
+    sport: "Baseball",
+    memberOf: { "@type": "SportsOrganization", name: "Major League Baseball" },
+    url: `/browse/${team.mlb_id}`,
+    athlete: sortedPitchers.map((p) => ({
+      "@type": "Person",
+      name: p.full_name,
+      url: `/pitcher/${p.mlb_id}`,
+    })),
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "/" },
+      { "@type": "ListItem", position: 2, name: "Teams", item: "/browse" },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: team.name,
+        item: `/browse/${team.mlb_id}`,
+      },
+    ],
+  };
+
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(teamJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <TopNav back={{ href: "/browse", label: "All teams" }} title="Team" />
       <div className="max-w-4xl mx-auto space-y-10">
         <header className="space-y-3">

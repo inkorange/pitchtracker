@@ -368,6 +368,20 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     affiliation: team ? { "@type": "SportsTeam", name: team.name } : undefined,
     sameAs: [`https://www.mlb.com/player/${pitcher.mlb_id}`],
   };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "/" },
+      { "@type": "ListItem", position: 2, name: "Pitchers", item: "/browse" },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: pitcher.full_name,
+        item: `/pitcher/${pitcher.mlb_id}`,
+      },
+    ],
+  };
 
   return (
     <>
@@ -378,6 +392,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <PitcherOutcomeLegendGate>
         <OutcomeLegend />
