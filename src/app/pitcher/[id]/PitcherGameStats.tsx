@@ -37,7 +37,7 @@ export function PitcherGameStats({ line, xbh, gameDate, opponentName }: Props) {
           className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-[0.1em] ${DECISION_STYLE[line.decision]}`}
           title={line.noteRaw ?? line.decision}
         >
-          {line.decision === "ND" ? "No decision" : line.decision}
+          {line.decision === "ND" ? "N/D" : line.decision}
         </span>
       </div>
       <div className="grid grid-cols-4 gap-x-2 gap-y-1.5 text-[11px] tabular-nums">
