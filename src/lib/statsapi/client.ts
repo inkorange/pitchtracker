@@ -212,6 +212,98 @@ export async function fetchPersonsCached(
   return result;
 }
 
+// One pitcher's pitching line from a game's boxscore — the same numbers
+// you'd see on MLB.com or ESPN. Returned from the canonical
+// /game/{gamePk}/boxscore endpoint so figures match the league record
+// exactly (rather than computing IP / ER ourselves from pitch data,
+// which would diverge on edge cases like inherited runners).
+export interface MlbPitcherGameLine {
+  pitcherId: number;
+  fullName: string;
+  inningsPitched: string; // "6.2" — Statcast's text-encoded outs
+  hits: number;
+  homeRuns: number;
+  runs: number;
+  earnedRuns: number;
+  strikeouts: number;
+  baseOnBalls: number;
+  numberOfPitches: number;
+  strikes: number;
+  battersFaced: number;
+  decision: "W" | "L" | "S" | "H" | "ND";
+  noteRaw: string | null; // e.g. "(W, 3-1)" — useful when you want season W-L
+}
+
+interface RawBoxscorePitchingLine {
+  inningsPitched?: string;
+  hits?: number;
+  homeRuns?: number;
+  runs?: number;
+  earnedRuns?: number;
+  strikeOuts?: number;
+  baseOnBalls?: number;
+  numberOfPitches?: number;
+  strikes?: number;
+  battersFaced?: number;
+  note?: string;
+}
+
+interface RawBoxscorePlayer {
+  person: { id: number; fullName: string };
+  stats?: { pitching?: RawBoxscorePitchingLine };
+}
+
+interface RawBoxscoreResponse {
+  teams: {
+    home: { players: Record<string, RawBoxscorePlayer> };
+    away: { players: Record<string, RawBoxscorePlayer> };
+  };
+}
+
+export async function fetchPitcherGameLine(
+  gamePk: number,
+  pitcherId: number,
+): Promise<MlbPitcherGameLine | null> {
+  // Past-game boxscores are immutable, but we don't have a cheap way
+  // to tell from the request whether the game is finished — so cap at
+  // an hour to let live games update. Plenty fast on cache hits.
+  const data = await fetchJson<RawBoxscoreResponse>(
+    `${BASE}/game/${gamePk}/boxscore`,
+    { next: { revalidate: 3600 }, cache: undefined },
+  );
+  const key = `ID${pitcherId}`;
+  const player = data.teams.home.players[key] ?? data.teams.away.players[key];
+  if (!player) return null;
+  const p = player.stats?.pitching;
+  if (!p) return null;
+
+  // The note field, when present, encodes the W/L/S/H decision —
+  // "(W, 3-1)", "(L, 0-2)", "(S, 12)", "(H, 4)". Anything else is ND.
+  const note = (p.note ?? "").trim();
+  let decision: MlbPitcherGameLine["decision"] = "ND";
+  if (note.length > 0) {
+    const ch = note.replace(/^\(/, "").charAt(0).toUpperCase();
+    if (ch === "W" || ch === "L" || ch === "S" || ch === "H") decision = ch;
+  }
+
+  return {
+    pitcherId,
+    fullName: player.person.fullName,
+    inningsPitched: p.inningsPitched ?? "0.0",
+    hits: p.hits ?? 0,
+    homeRuns: p.homeRuns ?? 0,
+    runs: p.runs ?? 0,
+    earnedRuns: p.earnedRuns ?? 0,
+    strikeouts: p.strikeOuts ?? 0,
+    baseOnBalls: p.baseOnBalls ?? 0,
+    numberOfPitches: p.numberOfPitches ?? 0,
+    strikes: p.strikes ?? 0,
+    battersFaced: p.battersFaced ?? 0,
+    decision,
+    noteRaw: note || null,
+  };
+}
+
 // Fetch the schedule between two dates inclusive. ISO YYYY-MM-DD strings.
 export async function fetchSchedule(
   startDate: string,

@@ -27,6 +27,8 @@ import { PitcherStatsArea } from "./PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
+import { fetchPitcherGameLine, type MlbPitcherGameLine } from "@/lib/statsapi/client";
+import { PitcherGameStats } from "./PitcherGameStats";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -346,6 +348,34 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     }
   }
 
+  // Game line panel — only when ?game=N is active. The official line
+  // comes from the MLB boxscore (matches what fans see on MLB.com);
+  // XBH is derived from our cached pitch events for this pitcher in
+  // this game, since boxscore pitching stats don't break out 2B/3B.
+  let gameLine: MlbPitcherGameLine | null = null;
+  let xbhInGame = 0;
+  if (sp.game && activeGameInfo) {
+    const activeGamePk = Number(sp.game);
+    try {
+      gameLine = await fetchPitcherGameLine(activeGamePk, pitcherId);
+    } catch {
+      // Network blip — render without the line. Stats panel is hidden.
+    }
+    if (cachedPitches) {
+      for (const p of cachedPitches) {
+        if (
+          p.game_pk === activeGamePk &&
+          p.events != null &&
+          (p.events === "double" ||
+            p.events === "triple" ||
+            p.events === "home_run")
+        ) {
+          xbhInGame += 1;
+        }
+      }
+    }
+  }
+
   const filterSummary = buildFilterSummary({
     season,
     pitchTypes,
@@ -484,7 +514,16 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           body={
             <PitcherBody
               arsenal={
-                <div>
+                <div className="space-y-4">
+                  {gameLine ? (
+                    <PitcherGameStats
+                      line={gameLine}
+                      xbh={xbhInGame}
+                      gameDate={activeGameInfo?.game_date ?? null}
+                      opponentName={activeGameInfo?.opponentName ?? null}
+                    />
+                  ) : null}
+                  <div>
                   <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
                   {(aggregates ?? []).length === 0 ? (
                     <div className="text-xs text-white/55 leading-relaxed">
@@ -515,6 +554,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                       ))}
                     </ul>
                   )}
+                  </div>
                 </div>
               }
               filters={
