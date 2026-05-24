@@ -41,7 +41,13 @@ export function TunnelMesh({ envelope, opacity = 0.4 }: TunnelMeshProps) {
   }, [tubeGeometry]);
 
   const commitRing = useMemo(() => {
-    const ring = interpolateAtY(envelope.spine, envelope.radii, COMMIT_Y_FT);
+    // Always render the commit ring when tunneling is on. When the
+    // envelope's spine doesn't extend all the way to COMMIT_Y_FT
+    // (pitch types diverged before commit), `interpolateAtY` returns
+    // null — fall through to `ringAtY` which extrapolates the spine's
+    // last tangent forward to the commit y-position so the marker
+    // still appears at a meaningful spot.
+    const ring = ringAtY(envelope.spine, envelope.radii, COMMIT_Y_FT);
     if (!ring) return null;
     return {
       center: statcastToThree(ring.point),
@@ -107,8 +113,13 @@ export function TunnelMesh({ envelope, opacity = 0.4 }: TunnelMeshProps) {
   );
 }
 
-// Thin glowing torus at the BP commit point (~23.8 ft from plate),
-// oriented perpendicular to the spine tangent.
+// Glowing torus at the BP commit point (~23.8 ft from plate),
+// oriented perpendicular to the spine tangent. Ring radius scales
+// off the tunnel envelope's radius at this y but with a generous
+// floor so the marker is always clearly visible (even on
+// late-diverging tunnels where the envelope is tight); tube
+// thickness is larger than the cone's wireframe so the ring reads
+// as a deliberate landmark, not part of the envelope skin.
 function CommitRing({
   center,
   axis,
@@ -119,7 +130,7 @@ function CommitRing({
   radius: number;
 }) {
   const geometry = useMemo(
-    () => new TorusGeometry(Math.max(0.05, radius), 0.025, 8, 48),
+    () => new TorusGeometry(Math.max(0.4, radius * 1.15), 0.05, 12, 64),
     [radius],
   );
   useEffect(() => {
@@ -153,11 +164,11 @@ function CommitRing({
         <meshStandardMaterial
           color={COMMIT_RING_COLOR}
           emissive={COMMIT_RING_COLOR}
-          emissiveIntensity={0.6}
+          emissiveIntensity={1.1}
           transparent
-          opacity={0.8}
+          opacity={0.95}
           roughness={0.3}
-          metalness={0.1}
+          metalness={0.15}
         />
       </mesh>
     </group>
@@ -278,4 +289,47 @@ function interpolateAtY(
     }
   }
   return null;
+}
+
+// Same shape as `interpolateAtY` but never gives up: if `targetY` is
+// past the spine's last point (the tunnel ended before the commit
+// point), extrapolate the spine's final tangent forward so the commit
+// ring always has a sensible location to render at. The geometric
+// "commit point" is a fixed property of the play — the marker
+// shouldn't disappear just because the tunnel collapsed early.
+function ringAtY(
+  spineStatcast: Array<[number, number, number]>,
+  radii: number[],
+  targetY: number,
+): { point: [number, number, number]; tangent: Vector3; radius: number } | null {
+  const inside = interpolateAtY(spineStatcast, radii, targetY);
+  if (inside) return inside;
+
+  const n = spineStatcast.length;
+  if (n < 2) return null;
+
+  const last = spineStatcast[n - 1];
+  const prev = spineStatcast[n - 2];
+  const dy = prev[1] - last[1];
+  if (dy <= 0) return null; // Degenerate spine segment.
+
+  const t = (last[1] - targetY) / dy;
+  const extrapPoint: [number, number, number] = [
+    last[0] + (last[0] - prev[0]) * t,
+    targetY,
+    last[2] + (last[2] - prev[2]) * t,
+  ];
+
+  const lastThree = statcastToThree(last);
+  const prevThree = statcastToThree(prev);
+  const tangent = new Vector3(
+    lastThree[0] - prevThree[0],
+    lastThree[1] - prevThree[1],
+    lastThree[2] - prevThree[2],
+  );
+  return {
+    point: extrapPoint,
+    tangent,
+    radius: radii[n - 1] ?? 0.15,
+  };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useTransition } from "react";
+import { useCallback, useTransition, type ReactNode } from "react";
 import {
   getPitchColor,
   getPitchLabel,
@@ -31,9 +31,19 @@ interface PitcherFiltersProps {
   arsenal: ArsenalEntry[];
   games: GameEntry[];
   season: number;
+  // Rendered right below the Game dropdown. Used by the pitcher
+  // page to drop the per-game stat line ( IP / K / BB / strike % /
+  // decision ) in next to the dropdown that selects which game
+  // those stats describe.
+  gameStatsSlot?: ReactNode;
 }
 
-export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) {
+export function PitcherFilters({
+  arsenal,
+  games,
+  season,
+  gameStatsSlot,
+}: PitcherFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -263,6 +273,8 @@ export function PitcherFilters({ arsenal, games, season }: PitcherFiltersProps) 
           </select>
         </div>
       )}
+
+      {gameStatsSlot}
 
       {(activePitchTypes.length > 0 ||
         activeHand ||

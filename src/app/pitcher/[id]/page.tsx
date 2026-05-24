@@ -27,6 +27,8 @@ import { PitcherStatsArea } from "./PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
+import { fetchPitcherGameLine, type MlbPitcherGameLine } from "@/lib/statsapi/client";
+import { PitcherGameStats } from "./PitcherGameStats";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -346,6 +348,34 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     }
   }
 
+  // Game line panel — only when ?game=N is active. The official line
+  // comes from the MLB boxscore (matches what fans see on MLB.com);
+  // XBH is derived from our cached pitch events for this pitcher in
+  // this game, since boxscore pitching stats don't break out 2B/3B.
+  let gameLine: MlbPitcherGameLine | null = null;
+  let xbhInGame = 0;
+  if (sp.game && activeGameInfo) {
+    const activeGamePk = Number(sp.game);
+    try {
+      gameLine = await fetchPitcherGameLine(activeGamePk, pitcherId);
+    } catch {
+      // Network blip — render without the line. Stats panel is hidden.
+    }
+    if (cachedPitches) {
+      for (const p of cachedPitches) {
+        if (
+          p.game_pk === activeGamePk &&
+          p.events != null &&
+          (p.events === "double" ||
+            p.events === "triple" ||
+            p.events === "home_run")
+        ) {
+          xbhInGame += 1;
+        }
+      }
+    }
+  }
+
   const filterSummary = buildFilterSummary({
     season,
     pitchTypes,
@@ -425,8 +455,15 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       {/* Card column. Absolute wrapper that holds the pitcher card AND
           the mobile-only summary banner stacked below it. Flex-col so
           the summary sits right beneath the card regardless of whether
-          the card is collapsed (short) or expanded (tall + scrolling). */}
-      <div className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] pointer-events-auto flex flex-col gap-2 max-h-[calc(100vh-5rem)]">
+          the card is collapsed (short) or expanded (tall + scrolling).
+          `data-pitcher-card-column` marks the wrapper so PitcherStatsArea
+          can anchor below the WHOLE column (card + summary), not just
+          the card section — otherwise the summary banner overlaps the
+          stat cards on mobile in stats mode. */}
+      <div
+        data-pitcher-card-column
+        className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] pointer-events-auto flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
+      >
       <section
         data-pitcher-card
         className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 overflow-y-auto min-h-0"
@@ -529,6 +566,16 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                       }))}
                       games={games}
                       season={season}
+                      gameStatsSlot={
+                        gameLine ? (
+                          <PitcherGameStats
+                            line={gameLine}
+                            xbh={xbhInGame}
+                            gameDate={activeGameInfo?.game_date ?? null}
+                            opponentName={activeGameInfo?.opponentName ?? null}
+                          />
+                        ) : null
+                      }
                     />
                   </div>
 

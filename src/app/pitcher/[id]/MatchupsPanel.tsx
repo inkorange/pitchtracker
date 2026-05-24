@@ -12,7 +12,26 @@ interface BatterResult {
   id: number;
   fullName: string;
   teamId: number | null;
+  // Short-label outcomes for each at-bat this batter had against the
+  // pitcher in the current scope. Rendered as small pills next to the
+  // name so users can scan the matchup story at a glance.
+  results: string[];
 }
+
+// Tailwind class set per result label. Keeps the row visually quiet
+// while still hinting at K (red) vs hit (green) vs walk (yellow) etc.
+const RESULT_PILL_STYLE: Record<string, string> = {
+  K: "bg-red-500/20 border-red-400/40 text-red-100",
+  BB: "bg-amber-500/20 border-amber-400/40 text-amber-100",
+  HBP: "bg-amber-500/20 border-amber-400/40 text-amber-100",
+  "1B": "bg-emerald-500/20 border-emerald-400/40 text-emerald-100",
+  "2B": "bg-emerald-500/25 border-emerald-400/50 text-emerald-100",
+  "3B": "bg-emerald-500/30 border-emerald-400/55 text-emerald-100",
+  HR: "bg-fuchsia-500/25 border-fuchsia-400/50 text-fuchsia-100",
+  Out: "bg-white/[0.06] border-white/15 text-white/65",
+  E: "bg-sky-500/20 border-sky-400/40 text-sky-100",
+  CI: "bg-sky-500/20 border-sky-400/40 text-sky-100",
+};
 
 interface AtBatSummary {
   game_pk: number;
@@ -665,7 +684,19 @@ function BatterPickList({
                 </div>
               ) : null}
             </div>
-            <span className="truncate">{b.fullName}</span>
+            <span className="truncate flex-1 min-w-0">{b.fullName}</span>
+            {b.results.length > 0 ? (
+              <span className="flex items-center gap-1 flex-shrink-0">
+                {b.results.map((r, i) => (
+                  <span
+                    key={i}
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold tracking-[0.04em] ${RESULT_PILL_STYLE[r] ?? "bg-white/[0.06] border-white/15 text-white/65"}`}
+                  >
+                    {r}
+                  </span>
+                ))}
+              </span>
+            ) : null}
           </button>
         </li>
       ))}

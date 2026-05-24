@@ -45,15 +45,21 @@ export function PitcherStatsArea() {
 
   useEffect(() => {
     if (view !== "stats" || isDesktop) return;
-    const card = document.querySelector("[data-pitcher-card]");
-    if (!card) return;
+    // Anchor below the WHOLE card column (card section + the mobile
+    // filter-summary banner stacked beneath it), not just the card.
+    // Falling back to [data-pitcher-card] handles older renders /
+    // surfaces that don't have the wrapper yet.
+    const target =
+      document.querySelector("[data-pitcher-card-column]") ??
+      document.querySelector("[data-pitcher-card]");
+    if (!target) return;
     const update = () => {
-      const rect = (card as HTMLElement).getBoundingClientRect();
+      const rect = (target as HTMLElement).getBoundingClientRect();
       setMobileTopPx(rect.bottom + MOBILE_GAP_PX);
     };
     update();
     const ro = new ResizeObserver(update);
-    ro.observe(card);
+    ro.observe(target);
     return () => ro.disconnect();
   }, [view, isDesktop]);
 

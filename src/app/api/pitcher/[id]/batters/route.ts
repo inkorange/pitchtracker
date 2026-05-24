@@ -33,6 +33,41 @@ interface BatterResult {
   id: number;
   fullName: string;
   teamId: number | null;
+  // Short-label outcomes (e.g. ["K", "BB", "1B"]) for every at-bat
+  // this batter had against the pitcher in the matched scope (team /
+  // search / suggestion). Order is insertion (no real chronological
+  // sort, but recent ABs cluster late since the pitch query sorts by
+  // game). Empty array if no terminating-event data is available.
+  results: string[];
+}
+
+// Map an MLB event value to a compact pill label. Anything we don't
+// recognize falls through as null so the UI can skip it cleanly.
+const EVENT_LABEL: Record<string, string> = {
+  strikeout: "K",
+  strikeout_double_play: "K",
+  walk: "BB",
+  intent_walk: "BB",
+  hit_by_pitch: "HBP",
+  single: "1B",
+  double: "2B",
+  triple: "3B",
+  home_run: "HR",
+  field_out: "Out",
+  force_out: "Out",
+  fielders_choice: "Out",
+  fielders_choice_out: "Out",
+  grounded_into_double_play: "Out",
+  double_play: "Out",
+  triple_play: "Out",
+  sac_fly: "Out",
+  sac_bunt: "Out",
+  field_error: "E",
+  catcher_interf: "CI",
+};
+function labelForEvent(ev: string | null | undefined): string | null {
+  if (!ev) return null;
+  return EVENT_LABEL[ev] ?? null;
 }
 
 interface TeamResult {
@@ -76,6 +111,8 @@ export async function GET(request: Request, { params }: RouteParams) {
   interface PitchRow {
     batter_id: number | null;
     inning_topbot: string | null;
+    at_bat_number: number | null;
+    events: string | null;
     pitch_games: {
       season: number;
       game_type: string | null;
@@ -88,7 +125,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   const { data, error } = await supabase
     .from("pitch_game_pitches")
     .select(
-      "batter_id, inning_topbot, pitch_games!inner(season, game_type, game_date, game_pk, home_team_id, away_team_id)",
+      "batter_id, inning_topbot, at_bat_number, events, pitch_games!inner(season, game_type, game_date, game_pk, home_team_id, away_team_id)",
     )
     .eq("pitcher_id", pitcherId)
     .eq("pitch_games.season", season)
@@ -117,6 +154,13 @@ export async function GET(request: Request, { params }: RouteParams) {
     lastDate: string;
   }
   const teamAgg = new Map<number, TeamAgg>();
+
+  // Per-batter at-bat results. Keyed by `${game_pk}-${at_bat_number}`
+  // so we only record one outcome per AB even though many pitch rows
+  // share that key. Only the terminating pitch has a non-null events,
+  // so the entry is overwritten in that one row and stays null for
+  // the others.
+  const batterAbResults = new Map<number, Map<string, string>>();
 
   for (const r of rows) {
     const bid = r.batter_id;
@@ -159,7 +203,31 @@ export async function GET(request: Request, { params }: RouteParams) {
         if (date > t.lastDate) t.lastDate = date;
       }
     }
+
+    if (r.events && typeof gamePk === "number" && typeof r.at_bat_number === "number") {
+      const key = `${gamePk}-${r.at_bat_number}`;
+      let perBatter = batterAbResults.get(bid);
+      if (!perBatter) {
+        perBatter = new Map<string, string>();
+        batterAbResults.set(bid, perBatter);
+      }
+      perBatter.set(key, r.events);
+    }
   }
+
+  // Resolve the per-batter event-map into the short-label array the
+  // UI renders. Called by every branch (team filter, suggestions,
+  // search), so the BatterResult shape stays consistent.
+  const resultsFor = (bid: number): string[] => {
+    const perBatter = batterAbResults.get(bid);
+    if (!perBatter) return [];
+    const out: string[] = [];
+    for (const ev of perBatter.values()) {
+      const label = labelForEvent(ev);
+      if (label) out.push(label);
+    }
+    return out;
+  };
 
   // Team-filter mode: list all batters who faced this pitcher while
   // on the given team. Skips the q-search path entirely.
@@ -176,6 +244,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         id: bid,
         fullName: p.fullName,
         teamId: filterTeamId,
+        results: resultsFor(bid),
       });
     }
     batters.sort((a, b) => a.fullName.localeCompare(b.fullName));
@@ -200,6 +269,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         id: bid,
         fullName: p.fullName,
         teamId: agg.get(bid)?.lastTeamId ?? null,
+        results: resultsFor(bid),
       });
     }
 
@@ -253,6 +323,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         id: bid,
         fullName: p.fullName,
         teamId: agg.get(bid)?.lastTeamId ?? null,
+        results: resultsFor(bid),
       });
     }
   }
