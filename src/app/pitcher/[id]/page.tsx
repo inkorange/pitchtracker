@@ -514,16 +514,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           body={
             <PitcherBody
               arsenal={
-                <div className="space-y-4">
-                  {gameLine ? (
-                    <PitcherGameStats
-                      line={gameLine}
-                      xbh={xbhInGame}
-                      gameDate={activeGameInfo?.game_date ?? null}
-                      opponentName={activeGameInfo?.opponentName ?? null}
-                    />
-                  ) : null}
-                  <div>
+                <div>
                   <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
                   {(aggregates ?? []).length === 0 ? (
                     <div className="text-xs text-white/55 leading-relaxed">
@@ -554,7 +545,6 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                       ))}
                     </ul>
                   )}
-                  </div>
                 </div>
               }
               filters={
@@ -569,6 +559,16 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                       }))}
                       games={games}
                       season={season}
+                      gameStatsSlot={
+                        gameLine ? (
+                          <PitcherGameStats
+                            line={gameLine}
+                            xbh={xbhInGame}
+                            gameDate={activeGameInfo?.game_date ?? null}
+                            opponentName={activeGameInfo?.opponentName ?? null}
+                          />
+                        ) : null
+                      }
                     />
                   </div>
 
