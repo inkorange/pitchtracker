@@ -32,6 +32,12 @@ interface AtBatSummary {
   pitch_count: number;
   /** Last pitch's `events` if non-empty, else its `description`. */
   outcome: string | null;
+  /**
+   * Last pitch's `description` (called_strike / swinging_strike /
+   * foul_tip / …). Needed to differentiate strikeout types when
+   * formatting the AB-result label client-side.
+   */
+  last_description: string | null;
 }
 
 interface PitchRow {
@@ -165,6 +171,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         (b.last_events && b.last_events.length > 0
           ? b.last_events
           : b.last_description) ?? null,
+      last_description: b.last_description,
     }))
     .sort((a, b) => {
       const d = a.game_date.localeCompare(b.game_date);

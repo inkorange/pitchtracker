@@ -7,6 +7,7 @@ import { useParams } from "next/navigation";
 import { parseAsInteger, useQueryState, useQueryStates } from "nuqs";
 import { eventPillColor } from "@/lib/viz/colors";
 import { personHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
+import { formatAtBatResultLabel } from "@/lib/at-bat-events";
 
 interface BatterResult {
   id: number;
@@ -44,6 +45,8 @@ interface AtBatSummary {
   batter_team_id: number | null;
   pitch_count: number;
   outcome: string | null;
+  /** Last pitch's description — drives strikeout type (L/S/F). */
+  last_description: string | null;
 }
 
 interface MatchupsPanelProps {
@@ -904,16 +907,8 @@ function MatchupRow({
           eventPillColor(ab.outcome)
         }
       >
-        {humanizeOutcome(ab.outcome)}
+        {formatAtBatResultLabel(ab.outcome, ab.last_description)}
       </span>
     </button>
   );
-}
-
-function humanizeOutcome(raw: string | null): string {
-  if (!raw) return "—";
-  return raw
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
 }

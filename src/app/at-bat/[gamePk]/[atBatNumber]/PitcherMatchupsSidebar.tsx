@@ -8,6 +8,7 @@ import { parseAsString, useQueryState } from "nuqs";
 import {
   availableAtBatResultChips,
   expandAtBatEvents,
+  formatAtBatResultLabel,
 } from "@/lib/at-bat-events";
 import { AtBatResultFilter } from "@/components/filters/AtBatResultFilter";
 import { eventPillColor } from "@/lib/viz/colors";
@@ -144,6 +145,10 @@ export function PitcherMatchupsSidebar({
               ab.final_events && ab.final_events.length > 0
                 ? ab.final_events
                 : ab.final_description ?? "";
+            const label = formatAtBatResultLabel(
+              ab.final_events,
+              ab.final_description,
+            );
             const siblingHref = eventParam
               ? `/at-bat/${gamePk}/${ab.at_bat_number}?event=${encodeURIComponent(eventParam)}`
               : `/at-bat/${gamePk}/${ab.at_bat_number}`;
@@ -194,14 +199,7 @@ export function PitcherMatchupsSidebar({
                       eventPillColor(finalStr)
                     }
                   >
-                    {finalStr
-                      ? finalStr
-                          .split("_")
-                          .map(
-                            (w) => w.charAt(0).toUpperCase() + w.slice(1),
-                          )
-                          .join(" ")
-                      : "—"}
+                    {label}
                   </span>
                 </Link>
               </li>
