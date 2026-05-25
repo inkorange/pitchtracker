@@ -3,7 +3,11 @@ import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureGameCache } from "@/lib/cache/backfill";
 
-export const maxDuration = 300;
+// 800s is the Vercel Pro ceiling. The daily run finishes in 30-60s
+// because the lazy short-circuit skips already-cached games — the
+// headroom is for the one-off ?force=all&lookback=N backfill that
+// has to re-pull every game in a wider window.
+export const maxDuration = 800;
 
 // Game-centric daily precache. Walks the regular-season games from
 // the last N days (BOUNDED to today — pitch_games stores the full
@@ -44,9 +48,27 @@ export async function GET(request: Request) {
   const authError = verifyCronAuth(request);
   if (authError) return authError;
 
+  const url = new URL(request.url);
+  // ?force=all re-pulls every game in the window from Savant, bypassing
+  // the lazy short-circuit. One-off use for historical backfill — fixes
+  // games whose original fetch landed partial data (saw this with
+  // Skubal's 4/29 start: only 5 pitchers and ~half the pitch count
+  // were in the cache, because Savant returned a truncated CSV at the
+  // time). The daily scheduled run leaves this off; ad-hoc curl with
+  // ?force=all is the recovery tool.
+  const forceAll = url.searchParams.get("force") === "all";
+  // ?lookback=N overrides the 30-day window. Combine with ?force=all
+  // to do a one-off historical sweep across the whole season — useful
+  // after a stretch of broken crons left data gaps further back.
+  const lookbackParam = Number(url.searchParams.get("lookback"));
+  const lookbackDays =
+    Number.isFinite(lookbackParam) && lookbackParam > 0
+      ? Math.min(lookbackParam, 365)
+      : LOOKBACK_DAYS;
+
   const supabase = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
-  const cutoff = dateNDaysAgo(LOOKBACK_DAYS);
+  const cutoff = dateNDaysAgo(lookbackDays);
   const forceCutoff = dateNDaysAgo(FORCE_RECENT_DAYS);
 
   // Upper-bound on game_date is critical: pitch_games carries the
@@ -78,7 +100,7 @@ export async function GET(request: Request) {
           // Force re-pull for the most recent days — a game fetched
           // mid-innings has a partial pitch set. Older games are
           // immutable, so the lazy short-circuit saves the Savant call.
-          const force = g.game_date >= forceCutoff;
+          const force = forceAll || g.game_date >= forceCutoff;
           // skipRecompute: aggregates are recomputed once at the end
           // of the cron chain by /api/cron/refresh-aggregates; calling
           // pitch_recompute_aggregates() per game would make the cron
@@ -94,7 +116,9 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     window_start: cutoff,
+    window_days: lookbackDays,
     force_cutoff: forceCutoff,
+    force_all: forceAll,
     games_seen: list.length,
     processed,
     failures,
