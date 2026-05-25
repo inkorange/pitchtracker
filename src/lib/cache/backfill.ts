@@ -18,14 +18,17 @@ const inFlight = new Map<string, Promise<void>>();
 export async function ensurePitcherSeasonCache(
   pitcherId: number,
   season: number,
-  opts: { force?: boolean } = {},
+  opts: { force?: boolean; skipRecompute?: boolean } = {},
 ): Promise<void> {
   const key = `${pitcherId}:${season}:${opts.force ? "force" : "lazy"}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
-  const p = doEnsure(pitcherId, season, opts.force === true).finally(() =>
-    inFlight.delete(key),
-  );
+  const p = doEnsure(
+    pitcherId,
+    season,
+    opts.force === true,
+    opts.skipRecompute === true,
+  ).finally(() => inFlight.delete(key));
   inFlight.set(key, p);
   return p;
 }
@@ -34,6 +37,7 @@ async function doEnsure(
   pitcherId: number,
   season: number,
   force: boolean,
+  skipRecompute: boolean,
 ): Promise<void> {
   const supabase = createAdminClient();
 
@@ -172,8 +176,13 @@ async function doEnsure(
     await supabase.from("pitch_pitcher_games").upsert(chunk);
   }
 
-  // Recompute aggregates so the arsenal panel populates.
-  await supabase.rpc("pitch_recompute_aggregates");
+  // Recompute aggregates so the arsenal panel populates. Cron callers
+  // pass skipRecompute=true and rely on the dedicated refresh-aggregates
+  // cron — recomputing per-pitcher inside a batch loop is what was
+  // pushing the precache function over its timeout.
+  if (!skipRecompute) {
+    await supabase.rpc("pitch_recompute_aggregates");
+  }
 }
 
 // On-demand cache for a single game. Used by the team+date lookup
@@ -184,19 +193,25 @@ async function doEnsure(
 // earlier fetch landed mid-game and missed late innings).
 export async function ensureGameCache(
   gamePk: number,
-  opts: { force?: boolean } = {},
+  opts: { force?: boolean; skipRecompute?: boolean } = {},
 ): Promise<void> {
   const key = `game:${gamePk}:${opts.force ? "force" : "lazy"}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
-  const p = doEnsureGame(gamePk, opts.force === true).finally(() =>
-    inFlight.delete(key),
-  );
+  const p = doEnsureGame(
+    gamePk,
+    opts.force === true,
+    opts.skipRecompute === true,
+  ).finally(() => inFlight.delete(key));
   inFlight.set(key, p);
   return p;
 }
 
-async function doEnsureGame(gamePk: number, force: boolean): Promise<void> {
+async function doEnsureGame(
+  gamePk: number,
+  force: boolean,
+  skipRecompute: boolean,
+): Promise<void> {
   const supabase = createAdminClient();
 
   // Already have pitches for this game? bail out cheaply, unless the
@@ -315,6 +330,10 @@ async function doEnsureGame(gamePk: number, force: boolean): Promise<void> {
     await supabase.from("pitch_pitcher_games").upsert(chunk);
   }
 
-  await supabase.rpc("pitch_recompute_aggregates");
+  // Same skip rule as the per-pitcher path: cron callers opt out so the
+  // batch loop doesn't pay 1× full recompute per game.
+  if (!skipRecompute) {
+    await supabase.rpc("pitch_recompute_aggregates");
+  }
 }
 
