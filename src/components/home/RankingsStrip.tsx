@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { MetricInfo } from "./MetricInfo";
 
 // Server-rendered Rankings strip — reads pitch_rankings (populated
 // by /api/cron/refresh-rankings) for the active season and renders
@@ -14,17 +15,53 @@ import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 // preseason / fresh deploy with no data).
 
 const CATEGORIES = [
-  { key: "velo_ff", title: "Top Velocity", subtitle: "4-seam mph", unit: "mph", precision: 1 },
-  { key: "strikeouts", title: "Most Strikeouts", subtitle: "season K count", unit: "K", precision: 0 },
-  { key: "whiff_pct", title: "Top Whiff %", subtitle: "swstr per pitch", unit: "%", precision: 1 },
-  { key: "csw_pct", title: "Top CSW %", subtitle: "called + swinging", unit: "%", precision: 1 },
-  { key: "spin_ff", title: "Top Spin", subtitle: "4-seam rpm", unit: "rpm", precision: 0 },
+  {
+    key: "velo_ff",
+    title: "Top Velocity",
+    subtitle: "4-seam mph",
+    unit: "mph",
+    precision: 1,
+    info: "Average 4-seam fastball velocity. Pure power — the radar-gun stat that's been the headline pitching metric for a century.",
+  },
+  {
+    key: "strikeouts",
+    title: "Most Strikeouts",
+    subtitle: "season K count",
+    unit: "K",
+    precision: 0,
+    info: "Total strikeouts on the season. Influenced by both swing-and-miss stuff and innings pitched.",
+  },
+  {
+    key: "whiff_pct",
+    title: "Top Whiff %",
+    subtitle: "swings + misses",
+    unit: "%",
+    precision: 1,
+    info: "Swinging-strike rate — the share of swings batters miss entirely. Measures how unhittable a pitcher's stuff is when hitters commit to swinging.",
+  },
+  {
+    key: "csw_pct",
+    title: "Top CSW %",
+    subtitle: "called + swinging",
+    unit: "%",
+    precision: 1,
+    info: "Called Strikes + Whiffs as a share of all pitches thrown. Captures both freezing batters with the slider and getting them to chase. One of the best single-pitch indicators of pitcher dominance.",
+  },
+  {
+    key: "spin_ff",
+    title: "Top Spin",
+    subtitle: "4-seam rpm",
+    unit: "rpm",
+    precision: 0,
+    info: "Average spin rate on the 4-seam fastball, in revolutions per minute. High spin keeps the ball up in the zone (resists gravity), which produces the perceived 'rising fastball' that drives swings under the ball.",
+  },
   {
     key: "vaa_flat_ff",
     title: "Flattest VAA",
     subtitle: "4-seam approach°",
     unit: "°",
     precision: 2,
+    info: "Vertical Approach Angle — the angle (from horizontal) at which the fastball crosses the plate. Flatter angles (closer to 0°) at the top of the zone are extremely hard to hit because the bat must square up a pitch coming in nearly level.",
   },
 ] as const;
 
@@ -91,6 +128,7 @@ export async function RankingsStrip() {
               subtitle={cat.subtitle}
               unit={cat.unit}
               precision={cat.precision}
+              info={cat.info}
               items={items}
               nameById={nameById}
             />
@@ -106,6 +144,7 @@ function RankingsCard({
   subtitle,
   unit,
   precision,
+  info,
   items,
   nameById,
 }: {
@@ -113,18 +152,22 @@ function RankingsCard({
   subtitle: string;
   unit: string;
   precision: number;
+  info: string;
   items: RankingRow[];
   nameById: Map<number, string>;
 }) {
   return (
     <div className="rounded-lg bg-white/[0.05] border border-white/10 px-3 py-4 space-y-3">
-      <div className="px-1 space-y-0.5">
-        <h3 className="text-sm text-white/95 font-medium whitespace-nowrap">
-          {title}
-        </h3>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-white/40 whitespace-nowrap">
-          {subtitle}
+      <div className="px-1 flex items-start justify-between gap-2">
+        <div className="space-y-0.5 min-w-0">
+          <h3 className="text-sm text-white/95 font-medium whitespace-nowrap">
+            {title}
+          </h3>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-white/40 whitespace-nowrap">
+            {subtitle}
+          </div>
         </div>
+        <MetricInfo label={title} description={info} />
       </div>
       <ol className="space-y-1.5">
         {items.map((r) => (
