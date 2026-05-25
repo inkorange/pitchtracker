@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -110,6 +110,19 @@ export function PitcherMatchupsSidebar({
     router.push(url);
   };
 
+  // Scroll the active at-bat into view inside the MatchupsCollapse's
+  // overflow container on mount and whenever the user navigates to a
+  // different AB. Without this, deep-linking into the middle of a
+  // long pitcher's outing leaves the current AB highlighted but
+  // somewhere off-screen until the user scrolls manually.
+  const listRef = useRef<HTMLUListElement | null>(null);
+  useEffect(() => {
+    const current = listRef.current?.querySelector('[aria-current="true"]');
+    if (current instanceof HTMLElement) {
+      current.scrollIntoView({ block: "nearest", behavior: "auto" });
+    }
+  }, [currentAbN, filtered]);
+
   if (allPitcherAbs.length <= 1) return null;
 
   return (
@@ -124,7 +137,7 @@ export function PitcherMatchupsSidebar({
         />
       </div>
       <MatchupsCollapse count={filtered.length}>
-        <ul className="space-y-1">
+        <ul ref={listRef} className="space-y-1">
           {filtered.map((ab) => {
             const isCurrent = ab.at_bat_number === currentAbN;
             const finalStr =
