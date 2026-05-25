@@ -3,24 +3,23 @@ import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 
-export const maxDuration = 300;
+export const maxDuration = 600;
 
-// Walks every active-this-season pitcher and ensures their season
-// pitches are in pitch_game_pitches. Until this runs at least once,
-// the cache only contains pitchers whose /pitcher/[id] pages have
-// been visited — which makes the homepage rankings biased toward
-// "pitchers Chris has tested with" instead of the actual MLB top
-// performers.
-//
-// ensurePitcherSeasonCache short-circuits as a no-op for any pitcher
-// who already has games cached, so re-runs are cheap. Concurrency is
-// kept low (4) to stay polite to Savant and so Vercel's 300s
-// per-invocation cap covers a worst-case full backfill.
+// Walks every active-this-season pitcher and refreshes their cached
+// season pitches. Forces a Savant pull every run (vs. the lazy
+// page-load path that short-circuits on any existing cached games)
+// so newly-pitched games make it into pitch_game_pitches the day
+// after they're played — without `force`, the rankings freeze at
+// whatever each pitcher's first-fetched snapshot contained.
 //
 // Vercel cron schedule: must run BEFORE refresh-aggregates so the
-// downstream aggregates / rankings see the complete pitcher set.
+// downstream aggregates / rankings see today's games.
+//
+// Cost: 1500 pitchers × ~1s/Savant fetch with concurrency=6 sits
+// around 250-300s real-world. Bumped maxDuration well above that
+// to absorb tail latency without aborting the run.
 
-const CONCURRENCY = 4;
+const CONCURRENCY = 6;
 
 export async function GET(request: Request) {
   const authError = verifyCronAuth(request);
@@ -50,7 +49,9 @@ export async function GET(request: Request) {
     await Promise.all(
       batch.map(async (id) => {
         try {
-          await ensurePitcherSeasonCache(id, season);
+          // force=true so already-cached pitchers get refreshed —
+          // otherwise their data freezes at the first cached snapshot.
+          await ensurePitcherSeasonCache(id, season, { force: true });
         } catch {
           failures += 1;
         }

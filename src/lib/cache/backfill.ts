@@ -18,28 +18,44 @@ const inFlight = new Map<string, Promise<void>>();
 export async function ensurePitcherSeasonCache(
   pitcherId: number,
   season: number,
+  opts: { force?: boolean } = {},
 ): Promise<void> {
-  const key = `${pitcherId}:${season}`;
+  const key = `${pitcherId}:${season}:${opts.force ? "force" : "lazy"}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
-  const p = doEnsure(pitcherId, season).finally(() => inFlight.delete(key));
+  const p = doEnsure(pitcherId, season, opts.force === true).finally(() =>
+    inFlight.delete(key),
+  );
   inFlight.set(key, p);
   return p;
 }
 
-async function doEnsure(pitcherId: number, season: number): Promise<void> {
+async function doEnsure(
+  pitcherId: number,
+  season: number,
+  force: boolean,
+): Promise<void> {
   const supabase = createAdminClient();
 
   // "Already cached?" check via the pitch_pitcher_games mapping table.
   // This is the small per-pitcher mapping (~30-80 rows/season), so the
   // join filter on pitch_games.season returns only this pitcher's games
   // in the active season — no row-cap risk.
-  const { data: existingPitcherGames } = await supabase
-    .from("pitch_pitcher_games")
-    .select("game_pk, pitch_games!inner(season)")
-    .eq("pitcher_id", pitcherId)
-    .eq("pitch_games.season", season);
-  if ((existingPitcherGames ?? []).length > 0) return;
+  //
+  // The lazy path (page-render demand-load) skips fully-cached pitchers
+  // because their data is good enough for browsing. The forced path
+  // (daily precache cron) always refetches so we pick up new games the
+  // pitcher's appeared in since the cache was first populated —
+  // otherwise the rankings get permanently frozen at the first cached
+  // snapshot per pitcher.
+  if (!force) {
+    const { data: existingPitcherGames } = await supabase
+      .from("pitch_pitcher_games")
+      .select("game_pk, pitch_games!inner(season)")
+      .eq("pitcher_id", pitcherId)
+      .eq("pitch_games.season", season);
+    if ((existingPitcherGames ?? []).length > 0) return;
+  }
 
   // Pull from Savant.
   let fresh;

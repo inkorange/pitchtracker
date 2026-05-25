@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 // Recomputes pitch_pitcher_aggregates from whatever is currently cached in
 // pitch_game_pitches by calling the pitch_recompute_aggregates() Postgres
