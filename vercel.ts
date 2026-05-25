@@ -19,12 +19,13 @@ export const config: VercelConfig = {
     // downstream aggregate + notable-at-bats jobs see today's results.
     { path: "/api/cron/refresh-games", schedule: "0 11 * * *" },
 
-    // Walk every active pitcher and lazy-fetch their season pitches
-    // from Savant so the rankings + aggregates see the full league,
-    // not just pitchers whose pages have been visited.
-    // ensurePitcherSeasonCache short-circuits when data is already
-    // cached — re-runs are cheap.
-    { path: "/api/cron/precache-season-pitchers", schedule: "5 11 * * *" },
+    // Game-centric daily precache: walks the last week of regular-
+    // season games and ensures each game's pitches are cached.
+    // ~15 games/day vs the prior per-pitcher approach's ~1500 calls
+    // — fits well under the function timeout and keeps every active
+    // pitcher's data current (since pitch rows backfill all the
+    // pitchers who appeared in those games).
+    { path: "/api/cron/precache-recent-games", schedule: "5 11 * * *" },
 
     // Recompute pitch_pitcher_aggregates from cached pitches. Reads
     // pitch_game_pitches, writes pitch_pitcher_aggregates.

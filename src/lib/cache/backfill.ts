@@ -179,26 +179,37 @@ async function doEnsure(
 // On-demand cache for a single game. Used by the team+date lookup
 // flow so users can land on any scheduled game and have its pitches
 // pulled from Savant on first visit, rather than dead-ending on a
-// "no pitches" stub.
-export async function ensureGameCache(gamePk: number): Promise<void> {
-  const key = `game:${gamePk}`;
+// "no pitches" stub. Also called by the precache-recent-games cron
+// with force=true to re-pull today/yesterday's games (in case the
+// earlier fetch landed mid-game and missed late innings).
+export async function ensureGameCache(
+  gamePk: number,
+  opts: { force?: boolean } = {},
+): Promise<void> {
+  const key = `game:${gamePk}:${opts.force ? "force" : "lazy"}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
-  const p = doEnsureGame(gamePk).finally(() => inFlight.delete(key));
+  const p = doEnsureGame(gamePk, opts.force === true).finally(() =>
+    inFlight.delete(key),
+  );
   inFlight.set(key, p);
   return p;
 }
 
-async function doEnsureGame(gamePk: number): Promise<void> {
+async function doEnsureGame(gamePk: number, force: boolean): Promise<void> {
   const supabase = createAdminClient();
 
-  // Already have pitches for this game? bail out cheaply.
-  const { data: existing } = await supabase
-    .from("pitch_pitcher_games")
-    .select("game_pk")
-    .eq("game_pk", gamePk)
-    .limit(1);
-  if ((existing ?? []).length > 0) return;
+  // Already have pitches for this game? bail out cheaply, unless the
+  // caller forced a re-pull (e.g. the daily cron refreshing today and
+  // yesterday's games in case the prior fetch was mid-game).
+  if (!force) {
+    const { data: existing } = await supabase
+      .from("pitch_pitcher_games")
+      .select("game_pk")
+      .eq("game_pk", gamePk)
+      .limit(1);
+    if ((existing ?? []).length > 0) return;
+  }
 
   let fresh: SavantPitchRow[];
   try {
