@@ -145,3 +145,51 @@ export function availableAtBatResultChips(
   }
   return out;
 }
+
+/**
+ * Human-readable label for an at-bat's terminating outcome, using both
+ * the MLB `events` string (canonical result) and the LAST PITCH's
+ * `description` to differentiate the kind of strikeout.
+ *
+ *   strikeout       + called_strike            → "Strikeout (L)"  (looking)
+ *   strikeout       + swinging_strike / blocked → "Strikeout (S)"  (swinging)
+ *   strikeout       + foul_tip                  → "Strikeout (F)"  (foul tip)
+ *   strikeout_dp    + (same)                    → "Strikeout DP (X)"
+ *   everything else → events (if non-empty) else description, snake → Title Case
+ *
+ * Single source of truth so the pill on both the at-bat page sidebar
+ * and the pitcher-page matchups list reads consistently.
+ */
+export function formatAtBatResultLabel(
+  events: string | null | undefined,
+  description: string | null | undefined,
+): string {
+  if (events === "strikeout" || events === "strikeout_double_play") {
+    const base = events === "strikeout_double_play" ? "Strikeout DP" : "Strikeout";
+    const suffix = strikeoutSuffix(description);
+    return suffix ? `${base} (${suffix})` : base;
+  }
+  const raw = events && events.length > 0 ? events : description;
+  if (!raw) return "—";
+  return raw
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function strikeoutSuffix(
+  description: string | null | undefined,
+): "L" | "S" | "F" | null {
+  switch (description) {
+    case "called_strike":
+      return "L";
+    case "swinging_strike":
+    case "swinging_strike_blocked":
+    case "missed_bunt":
+      return "S";
+    case "foul_tip":
+      return "F";
+    default:
+      return null;
+  }
+}
