@@ -8,7 +8,7 @@ import { CatmullRomCurve3, Vector3 } from "three";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
-import { BatterSilhouette, frontPresetForStand } from "@/components/scene/BatterSilhouette";
+import { Batter, frontPresetForStand } from "@/components/scene/BatterSilhouette";
 import { BaseballGlyph } from "@/components/icons/BaseballGlyph";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
@@ -331,7 +331,7 @@ export function AtBatReplayScene({
           progress={intraProgress}
           phase={phase}
         />
-        {batterStand ? <BatterSilhouette stand={batterStand} /> : null}
+        {batterStand ? <Batter stand={batterStand} /> : null}
         {/* Outcome chip on every pitch that has already landed (idx <
             currentIdx, plus the active pitch once it's settled). */}
         {prepared.map((p, i) => {

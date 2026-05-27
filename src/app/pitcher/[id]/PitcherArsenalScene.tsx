@@ -9,7 +9,7 @@ import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { TunnelMesh } from "@/components/scene/TunnelMesh";
-import { BatterSilhouette, frontPresetForStand } from "@/components/scene/BatterSilhouette";
+import { Batter, frontPresetForStand } from "@/components/scene/BatterSilhouette";
 import { statcastToThree } from "@/lib/viz/coords";
 import { getOutcomeColor, getPitchLabel } from "@/lib/viz/colors";
 import type { CameraPosition, CameraPreset } from "@/lib/viz/camera-presets";
@@ -299,7 +299,7 @@ export function PitcherArsenalScene({
         }
       >
         {inAtBatMode && batterStand ? (
-          <BatterSilhouette stand={batterStand} />
+          <Batter stand={batterStand} />
         ) : null}
         {inAtBatMode ? (
           <AtBatPlaybackLayer
