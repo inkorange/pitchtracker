@@ -314,3 +314,108 @@ export async function fetchSchedule(
   );
   return data.dates.flatMap((d) => d.games);
 }
+
+// =====================================================================
+// Hydrated schedule fetch — scores + W/L/SV decisions for one day.
+// Used by the homepage "Yesterday's games" strip.
+// =====================================================================
+
+export interface MlbDecisionPlayer {
+  id: number;
+  fullName: string;
+}
+
+export interface MlbGameResult {
+  gamePk: number;
+  officialDate: string;
+  gameType: string;
+  status: { abstractGameState: string; detailedState: string };
+  home: { teamId: number; teamName: string; score: number | null };
+  away: { teamId: number; teamName: string; score: number | null };
+  decisions: {
+    winner: MlbDecisionPlayer | null;
+    loser: MlbDecisionPlayer | null;
+    save: MlbDecisionPlayer | null;
+  };
+}
+
+interface RawHydratedScheduleResponse {
+  dates: Array<{
+    date: string;
+    games: Array<{
+      gamePk: number;
+      officialDate?: string;
+      gameType?: string;
+      status: { abstractGameState: string; detailedState: string };
+      teams: {
+        home: { team: { id: number; name: string }; score?: number };
+        away: { team: { id: number; name: string }; score?: number };
+      };
+      linescore?: {
+        teams?: {
+          home?: { runs?: number };
+          away?: { runs?: number };
+        };
+      };
+      decisions?: {
+        winner?: MlbDecisionPlayer;
+        loser?: MlbDecisionPlayer;
+        save?: MlbDecisionPlayer;
+      };
+    }>;
+  }>;
+}
+
+/**
+ * Fetch every game on a single official baseball day (YYYY-MM-DD in
+ * MLB's canonical timezone), hydrated with linescore + decisions so
+ * we can render final scores and W/L/SV pitchers without N round
+ * trips. Bypasses the project-wide `cache: "no-store"` because once a
+ * game is Final its decisions don't change — a 10-minute revalidate
+ * is fine and keeps the homepage fast.
+ */
+export async function fetchGameResults(date: string): Promise<MlbGameResult[]> {
+  const url = `${BASE}/schedule?sportId=1&date=${date}&hydrate=linescore,decisions`;
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "pitchtracker/0.1 (+https://github.com/inkorange/pitchtracker)",
+    },
+    next: { revalidate: 600 },
+  });
+  if (!res.ok) {
+    throw new Error(`MLB Stats API ${res.status} ${res.statusText} for ${url}`);
+  }
+  const data = (await res.json()) as RawHydratedScheduleResponse;
+  const out: MlbGameResult[] = [];
+  for (const d of data.dates) {
+    for (const g of d.games) {
+      const homeScore =
+        g.teams.home.score ?? g.linescore?.teams?.home?.runs ?? null;
+      const awayScore =
+        g.teams.away.score ?? g.linescore?.teams?.away?.runs ?? null;
+      out.push({
+        gamePk: g.gamePk,
+        officialDate: g.officialDate ?? d.date,
+        gameType: g.gameType ?? "R",
+        status: g.status,
+        home: {
+          teamId: g.teams.home.team.id,
+          teamName: g.teams.home.team.name,
+          score: typeof homeScore === "number" ? homeScore : null,
+        },
+        away: {
+          teamId: g.teams.away.team.id,
+          teamName: g.teams.away.team.name,
+          score: typeof awayScore === "number" ? awayScore : null,
+        },
+        decisions: {
+          winner: g.decisions?.winner ?? null,
+          loser: g.decisions?.loser ?? null,
+          save: g.decisions?.save ?? null,
+        },
+      });
+    }
+  }
+  return out;
+}

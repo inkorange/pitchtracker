@@ -5,6 +5,7 @@ import { PitcherSearch } from "@/components/search/PitcherSearch";
 import { FeaturedStrip } from "@/components/home/FeaturedStrip";
 import { DailyPickStrip } from "@/components/home/DailyPickStrip";
 import { RankingsStrip } from "@/components/home/RankingsStrip";
+import { YesterdayGamesStrip } from "@/components/home/YesterdayGamesStrip";
 import { StripFallback } from "@/components/home/StripFallback";
 
 export default function Home() {
@@ -119,6 +120,12 @@ export default function Home() {
             in when its Supabase query resolves. */}
         <Suspense fallback={<StripFallback title="Today" rows={2} />}>
           <DailyPickStrip />
+        </Suspense>
+
+        <Suspense
+          fallback={<StripFallback title="Yesterday's games" rows={5} grid />}
+        >
+          <YesterdayGamesStrip />
         </Suspense>
 
         <Suspense fallback={<StripFallback title="Leaders" rows={6} grid />}>
