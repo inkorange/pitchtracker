@@ -1,21 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
-import { teamLogoUrl } from "@/lib/viz/headshot";
+import { fetchGameResults, type MlbGameResult } from "@/lib/statsapi/client";
 import { TopNav } from "@/components/chrome/TopNav";
+import { GameCard } from "@/components/games/GameCard";
 
 export const metadata: Metadata = {
   title: "At-bat replay · pitchtracker",
 };
-
-interface GameRow {
-  game_pk: number;
-  game_date: string;
-  home_team_id: number | null;
-  away_team_id: number | null;
-  season: number;
-}
 
 interface TeamRow {
   mlb_id: number;
@@ -50,17 +41,21 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
   );
 
   // Date-scoped games list: defaults to yesterday's slate when the
-  // user hasn't searched yet. The destination /at-bat/[gamePk] page
-  // lazy-fetches from Savant on first visit so we don't need to
-  // pre-filter to cached games.
+  // user hasn't searched yet. Sourced from MLB Stats (hydrated with
+  // linescore + decisions) so each card can show scores + W/L/SV,
+  // not just the team-vs-team line. The destination /at-bat/[gamePk]
+  // page lazy-fetches pitches from Savant on first visit so we don't
+  // need to pre-filter to cached games.
   const queryDate = sp.date ?? yesterdayIso;
-  const { data: gamesRaw } = await supabase
-    .from("pitch_games")
-    .select("game_pk, game_date, home_team_id, away_team_id, season")
-    .eq("game_date", queryDate)
-    .eq("game_type", "R")
-    .order("game_pk", { ascending: true });
-  const games = (gamesRaw ?? []) as GameRow[];
+  let games: MlbGameResult[] = [];
+  try {
+    const all = await fetchGameResults(queryDate);
+    games = all
+      .filter((g) => g.gameType === "R")
+      .sort((a, b) => a.gamePk - b.gamePk);
+  } catch {
+    games = [];
+  }
 
   const errorMessage = (() => {
     if (sp.error === "notfound") {
@@ -111,58 +106,16 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
           {games.length === 0 ? (
             <p className="text-sm text-white/55">{emptyMessage}</p>
           ) : (
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {games.map((g) => {
-                const home = g.home_team_id ? teamById.get(g.home_team_id) : null;
-                const away = g.away_team_id ? teamById.get(g.away_team_id) : null;
-                return (
-                  <li key={g.game_pk}>
-                    <Link
-                      href={`/at-bat/${g.game_pk}`}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 transition-colors"
-                    >
-                      <div className="flex items-center -space-x-2">
-                        {away?.mlb_id ? (
-                          <div className="relative w-7 h-7 bg-[#0a0e14] rounded-full p-0.5">
-                            <Image
-                              src={teamLogoUrl(away.mlb_id)}
-                              alt={away.name}
-                              fill
-                              sizes="28px"
-                              className="object-contain"
-                              unoptimized
-                            />
-                          </div>
-                        ) : null}
-                        {home?.mlb_id ? (
-                          <div className="relative w-7 h-7 bg-[#0a0e14] rounded-full p-0.5">
-                            <Image
-                              src={teamLogoUrl(home.mlb_id)}
-                              alt={home.name}
-                              fill
-                              sizes="28px"
-                              className="object-contain"
-                              unoptimized
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-white/95 truncate">
-                          {away?.abbreviation ?? "?"} @ {home?.abbreviation ?? "?"}
-                        </div>
-                        <div className="text-[11px] text-white/45 tabular-nums">
-                          {g.game_date}
-                        </div>
-                      </div>
-                      <span className="text-[10px] uppercase tracking-[0.14em] text-white/35">
-                        Browse →
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {games.map((g) => (
+                <GameCard
+                  key={g.gamePk}
+                  game={g}
+                  awayAbbr={teamById.get(g.away.teamId)?.abbreviation ?? "?"}
+                  homeAbbr={teamById.get(g.home.teamId)?.abbreviation ?? "?"}
+                />
+              ))}
+            </div>
           )}
         </section>
       </div>
