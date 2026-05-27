@@ -111,6 +111,45 @@ Short-code params (commas for multi-values):
 - \`outcome\` — shared outcome filter
 - \`syncRelease\` — true (lock the release points)
 
+## Pitch type codes (Statcast)
+
+Statcast pitch_type codes and their human labels. Use this table both
+(a) to translate the user's spoken pitch name into one or more codes when
+building a URL, and (b) to LABEL pitch_type codes when reporting them back
+in chat — do NOT rely on your training-data memory of these codes, as it
+is wrong for several of them (notably ST, SV, SC).
+
+| Code | Label             | User-spoken names that map to this code |
+|------|-------------------|------------------------------------------|
+| FF   | 4-Seam Fastball   | "fastball", "four-seam", "heater", "4-seam" |
+| SI   | Sinker            | "sinker", "two-seam", "2-seam" |
+| FC   | Cutter            | "cutter", "cut fastball" |
+| FS   | Splitter          | "splitter", "split-finger", "split" |
+| FA   | Fastball          | "fastball" (generic; rare in modern data) |
+| SL   | Slider            | "slider" (the standard tight slider) |
+| ST   | Sweeper           | "sweeper", "sweeping slider", "horizontal slider" |
+| SV   | Sweeper           | also rendered as "Sweeper" in our data (legacy SV codes) |
+| CU   | Curveball         | "curveball", "curve", "12-6", "hook" |
+| KC   | Knuckle Curve     | "knuckle curve", "spike curve" |
+| CS   | Slow Curve        | "slow curve", "eephus curve" |
+| CH   | Changeup          | "changeup", "change", "cambio" |
+| FO   | Forkball          | "forkball", "fork" |
+| SC   | Screwball         | "screwball", "screw", "scroogie" |
+| EP   | Eephus            | "eephus" |
+| KN   | Knuckleball       | "knuckleball", "knuckler" |
+
+**Key gotcha**: when the user asks about a "sweeper", expand to BOTH
+\`ST\` AND \`SV\` (e.g. \`pt=ST,SV\`). The two codes both render as
+"Sweeper" in our UI; some pitchers' arsenals are tagged as one and some
+as the other depending on when the data was ingested. Never reply "I
+don't see a sweeper in his arsenal" when a row exists with pitch_type
+in {ST, SV}.
+
+Group shortcuts (already in the rules below):
+- "fastballs" → \`pt=FF,SI,FC,FS,FA\`
+- "breaking balls" → \`pt=SL,ST,SV,CU,KC,CS\`
+- "offspeed" → \`pt=CH,FO,SC,EP,KN\`
+
 ## Translation rules
 
 - One pitcher mentioned, no batter → use \`/pitcher/{id}\`.
@@ -118,6 +157,7 @@ Short-code params (commas for multi-values):
 - Pitcher + batter (matchup) → use \`/explore?pid=...&bid=...\`.
 - "Yesterday" / "today" / "last week" → convert to absolute YYYY-MM-DD.
 - "Fastballs" → expand to pt=FF,SI,FC,FS,FA. "Breaking ball" → SL,ST,SV,CU,KC,CS. "Offspeed" → CH,FO,SC,EP,KN.
+- "X by way of Y" / "X on his Y" / "X via Y" — the user is asking for at-bats whose RESULT is X and whose TERMINATING pitch is Y. Combine \`event\` (result) with \`pt\` (pitch type). Example: "strikeouts by way of a sweeper" → \`/pitcher/{id}?pt=ST,SV&event=strikeout\`.
 - If the user just says "games" without qualifying, set \`gt=R\` so spring training and exhibition are filtered out.
 - If the user says "tunneling" — include \`tun=true\` on the pitcher page.
 - If the user says "show stats" / "show analytics" — include \`view=stats\` on the pitcher page.
