@@ -3,7 +3,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { fetchPersonsCached } from "@/lib/statsapi/client";
+import {
+  fetchGameResultByPk,
+  fetchPersonsCached,
+  type MlbGameResult,
+} from "@/lib/statsapi/client";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
@@ -60,6 +64,16 @@ export default async function GameAtBatsPage({ params }: PageProps) {
   // every such landing to "just work" rather than dead-end on an
   // empty stub. ensureGameCache no-ops once data is present.
   await ensureGameCache(gamePkN);
+
+  // Box score lookup from MLB Stats. Best-effort — if the API is
+  // down we just skip rendering the box-score panel. The hydrated
+  // schedule response is cached 10 min by fetchGameResultByPk.
+  let gameResult: MlbGameResult | null = null;
+  try {
+    gameResult = await fetchGameResultByPk(gamePkN);
+  } catch {
+    gameResult = null;
+  }
 
   const [{ data: game }, { data: pitchesRaw }] = await Promise.all([
     supabase
@@ -265,6 +279,14 @@ export default async function GameAtBatsPage({ params }: PageProps) {
           </div>
         </div>
 
+        {gameResult ? (
+          <BoxScore
+            result={gameResult}
+            awayAbbr={awayTeam?.abbreviation ?? "?"}
+            homeAbbr={homeTeam?.abbreviation ?? "?"}
+          />
+        ) : null}
+
         <AtBatGameList
           gamePk={gamePkN}
           allAtBats={allAtBatsDisplay}
@@ -273,6 +295,129 @@ export default async function GameAtBatsPage({ params }: PageProps) {
       </div>
     </main>
   );
+}
+
+// =====================================================================
+// Box score — R / H / E per team plus W / L / SV decisions.
+// Sourced from MLB Stats (linescore + decisions hydrate).
+// =====================================================================
+function BoxScore({
+  result,
+  awayAbbr,
+  homeAbbr,
+}: {
+  result: MlbGameResult;
+  awayAbbr: string;
+  homeAbbr: string;
+}) {
+  const awayScore = result.away.score;
+  const homeScore = result.home.score;
+  const awayWon =
+    awayScore != null && homeScore != null && awayScore > homeScore;
+  const homeWon =
+    awayScore != null && homeScore != null && homeScore > awayScore;
+  const hasDecisions =
+    result.decisions.winner ||
+    result.decisions.loser ||
+    result.decisions.save;
+  return (
+    <section className="rounded-lg bg-white/[0.04] border border-white/10 px-4 py-3">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 gap-y-1 text-sm tabular-nums items-baseline">
+        <span />
+        <span className="text-[10px] uppercase tracking-[0.16em] text-white/45 text-right">R</span>
+        <span className="text-[10px] uppercase tracking-[0.16em] text-white/45 text-right">H</span>
+        <span className="text-[10px] uppercase tracking-[0.16em] text-white/45 text-right">E</span>
+        <BoxScoreTeamRow
+          teamId={result.away.teamId}
+          abbr={awayAbbr}
+          line={result.away}
+          won={awayWon}
+        />
+        <BoxScoreTeamRow
+          teamId={result.home.teamId}
+          abbr={homeAbbr}
+          line={result.home}
+          won={homeWon}
+        />
+      </div>
+      {hasDecisions ? (
+        <div className="mt-3 pt-3 border-t border-white/[0.06] flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] tabular-nums">
+          {result.decisions.winner ? (
+            <BoxDecision tag="W" color="text-emerald-300/90" name={result.decisions.winner.fullName} />
+          ) : null}
+          {result.decisions.loser ? (
+            <BoxDecision tag="L" color="text-red-300/90" name={result.decisions.loser.fullName} />
+          ) : null}
+          {result.decisions.save ? (
+            <BoxDecision tag="SV" color="text-amber-300/90" name={result.decisions.save.fullName} />
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function BoxScoreTeamRow({
+  teamId,
+  abbr,
+  line,
+  won,
+}: {
+  teamId: number;
+  abbr: string;
+  line: MlbGameResult["home"];
+  won: boolean;
+}) {
+  const dim = "text-white/65";
+  const bold = "text-white font-semibold";
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <div className="relative w-6 h-6 flex-shrink-0">
+          <Image
+            src={teamLogoUrl(teamId)}
+            alt=""
+            fill
+            sizes="24px"
+            className="object-contain"
+            unoptimized
+          />
+        </div>
+        <span className={won ? bold : "text-white/85"}>{abbr}</span>
+      </div>
+      <span className={`text-right ${won ? bold : dim}`}>
+        {line.score ?? "—"}
+      </span>
+      <span className={`text-right ${dim}`}>{line.hits ?? "—"}</span>
+      <span className={`text-right ${dim}`}>{line.errors ?? "—"}</span>
+    </>
+  );
+}
+
+function BoxDecision({
+  tag,
+  color,
+  name,
+}: {
+  tag: string;
+  color: string;
+  name: string;
+}) {
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className={`${color} font-semibold uppercase tracking-[0.08em]`}>
+        {tag}
+      </span>
+      <span className="text-white/90">{shortPitcherName(name)}</span>
+    </span>
+  );
+}
+
+// "Garrett Crochet" → "G. Crochet" so the decisions row stays narrow.
+function shortPitcherName(full: string): string {
+  const parts = full.trim().split(/\s+/);
+  if (parts.length < 2) return full;
+  return `${parts[0][0]}. ${parts.slice(1).join(" ")}`;
 }
 
 function NotCachedState({ gamePk }: { gamePk: number }) {
