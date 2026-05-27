@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { AI_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import { checkAiRateLimit, clientIpFromRequest } from "@/lib/ai/rate-limit";
+import { getPitchLabel } from "@/lib/viz/colors";
 
 export const maxDuration = 30;
 
@@ -150,7 +151,15 @@ export async function POST(request: Request) {
               .eq("pitcher_id", pitcher_id)
               .eq("season", s);
             if (error) return { stats: [], error: error.message };
-            return { season: s, stats: data ?? [] };
+            // Inject the human-readable label per row so the LLM
+            // doesn't have to (mis)remember the Statcast code →
+            // name mapping. ST and SV both label as "Sweeper" here,
+            // matching what the UI renders.
+            const stats = (data ?? []).map((row) => ({
+              ...row,
+              pitch_label: row.pitch_type ? getPitchLabel(row.pitch_type) : null,
+            }));
+            return { season: s, stats };
           },
         }),
         get_at_bats_in_game: tool({
