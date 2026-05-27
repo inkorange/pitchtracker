@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { parseAsBoolean, useQueryState } from "nuqs";
+import { parseAsBoolean, parseAsInteger, useQueryState, useQueryStates } from "nuqs";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Scene } from "@/components/scene/Scene";
@@ -408,6 +408,15 @@ function SelectedLabels({
   entry: PitchEntry;
   pitcherLabel: string;
 }) {
+  // Setting both URL params at once flips the page into at-bat mode —
+  // the layout's ArsenalSceneShell reads abGame + abNum, swaps in the
+  // playback layer, and the matchups panel auto-collapses via
+  // FiltersGate. No need to clear selectedId; the overlay unmounts
+  // because <SelectedLabels> is gated on !inAtBatMode upstream.
+  const [, setAtBat] = useQueryStates({
+    abGame: parseAsInteger,
+    abNum: parseAsInteger,
+  });
   const anchor = statcastToThree(entry.path[entry.path.length - 1]);
   const p = entry.source;
   const rows: Array<{ label: string; value: string }> = [];
@@ -430,16 +439,33 @@ function SelectedLabels({
     <Html position={anchor} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
       <div style={{ position: "relative", width: 0, height: 0 }}>
         <div
-          className="absolute whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg"
+          className="absolute whitespace-nowrap px-2 py-1 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg flex flex-col items-start gap-1"
           style={{ left: 0, top: 0, transform: "translate(12px, -50%)" }}
         >
-          <span className="font-medium">{pitcherLabel}</span>
-          <span className="text-white/55 ml-1.5">{getPitchLabel(entry.pitchType)}</span>
-          {p.release_speed != null && (
-            <span className="text-white/70 ml-1.5">
-              {Number(p.release_speed).toFixed(1)} mph
-            </span>
-          )}
+          <div>
+            <span className="font-medium">{pitcherLabel}</span>
+            <span className="text-white/55 ml-1.5">{getPitchLabel(entry.pitchType)}</span>
+            {p.release_speed != null && (
+              <span className="text-white/70 ml-1.5">
+                {Number(p.release_speed).toFixed(1)} mph
+              </span>
+            )}
+          </div>
+          {/* Jump into at-bat playback for this pitch's plate appearance.
+              pointerEvents: "auto" because the parent <Html> wrapper has
+              pointer-events disabled so the floating labels don't intercept
+              orbit drags. */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              void setAtBat({ abGame: p.game_pk, abNum: p.at_bat_number });
+            }}
+            style={{ pointerEvents: "auto" }}
+            className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/50 text-[10px] uppercase tracking-[0.12em] text-emerald-100 transition-colors"
+          >
+            Watch at-bat →
+          </button>
         </div>
         {rows.length > 0 && (
           <div
