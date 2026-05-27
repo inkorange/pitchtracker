@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { parseAsBoolean, parseAsInteger, useQueryState, useQueryStates } from "nuqs";
+import { parseAsBoolean, useQueryState } from "nuqs";
+import { useRouter } from "next/navigation";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Scene } from "@/components/scene/Scene";
@@ -408,15 +409,12 @@ function SelectedLabels({
   entry: PitchEntry;
   pitcherLabel: string;
 }) {
-  // Setting both URL params at once flips the page into at-bat mode —
-  // the layout's ArsenalSceneShell reads abGame + abNum, swaps in the
-  // playback layer, and the matchups panel auto-collapses via
-  // FiltersGate. No need to clear selectedId; the overlay unmounts
-  // because <SelectedLabels> is gated on !inAtBatMode upstream.
-  const [, setAtBat] = useQueryStates({
-    abGame: parseAsInteger,
-    abNum: parseAsInteger,
-  });
+  // Navigate to the dedicated /at-bat/{gp}/{ab} replay page rather
+  // than flipping in-page at-bat mode via ?abGame/?abNum. The
+  // dedicated route already renders the full matchup chrome
+  // (batter name, team logos, game date, score, sibling AB sidebar);
+  // the in-page mode is leaner and the user wants the metadata.
+  const router = useRouter();
   const anchor = statcastToThree(entry.path[entry.path.length - 1]);
   const p = entry.source;
   const rows: Array<{ label: string; value: string }> = [];
@@ -459,7 +457,7 @@ function SelectedLabels({
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              void setAtBat({ abGame: p.game_pk, abNum: p.at_bat_number });
+              router.push(`/at-bat/${p.game_pk}/${p.at_bat_number}`);
             }}
             style={{ pointerEvents: "auto" }}
             className="px-2 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/50 text-[10px] uppercase tracking-[0.12em] text-emerald-100 transition-colors"
