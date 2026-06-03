@@ -4,17 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 
 // Search-icon trigger for the top nav. Clicking the magnifying glass
-// opens a popover anchored to the icon that renders the existing
-// PitcherSearch typeahead. Lifts the search out of the page content
-// area so the 3D scene gets the full viewport.
+// expands an inline pitcher-search input out to the LEFT of the icon
+// with a horizontal width animation, so the input visually grows from
+// the icon's anchor rather than popping in.
 //
 // Open / close behavior:
-//   - Click the icon to toggle open.
+//   - Click the icon to toggle.
 //   - Esc closes.
-//   - Click outside the popover (or icon) closes.
-//   - Navigating to a result closes (PitcherSearch already calls its
-//     own onClick → setOpen(false) for results; route change unmounts
-//     this component anyway).
+//   - Click outside closes.
+//   - Navigating to a result closes (route change unmounts).
+//
+// The input wrapper has a fixed inner width and animates the outer
+// width from 0 → that width with overflow-hidden. The PitcherSearch
+// dropdown lives inside the inner fixed-width div so the typeahead
+// results render at full width regardless of the expansion progress —
+// in practice users won't have typed two characters before the 200ms
+// width transition has finished anyway.
+const INPUT_WIDTH = "w-[min(18rem,calc(100vw-6rem))]";
+
 export function PitcherSearchPopover() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -38,9 +45,10 @@ export function PitcherSearchPopover() {
     };
   }, [open]);
 
-  // Focus the input when the popover opens. PitcherSearch exposes
-  // autoFocus, but it only fires on the first mount — we remount the
-  // input each open so a fresh focus always lands.
+  // Focus the input each time the popover opens. PitcherSearch's
+  // autoFocus prop only triggers on first mount; we always keep it
+  // mounted so the width animation can play, so reach in for the
+  // input on open instead.
   useEffect(() => {
     if (!open) return;
     const el = inputWrapRef.current?.querySelector("input");
@@ -48,12 +56,27 @@ export function PitcherSearchPopover() {
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative flex items-center gap-1">
+      <div
+        className={`overflow-hidden transition-[width,opacity] duration-200 ease-out ${
+          open ? `${INPUT_WIDTH} opacity-100` : "w-0 opacity-0"
+        }`}
+        aria-hidden={!open}
+      >
+        <div ref={inputWrapRef} className={INPUT_WIDTH}>
+          {/* The shared PitcherSearch component's input is bigger
+              than fits comfortably in a nav — wrap it in a class
+              override that tightens vertical padding. */}
+          <div className="[&_input]:py-1.5 [&_input]:text-sm">
+            <PitcherSearch placeholder="Search a pitcher…" />
+          </div>
+        </div>
+      </div>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center w-8 h-8 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-        aria-label="Search pitchers"
+        className="inline-flex items-center justify-center w-8 h-8 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
+        aria-label={open ? "Close pitcher search" : "Search pitchers"}
         aria-expanded={open}
         aria-haspopup="dialog"
       >
@@ -72,16 +95,6 @@ export function PitcherSearchPopover() {
           <path d="m20 20-3.5-3.5" />
         </svg>
       </button>
-      {open ? (
-        <div
-          ref={inputWrapRef}
-          role="dialog"
-          aria-label="Search pitchers"
-          className="absolute right-0 top-full mt-2 w-[min(20rem,calc(100vw-1.5rem))] z-40"
-        >
-          <PitcherSearch placeholder="Search a pitcher…" />
-        </div>
-      ) : null}
     </div>
   );
 }
