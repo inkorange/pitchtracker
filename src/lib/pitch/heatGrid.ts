@@ -6,6 +6,15 @@
 // lateral (positive = catcher's right / 3B side), plate_z is height.
 // The Stage's strike-zone wireframe uses w=0.71 (half-width) and
 // vertical bounds 1.5 → 3.55 ft, so we pad slightly to capture chases.
+//
+// All outcome classification flows through the project-wide
+// categorizeDescription so the heat grid speaks the exact same
+// language as the outcome filter chips (notably: foul_tip is a
+// "whiff" on this site, matching Statcast/FanGraphs whiff_rate
+// convention and the user's mental model when they filter by
+// outcome=whiff).
+
+import { categorizeDescription } from "@/lib/viz/colors";
 
 export interface HeatPitch {
   plate_x: number | null;
@@ -74,23 +83,10 @@ export const HEAT_GRID_BOUNDS = {
   zMax: ZONE_TOP + Z_MARGIN_TOP,
 };
 
-const SWING_DESCRIPTIONS = new Set([
-  "foul",
-  "foul_tip",
-  "foul_bunt",
-  "hit_into_play",
-  "swinging_strike",
-  "swinging_strike_blocked",
-  "missed_bunt",
-]);
-
-const WHIFF_DESCRIPTIONS = new Set([
-  "swinging_strike",
-  "swinging_strike_blocked",
-  "missed_bunt",
-]);
-
-const CALLED_DESCRIPTIONS = new Set(["called_strike"]);
+// Categories that count as a swing (bat moved at the pitch). Drawn
+// from categorizeDescription so the definition stays in lockstep
+// with the outcome filter chips.
+const SWING_CATEGORIES = new Set(["whiff", "foul", "inplay"]);
 
 export function buildHeatGrid(
   pitches: HeatPitch[],
@@ -139,16 +135,16 @@ export function buildHeatGrid(
     if (!c) continue;
     c.total += 1;
     total += 1;
-    const d = p.description ?? "";
-    const isSwing = SWING_DESCRIPTIONS.has(d);
+    const category = categorizeDescription(p.description);
+    const isSwing = SWING_CATEGORIES.has(category);
     if (isSwing) {
       c.swings += 1;
       totalSwings += 1;
     } else {
       totalTakes += 1;
     }
-    if (WHIFF_DESCRIPTIONS.has(d)) c.whiffs += 1;
-    if (CALLED_DESCRIPTIONS.has(d)) c.called += 1;
+    if (category === "whiff") c.whiffs += 1;
+    if (category === "called") c.called += 1;
     if (!c.inZone) totalOutOfZonePitches += 1;
   }
 
