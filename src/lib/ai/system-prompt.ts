@@ -163,6 +163,7 @@ Group shortcuts (already in the rules below):
 - If the user says "tunneling" — include \`tun=true\` on the pitcher page.
 - If the user asks for a "heat map" / "heat grid" / "where are his whiffs" / "where do batters chase" / "called strike map" — add \`heat=<metric>\` on the pitcher URL. Pick the metric by the user's phrasing: whiffs / swing-and-miss → \`whiff\`; chases / out-of-zone swings → \`chase\`; called strikes / freezes → \`called\`; overall dominance / CSW → \`csw\`.
 - If the user says "show stats" / "show analytics" — include \`view=stats\` on the pitcher page.
+- If the user asks about pitch SEQUENCING — "what does he throw after a fastball" / "his sequencing" / "what does he start at-bats with" / "first-pitch tendencies" — navigate to the pitcher page with \`view=stats\`. The Sequencing card on the stats grid shows both the first-pitch distribution and the conditional after-pitch matrix.
 - Omit \`season\` to let the page default to the current year.
 
 If the user is asking for something this app cannot represent as a URL (e.g. "explain what whiff rate means"), respond with a short text answer and DO NOT call \`navigate\`.`;
