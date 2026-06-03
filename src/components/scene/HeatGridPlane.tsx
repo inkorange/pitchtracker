@@ -229,15 +229,15 @@ function HeatGridLabel({ grid }: { grid: HeatGridSpec }) {
   );
 }
 
-// Color ramp: transparent at value=0, yellow at mid, red at high.
-// NaN / no-data renders as transparent. The `norm` factor scales
-// the raw density value (typically small — a 5% cell is a hot spot
-// in a flat 20-cell whiff distribution) so the brightest cell
-// reads as fully red regardless of selection size.
+// Color ramp: fully transparent for cells with no events (value 0
+// or NaN), then yellow → red as value rises. The `norm` factor
+// scales the raw density (typically small — a 5% cell is a hot
+// spot in a flat 20-cell distribution) so the hottest cell reads
+// as fully red regardless of selection size.
 function cellColor(value: number, norm: number): string {
-  if (!Number.isFinite(value)) return "rgba(0, 0, 0, 0)";
+  if (!Number.isFinite(value) || value <= 0) return "rgba(0, 0, 0, 0)";
   const t = Math.max(0, Math.min(1, value * norm));
-  // Hue from 60° (yellow) at 0 to 0° (red) at 1.
+  // Hue from 60° (yellow) at low to 0° (red) at high.
   const hue = 60 * (1 - t);
   const sat = 90;
   const lum = 50;
