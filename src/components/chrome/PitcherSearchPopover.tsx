@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PitcherSearch } from "@/components/search/PitcherSearch";
 
 // Search-icon trigger that opens a full-page overlay:
@@ -19,7 +20,19 @@ const INPUT_WIDTH = "w-[min(20rem,calc(100vw-5rem))]";
 
 export function PitcherSearchPopover() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const inputWrapRef = useRef<HTMLDivElement>(null);
+
+  // The overlay portals to document.body so it escapes TopNav's
+  // `backdrop-blur-md` — that filter establishes a containing block
+  // for fixed descendants, otherwise the backdrop scrim clips to the
+  // nav's 48px height.
+  useEffect(() => {
+    // Standard SSR-portal mount gate — we deliberately set state in
+    // an effect so the portal target only resolves client-side.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -39,10 +52,10 @@ export function PitcherSearchPopover() {
     if (el instanceof HTMLInputElement) el.focus();
   }, [open]);
 
-  return (
+  const overlay = (
     <>
-      {/* Backdrop scrim. Fixed z-40 sits ABOVE TopNav (z-30) so the
-          whole UI dims and the search panel becomes the only focus. */}
+      {/* Backdrop scrim — covers the entire viewport because it's
+          portaled outside TopNav. Click to close. */}
       <div
         onClick={() => setOpen(false)}
         aria-hidden
@@ -96,6 +109,12 @@ export function PitcherSearchPopover() {
           </svg>
         </button>
       </div>
+    </>
+  );
+
+  return (
+    <>
+      {mounted ? createPortal(overlay, document.body) : null}
       {/* In-nav trigger. Always mounted so the right side of the nav
           reserves the icon's width; the X button overlays it 1:1
           when open. */}
