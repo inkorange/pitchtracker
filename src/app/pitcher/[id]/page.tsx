@@ -176,6 +176,14 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   if (sp.game) {
     pitchQuery = pitchQuery.eq("game_pk", Number(sp.game));
   }
+  // ?vsBatter: narrow the per-side arsenal aggregates (the per-pitch
+  // list with use% / velo in the pitcher card) to pitches thrown to
+  // the selected batter. Keeps the card in sync with the
+  // filter-summary banner ("All pitches vs <batter>") and with the
+  // 3D scene + stats view, which also respect this param.
+  if (sp.vsBatter && !Number.isNaN(Number(sp.vsBatter))) {
+    pitchQuery = pitchQuery.eq("batter_id", Number(sp.vsBatter));
+  }
 
   const { data: cachedPitchesRaw } = await pitchQuery;
   const cachedPitches = cachedPitchesRaw as

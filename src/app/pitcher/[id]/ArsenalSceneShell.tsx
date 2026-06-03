@@ -59,14 +59,16 @@ export function ArsenalSceneShell() {
   const [view] = usePitcherView();
   const id = params?.id;
 
-  // Strip at-bat-mode params from the arsenal fetch — the per-side
-  // filters page.tsx reads stay in the URL during at-bat mode but
-  // shouldn't refetch the arsenal until the user exits at-bat mode.
+  // Strip at-bat-replay params from the arsenal fetch — they drive
+  // the playback overlay, not the underlying arsenal pitch set.
+  // ?vsBatter STAYS in the query so the 3D scene narrows to the
+  // batter scope when one is selected — otherwise the filter-summary
+  // banner reads "All pitches vs <batter>" while the canvas is still
+  // showing the whole season's arsenal.
   const arsenalQuery = (() => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.delete("abGame");
     sp.delete("abNum");
-    sp.delete("vsBatter");
     sp.delete("batterQ");
     return sp.toString();
   })();
