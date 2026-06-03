@@ -50,18 +50,24 @@ export function ArsenalCard({ perPitch, radar, totalPitches }: ArsenalCardProps)
 
   return (
     <StatCard title="Arsenal" hint={hint}>
-      <ul className="divide-y divide-white/[0.06]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {perPitch.map((p) => (
-          <li key={p.pitch_type} className="py-3 first:pt-0 last:pb-0">
-            <ArsenalRow stats={p} radar={radarByType.get(p.pitch_type) ?? null} />
-          </li>
+          <ArsenalTile
+            key={p.pitch_type}
+            stats={p}
+            radar={radarByType.get(p.pitch_type) ?? null}
+          />
         ))}
-      </ul>
+      </div>
     </StatCard>
   );
 }
 
-function ArsenalRow({
+// One self-contained mini-card per pitch type. Reads like a baseball
+// card: header (dot + name + usage), stats row, radar. Multi-column
+// grid on desktop keeps the whole arsenal in view without scrolling
+// — the prior single-row layout had ~40% empty horizontal space.
+function ArsenalTile({
   stats,
   radar,
 }: {
@@ -71,10 +77,9 @@ function ArsenalRow({
   const color = getPitchColor(stats.pitch_type);
   const label = getPitchLabel(stats.pitch_type);
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 lg:gap-5 items-start">
-      {/* Stats panel */}
-      <div className="space-y-2 min-w-0">
-        <div className="flex items-center gap-2">
+    <div className="rounded-md border border-white/[0.07] bg-white/[0.02] p-3 space-y-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ background: color }}
@@ -83,41 +88,65 @@ function ArsenalRow({
           <span className="text-sm font-medium text-white/95 truncate">
             {label}
           </span>
-          <span className="text-[11px] text-white/45 tabular-nums">
-            {stats.pitches} · {stats.usage_pct.toFixed(0)}%
-          </span>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-[11px] tabular-nums">
-          <Stat label="Velo" value={stats.velo_mean != null ? `${stats.velo_mean.toFixed(1)} mph` : "—"} />
-          <Stat label="CSW" value={`${stats.csw_pct.toFixed(1)}%`} />
-          <Stat label="Whiff" value={`${stats.whiff_pct.toFixed(1)}%`} />
-          <Stat
-            label="VAA"
-            value={stats.vaa_mean != null ? `${stats.vaa_mean.toFixed(1)}°` : "—"}
-          />
+        <span className="text-[11px] text-white/55 tabular-nums whitespace-nowrap">
+          {stats.usage_pct.toFixed(0)}%
+          <span className="text-white/35 ml-1">({stats.pitches})</span>
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-x-2 gap-y-1 text-[10.5px] tabular-nums">
+        <Stat
+          label="Velo"
+          value={stats.velo_mean != null ? stats.velo_mean.toFixed(1) : "—"}
+          suffix="mph"
+        />
+        <Stat
+          label="CSW"
+          value={stats.csw_pct.toFixed(1)}
+          suffix="%"
+        />
+        <Stat
+          label="Whiff"
+          value={stats.whiff_pct.toFixed(1)}
+          suffix="%"
+        />
+        <Stat
+          label="VAA"
+          value={stats.vaa_mean != null ? stats.vaa_mean.toFixed(1) : "—"}
+          suffix="°"
+        />
+      </div>
+      {radar ? (
+        <MiniRadar pitch={radar} color={color} />
+      ) : (
+        <div className="text-[10px] text-white/35 italic py-4 text-center">
+          No league data
         </div>
-      </div>
-      {/* Radar panel — small mini-chart inline with the row stats. */}
-      <div className="w-full lg:w-[170px] flex-shrink-0">
-        {radar ? (
-          <MiniRadar pitch={radar} color={color} />
-        ) : (
-          <div className="text-[10px] text-white/35 italic py-6 text-center">
-            No league data
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  suffix,
+}: {
+  label: string;
+  value: string;
+  suffix?: string;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[9px] uppercase tracking-[0.14em] text-white/40">
         {label}
       </span>
-      <span className="text-white/95">{value}</span>
+      <span className="text-white/95">
+        {value}
+        {suffix ? (
+          <span className="text-white/45 ml-0.5 text-[9px]">{suffix}</span>
+        ) : null}
+      </span>
     </div>
   );
 }
