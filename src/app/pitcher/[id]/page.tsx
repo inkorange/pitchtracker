@@ -701,8 +701,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       </div>
 
       {/* Stats analytics view — sibling of the pitcher card, NOT
-          inside it. Renders nothing in arsenal mode. */}
-      <PitcherStatsArea />
+          inside it. Renders nothing in arsenal mode. The
+          server-rendered filter-summary string flows in so the
+          scope banner mirrors the TopNav title and reflects every
+          active URL filter (game / pitch type / outcome / event /
+          hand / velo / batter / at-bat). */}
+      <PitcherStatsArea filterSummary={filterSummary} />
     </>
   );
 }

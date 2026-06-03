@@ -1,53 +1,43 @@
 "use client";
 
-// Top-of-stats-view scope banner. Tells the user what the cards below
-// are scoped to — "vs Bobby Witt Jr. · 2026 season" when batter-scoped,
-// "2026 season" otherwise. When scoped, the X button clears
-// ?vsBatter from the URL so the user can leave the matchup view
-// without re-opening the matchups panel.
+// Top-of-stats-view scope banner. Mirrors the filter-summary string
+// the page server builds for the TopNav title so the stats view's
+// scope description stays in sync with every URL filter (game,
+// pitch type, outcome, event, hand, velo bounds, batter, at-bat
+// mode) — the previous version only spoke about season + vsBatter
+// and silently ignored the rest, telling the user "Season 2026 ·
+// all batters" while the cards below were narrowed to Changeups
+// from a single game.
+//
+// When ?vsBatter is set, the X/Clear action still drops batter
+// scope (and at-bat playback params) in one click — the most
+// commonly-wanted exit from the matchup view.
 
 interface StatsScopeBannerProps {
-  seasonLabel: number;
-  /** Batter display name when scoped. May be null even when
-   *  `batterScoped` is true — there's a brief window before the
-   *  arsenal fetch resolves the name; the banner falls back to a
-   *  generic label in that case. */
-  batterName: string | null;
+  /** Pre-rendered filter-summary text from the page server (the
+   *  same string the TopNav title shows). Empty/null means "no
+   *  active filter" — banner falls back to a generic label. */
+  summary: string | null;
   batterScoped: boolean;
   onClearBatter: () => void;
 }
 
 export function StatsScopeBanner({
-  seasonLabel,
-  batterName,
+  summary,
   batterScoped,
   onClearBatter,
 }: StatsScopeBannerProps) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2">
       <div className="flex items-center gap-2 min-w-0 text-sm text-white/90">
-        {batterScoped ? (
-          <>
-            <span className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-              vs
-            </span>
-            <span className="font-medium truncate">
-              {batterName ?? "Selected batter"}
-            </span>
-            <span className="text-white/30">·</span>
-            <span className="text-white/65 tabular-nums">
-              {seasonLabel} season
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-              Season
-            </span>
-            <span className="font-medium tabular-nums">{seasonLabel}</span>
-            <span className="text-white/55 text-[11px]">· all batters</span>
-          </>
-        )}
+        <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 flex-shrink-0">
+          Scope
+        </span>
+        <span className="font-medium truncate">
+          {summary && summary.trim().length > 0
+            ? summary
+            : "All pitches"}
+        </span>
       </div>
       {batterScoped ? (
         <button
@@ -69,7 +59,7 @@ export function StatsScopeBanner({
           >
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
-          Clear
+          Clear batter
         </button>
       ) : null}
     </div>
