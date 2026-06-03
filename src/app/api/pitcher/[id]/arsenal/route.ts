@@ -252,31 +252,18 @@ async function fetchArsenalRadar(
   pitcherId: number,
   season: number,
 ): Promise<ArsenalRadar | null> {
-  // Pull every pitcher × pitch_type aggregate for the season. Two
-  // things to call out:
-  //   1. NO SQL-level sample-size filter — the pitcher's own row is
-  //      always returned even if they only threw a handful of a
-  //      given pitch type. The MIN_LEAGUE_PITCHES floor is applied
-  //      IN JS strictly to the percentile pool below. Previously
-  //      the SQL filter dropped sub-threshold rows entirely
-  //      including the pitcher's, so low-volume pitchers got
-  //      "No league data" on every tile.
-  //   2. .range(0, 9999) — Supabase's default cap is 1000 rows; the
-  //      qualifying season pool is ~2100 rows, so the previous
-  //      query was silently truncating half the league. Whichever
-  //      half pitcher 694973 fell into determined whether his
-  //      tiles got data, hence the "even Four-Seam shows No league
-  //      data" symptom that no threshold change could fix.
-  const { data, error } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select(
-      "pitcher_id, pitch_type, avg_velocity, avg_spin_rate, avg_induced_vertical_break, avg_horizontal_break, whiff_rate, pitch_count",
-    )
-    .eq("season", season)
-    .eq("batter_hand", "*")
-    .range(0, 9999);
-  if (error || !data) return null;
-
+  // Split into two queries so neither runs up against PostgREST's
+  // hard 1000-row server-side cap (which `.range(0, 9999)` does NOT
+  // bypass — the cap is enforced by the server-side `max-rows`
+  // config). The season-wide '*' aggregate pool sits at ~3,200 rows
+  // total, so the previous "fetch everything then filter to this
+  // pitcher in JS" pattern silently truncated half the league and
+  // dropped pitcher 694973's rows entirely.
+  //
+  // Step 1: pitcher's own rows. Always tiny (one per pitch type the
+  // pitcher throws, ≤10 in practice), no cap risk. No SQL sample
+  // floor — even sub-25 pitch types get a radar entry; the
+  // MIN_LEAGUE_PITCHES filter applies only to the percentile pool.
   type Row = {
     pitcher_id: number;
     pitch_type: string | null;
@@ -287,29 +274,44 @@ async function fetchArsenalRadar(
     whiff_rate: number | null;
     pitch_count: number | null;
   };
-  const rows = data as Row[];
-
-  // Bucket rows by pitch_type, keeping ONLY rows above the sample
-  // threshold in the percentile pool — those are the "league" we
-  // rank against. The pitcher's own row may or may not be in the
-  // pool; if it isn't, we still produce a radar for them, ranked
-  // against the qualifying pool.
-  const poolByType = new Map<string, Row[]>();
-  for (const r of rows) {
-    if (!r.pitch_type) continue;
-    if ((r.pitch_count ?? 0) < MIN_LEAGUE_PITCHES) continue;
-    const arr = poolByType.get(r.pitch_type) ?? [];
-    arr.push(r);
-    poolByType.set(r.pitch_type, arr);
+  const select =
+    "pitcher_id, pitch_type, avg_velocity, avg_spin_rate, avg_induced_vertical_break, avg_horizontal_break, whiff_rate, pitch_count";
+  const { data: mineData, error: mineErr } = await supabase
+    .from("pitch_pitcher_aggregates")
+    .select(select)
+    .eq("pitcher_id", pitcherId)
+    .eq("season", season)
+    .eq("batter_hand", "*");
+  if (mineErr || !mineData) return null;
+  const mine = (mineData as Row[])
+    .filter((r) => r.pitch_type)
+    .sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
+  if (mine.length === 0) {
+    return { pitches: [], minPitchesForLeague: MIN_LEAGUE_PITCHES };
   }
 
-  // The pitcher's own rows, in display order — most-thrown first so
-  // the small-multiples render the busiest pitches first. No sample
-  // floor here; even a low-volume pitch type gets a radar so the
-  // user always sees what we have.
-  const mine = rows
-    .filter((r) => r.pitcher_id === pitcherId)
-    .sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
+  // Step 2: league percentile pool, fetched per pitch_type the
+  // pitcher actually throws. The largest single pitch type has ~600
+  // pitchers in the season — safely under the row cap — and only
+  // running the queries we need is faster than always pulling 3,200
+  // rows. Parallel fan-out so the radar latency stays close to one
+  // round-trip.
+  const myTypes = Array.from(
+    new Set(mine.map((r) => r.pitch_type!).filter(Boolean)),
+  );
+  const poolByType = new Map<string, Row[]>();
+  await Promise.all(
+    myTypes.map(async (pt) => {
+      const { data } = await supabase
+        .from("pitch_pitcher_aggregates")
+        .select(select)
+        .eq("season", season)
+        .eq("batter_hand", "*")
+        .eq("pitch_type", pt)
+        .gte("pitch_count", MIN_LEAGUE_PITCHES);
+      poolByType.set(pt, (data ?? []) as Row[]);
+    }),
+  );
 
   const out: RadarPitch[] = mine.map((row) => {
     const pool = poolByType.get(row.pitch_type!) ?? [];
