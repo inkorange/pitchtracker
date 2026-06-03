@@ -6,9 +6,12 @@ import { Html } from "@react-three/drei";
 import { statcastToThree } from "@/lib/viz/coords";
 import {
   HEAT_METRIC_EMPTY_HINTS,
+  HEAT_METRIC_EVENT_LABELS,
   HEAT_METRIC_LABELS,
   heatMetricDenominator,
+  type HeatCell,
   type HeatGridSpec,
+  type HeatMetric,
 } from "@/lib/pitch/heatGrid";
 
 // Renders the heat grid as a textured plane positioned at the strike
@@ -122,12 +125,20 @@ function drawHeatGrid(
   // stay visible no matter what TEXEL_PER_CELL gets set to.
   const cellBorderW = Math.max(1, cellW * 0.025);
   const zoneOutlineW = Math.max(2, cellW * 0.045);
+  // Density values are small in absolute terms (a cell with 4 of
+  // 100 whiffs = 0.04) — auto-scale to the max cell value so the
+  // hottest spot reads as fully red regardless of selection size.
+  let maxValue = 0;
+  for (const c of grid.cells) {
+    if (Number.isFinite(c.value) && c.value > maxValue) maxValue = c.value;
+  }
+  const norm = maxValue > 0 ? 1 / maxValue : 1;
   for (const cell of grid.cells) {
     const x = cell.col * cellW;
     // Canvas Y is top-down; our row 0 is the bottom (low strike-zone
     // height), so flip when drawing.
     const y = (grid.rows - 1 - cell.row) * cellH;
-    ctx.fillStyle = cellColor(cell.value);
+    ctx.fillStyle = cellColor(cell.value, norm);
     ctx.fillRect(x, y, cellW, cellH);
     // Cell border: faint to read as a "grid".
     ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
@@ -150,8 +161,9 @@ function drawHeatGrid(
         cellH - zoneOutlineW,
       );
     }
-    // Value label — small, centered.
-    if (Number.isFinite(cell.value) && cell.total > 0) {
+    // Event count for this cell driving the share-of-total value.
+    const eventCount = cellEventCount(cell, grid.metric);
+    if (Number.isFinite(cell.value) && eventCount > 0) {
       ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
       ctx.font = `${Math.round(cellH * 0.22)}px ui-monospace, monospace`;
       ctx.textAlign = "center";
@@ -161,19 +173,25 @@ function drawHeatGrid(
         x + cellW / 2,
         y + cellH * 0.42,
       );
-      // Pitch count below.
+      // Event count below (whiffs / chases / called / csw in this
+      // cell — the numerator the percentage is a share of).
       ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
       ctx.font = `${Math.round(cellH * 0.16)}px ui-monospace, monospace`;
-      ctx.fillText(`n=${cell.total}`, x + cellW / 2, y + cellH * 0.66);
-    } else if (cell.total > 0) {
-      // Total without ratio (e.g., "n=3" for cells lacking the
-      // denominator).
-      ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
-      ctx.font = `${Math.round(cellH * 0.16)}px ui-monospace, monospace`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`n=${cell.total}`, x + cellW / 2, y + cellH / 2);
+      ctx.fillText(`n=${eventCount}`, x + cellW / 2, y + cellH * 0.66);
     }
+  }
+}
+
+function cellEventCount(c: HeatCell, metric: HeatMetric): number {
+  switch (metric) {
+    case "whiff":
+      return c.whiffs;
+    case "chase":
+      return c.chaseSwings;
+    case "called":
+      return c.called;
+    case "csw":
+      return c.called + c.whiffs;
   }
 }
 
@@ -185,6 +203,8 @@ function drawHeatGrid(
 function HeatGridLabel({ grid }: { grid: HeatGridSpec }) {
   const denominator = heatMetricDenominator(grid);
   const hasData = denominator > 0;
+  const [singular, plural] = HEAT_METRIC_EVENT_LABELS[grid.metric];
+  const eventLabel = denominator === 1 ? singular : plural;
   return (
     <div
       className={`px-2 py-1 rounded bg-black/80 backdrop-blur-sm border text-[10px] tabular-nums whitespace-nowrap pointer-events-none shadow-lg ${
@@ -197,7 +217,7 @@ function HeatGridLabel({ grid }: { grid: HeatGridSpec }) {
             {HEAT_METRIC_LABELS[grid.metric]}
           </span>
           <span className="text-white/55 ml-1.5">
-            {grid.total} pitch{grid.total === 1 ? "" : "es"}
+            {denominator} {eventLabel}
           </span>
         </>
       ) : (
@@ -210,10 +230,13 @@ function HeatGridLabel({ grid }: { grid: HeatGridSpec }) {
 }
 
 // Color ramp: transparent at value=0, yellow at mid, red at high.
-// NaN / no-data renders as transparent.
-function cellColor(value: number): string {
+// NaN / no-data renders as transparent. The `norm` factor scales
+// the raw density value (typically small — a 5% cell is a hot spot
+// in a flat 20-cell whiff distribution) so the brightest cell
+// reads as fully red regardless of selection size.
+function cellColor(value: number, norm: number): string {
   if (!Number.isFinite(value)) return "rgba(0, 0, 0, 0)";
-  const t = Math.max(0, Math.min(1, value));
+  const t = Math.max(0, Math.min(1, value * norm));
   // Hue from 60° (yellow) at 0 to 0° (red) at 1.
   const hue = 60 * (1 - t);
   const sat = 90;

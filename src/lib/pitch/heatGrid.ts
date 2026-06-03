@@ -28,13 +28,20 @@ export interface HeatCell {
   col: number;
   row: number;
   total: number; // every pitch that landed in this cell
-  swings: number; // foul, foul tip, swstr, swstr blocked, in-play, missed bunt
-  whiffs: number; // swstr, swstr blocked, missed bunt
+  swings: number; // any swing (whiff/foul/foul tip/in-play/missed bunt)
+  whiffs: number; // whiff category (swstr / swstr blocked / missed bunt / foul tip)
   called: number; // called strikes
+  /** Whether the cell sits inside the strike zone. Drives the
+   *  chase-density numerator (chase is a swing in a NON-zone cell). */
   inZone: boolean;
+  /** Count of "chase swings" in this cell — swings on out-of-zone
+   *  pitches. Zero for in-zone cells. Tracked separately so chase%
+   *  density divides correctly. */
+  chaseSwings: number;
   /**
-   * The active metric's value in [0, 1]. NaN when the denominator is
-   * zero (e.g. "whiff%" in a cell with no swings) — the renderer
+   * The active metric's value in [0, 1]. Density semantics: the
+   * cell's share of the metric event total across the whole grid.
+   * NaN when the grid-wide event total is zero — the renderer
    * treats NaN as "no data" and draws nothing.
    */
   value: number;
@@ -52,13 +59,15 @@ export interface HeatGridSpec {
   cells: HeatCell[];
   /** Total pitches that fell inside the grid bounds. */
   total: number;
-  /** Aggregate denominator counts — drive the empty-state label so
-   *  users see "Whiff % needs swings" instead of an unexplained
-   *  blank grid when their outcome filter doesn't include any
-   *  swing-producing pitches. */
-  totalSwings: number;
-  totalTakes: number;
-  totalOutOfZonePitches: number;
+  /** Grid-wide event totals. The per-cell `value` is each cell's
+   *  share of the metric event total (density semantics), so the
+   *  selected metric's total is the active denominator. When zero
+   *  the renderer shows an empty-state hint instead of a blank
+   *  grid. */
+  totalWhiffs: number;
+  totalCalled: number;
+  totalChaseSwings: number;
+  totalCsw: number;
 }
 
 // Strike zone (Statcast convention).
@@ -114,6 +123,7 @@ export function buildHeatGrid(
         swings: 0,
         whiffs: 0,
         called: 0,
+        chaseSwings: 0,
         inZone,
         value: NaN,
       });
@@ -121,9 +131,9 @@ export function buildHeatGrid(
   }
 
   let total = 0;
-  let totalSwings = 0;
-  let totalTakes = 0;
-  let totalOutOfZonePitches = 0;
+  let totalWhiffs = 0;
+  let totalCalled = 0;
+  let totalChaseSwings = 0;
   for (const p of pitches) {
     if (p.plate_x == null || p.plate_z == null) continue;
     if (p.plate_x < xMin || p.plate_x >= xMax) continue;
@@ -139,18 +149,32 @@ export function buildHeatGrid(
     const isSwing = SWING_CATEGORIES.has(category);
     if (isSwing) {
       c.swings += 1;
-      totalSwings += 1;
-    } else {
-      totalTakes += 1;
+      if (!c.inZone) {
+        c.chaseSwings += 1;
+        totalChaseSwings += 1;
+      }
     }
-    if (category === "whiff") c.whiffs += 1;
-    if (category === "called") c.called += 1;
-    if (!c.inZone) totalOutOfZonePitches += 1;
+    if (category === "whiff") {
+      c.whiffs += 1;
+      totalWhiffs += 1;
+    }
+    if (category === "called") {
+      c.called += 1;
+      totalCalled += 1;
+    }
   }
+  const totalCsw = totalCalled + totalWhiffs;
 
-  // Second pass: compute the active metric per cell.
+  // Second pass: compute each cell's share of the active metric's
+  // grid-wide event total (density). With this definition the cells
+  // sum to 100% (or near it, modulo cells with zero events).
   for (const c of cells) {
-    c.value = computeMetric(c, metric);
+    c.value = computeMetric(c, metric, {
+      totalWhiffs,
+      totalCalled,
+      totalChaseSwings,
+      totalCsw,
+    });
   }
 
   return {
@@ -163,55 +187,78 @@ export function buildHeatGrid(
     metric,
     cells,
     total,
-    totalSwings,
-    totalTakes,
-    totalOutOfZonePitches,
+    totalWhiffs,
+    totalCalled,
+    totalChaseSwings,
+    totalCsw,
   };
 }
 
-/** Sum of the denominator events the active metric needs to compute.
- *  When zero, every cell ends up NaN and the grid renders blank —
- *  the label should explain why instead of just showing a pitch
- *  count over an empty grid. */
+/** Grid-wide total of the active metric's event type. When zero,
+ *  every cell ends up NaN and the grid renders blank — the label
+ *  should explain why instead of just showing a pitch count over
+ *  an empty grid. */
 export function heatMetricDenominator(grid: HeatGridSpec): number {
   switch (grid.metric) {
     case "whiff":
-      return grid.totalSwings;
+      return grid.totalWhiffs;
     case "chase":
-      return grid.totalOutOfZonePitches;
+      return grid.totalChaseSwings;
     case "called":
-      return grid.totalTakes;
+      return grid.totalCalled;
     case "csw":
-      return grid.total;
+      return grid.totalCsw;
   }
 }
 
-export const HEAT_METRIC_EMPTY_HINTS: Record<HeatMetric, string> = {
-  whiff:
-    "Whiff % needs swings — include whiffs, fouls, or in-play in the outcome filter.",
-  chase:
-    "Chase % needs out-of-zone pitches in the selection.",
-  called:
-    "Called strike % needs takes — include balls or called strikes in the outcome filter.",
-  csw: "CSW % needs pitches in the selection.",
+/** Singular / plural event labels paired with the denominator so
+ *  the chip can read "14 whiffs", "0 chases", etc. */
+export const HEAT_METRIC_EVENT_LABELS: Record<HeatMetric, [string, string]> = {
+  whiff: ["whiff", "whiffs"],
+  chase: ["chase", "chases"],
+  called: ["called strike", "called strikes"],
+  csw: ["called-or-whiff", "called-or-whiffs"],
 };
 
-function computeMetric(c: HeatCell, metric: HeatMetric): number {
+export const HEAT_METRIC_EMPTY_HINTS: Record<HeatMetric, string> = {
+  whiff:
+    "No whiffs in this selection — adjust the outcome / pitch-type filters to include whiff pitches.",
+  chase:
+    "No chase swings in this selection — chases are swings on out-of-zone pitches.",
+  called:
+    "No called strikes in this selection — include called-strike outcomes to populate the heat.",
+  csw: "No called strikes or whiffs in this selection.",
+};
+
+interface GridTotals {
+  totalWhiffs: number;
+  totalCalled: number;
+  totalChaseSwings: number;
+  totalCsw: number;
+}
+
+function computeMetric(
+  c: HeatCell,
+  metric: HeatMetric,
+  totals: GridTotals,
+): number {
   switch (metric) {
     case "whiff":
-      // Swing-and-miss rate among swings.
-      return c.swings > 0 ? c.whiffs / c.swings : NaN;
+      // Cell's share of all whiffs in the grid.
+      return totals.totalWhiffs > 0 ? c.whiffs / totals.totalWhiffs : NaN;
     case "chase":
-      // Out-of-zone swing rate.
-      if (c.inZone) return NaN;
-      return c.total > 0 ? c.swings / c.total : NaN;
+      // Cell's share of all chase swings (in-zone cells contribute 0).
+      return totals.totalChaseSwings > 0
+        ? c.chaseSwings / totals.totalChaseSwings
+        : NaN;
     case "called":
-      // Called-strike rate among takes (non-swings).
-      const takes = c.total - c.swings;
-      return takes > 0 ? c.called / takes : NaN;
+      // Cell's share of all called strikes.
+      return totals.totalCalled > 0 ? c.called / totals.totalCalled : NaN;
     case "csw":
-      // Called Strikes + Whiffs share of all pitches.
-      return c.total > 0 ? (c.called + c.whiffs) / c.total : NaN;
+      // Cell's share of all called-strike + whiff events.
+      return totals.totalCsw > 0
+        ? (c.called + c.whiffs) / totals.totalCsw
+        : NaN;
   }
 }
 
@@ -236,11 +283,11 @@ export const HEAT_METRIC_LABELS: Record<HeatMetric, string> = {
 
 export const HEAT_METRIC_DESCRIPTIONS: Record<HeatMetric, string> = {
   whiff:
-    "Share of swings batters miss entirely, computed per grid cell. Higher = more unhittable stuff in that zone.",
+    "Each cell's share of all whiffs in the selection. Cells sum to 100% — answers 'where do his whiffs land?'.",
   chase:
-    "Share of out-of-zone pitches batters swing at. Cells inside the strike zone are blank since 'chase' only applies to balls.",
+    "Each cell's share of all chase swings (swings on out-of-zone pitches). In-zone cells stay blank since a swing in zone isn't a chase.",
   called:
-    "Share of takes that were called strikes, per cell. Higher = batters letting good pitches go by — freeze-em territory.",
+    "Each cell's share of all called strikes in the selection. Reveals the spots a pitcher gets the umpire's call.",
   csw:
-    "Called Strikes + Whiffs as a share of all pitches in that cell. Best single-pitch dominance metric in zone.",
+    "Each cell's share of all called-strike + whiff events combined. Standard 'dominant pitch' density map.",
 };
