@@ -26,7 +26,11 @@ import { PitcherStatsArea } from "./PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
-import { fetchPitcherGameLine, type MlbPitcherGameLine } from "@/lib/statsapi/client";
+import {
+  fetchPitcherGameLine,
+  fetchPersonsCached,
+  type MlbPitcherGameLine,
+} from "@/lib/statsapi/client";
 import { PitcherGameStats } from "./PitcherGameStats";
 
 interface PageProps {
@@ -47,6 +51,13 @@ interface PageProps {
     // for a one-sided filter. Used for "show me pitches over 95" queries.
     veloMin?: string;
     veloMax?: string;
+    // Batter-scope and at-bat-replay params driven by the matchups
+    // panel. Read on the server to build the filter-summary banner;
+    // also consumed client-side by AtBatHeader / MatchupsPanel /
+    // PitcherStatsView for narrowing and playback.
+    vsBatter?: string;
+    abGame?: string;
+    abNum?: string;
   }>;
 }
 
@@ -326,24 +337,66 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         .then((r) => r.data)
     : null;
 
+  // Capture pitcher's current team for the opponent-resolution
+  // closure below — TS can't carry the post-notFound() narrowing of
+  // `pitcher` into the function body, so a local const sidesteps it.
+  const pitcherTeamId = pitcher.current_team_id ?? null;
+
+  // Resolve a game_pk to { game_date, opponentName } using the same
+  // home/away → opponent logic shared between the URL ?game= filter
+  // and the at-bat-replay (?abGame) summary.
+  function resolveGameInfo(
+    gamePk: number,
+  ): { game_date: string; opponentName: string | null } | null {
+    const meta = gameByPk.get(gamePk);
+    if (!meta) return null;
+    const opponentId =
+      pitcherTeamId != null && meta.home_team_id === pitcherTeamId
+        ? meta.away_team_id
+        : pitcherTeamId != null && meta.away_team_id === pitcherTeamId
+          ? meta.home_team_id
+          : (meta.home_team_id ?? meta.away_team_id);
+    return {
+      game_date: meta.game_date,
+      opponentName: opponentId ? (teamFullName.get(opponentId) ?? null) : null,
+    };
+  }
+
   // Resolve the currently-filtered game (if any) to a date + opponent
   // name for the filter-summary banner.
-  let activeGameInfo: { game_date: string; opponentName: string | null } | null = null;
-  if (sp.game) {
-    const activeGamePk = Number(sp.game);
-    const meta = gameByPk.get(activeGamePk);
-    if (meta) {
-      const pitcherTeamId = pitcher.current_team_id ?? null;
-      const opponentId =
-        pitcherTeamId != null && meta.home_team_id === pitcherTeamId
-          ? meta.away_team_id
-          : pitcherTeamId != null && meta.away_team_id === pitcherTeamId
-            ? meta.home_team_id
-            : (meta.home_team_id ?? meta.away_team_id);
-      activeGameInfo = {
-        game_date: meta.game_date,
-        opponentName: opponentId ? (teamFullName.get(opponentId) ?? null) : null,
-      };
+  const activeGameInfo = sp.game ? resolveGameInfo(Number(sp.game)) : null;
+
+  // Batter scope (?vsBatter=<id>) — resolve to a display name so the
+  // filter-summary banner can say "vs James Wood" instead of
+  // exposing the mlb_id.
+  const vsBatterParam = sp.vsBatter ? Number(sp.vsBatter) : null;
+  const vsBatterId =
+    vsBatterParam != null && Number.isFinite(vsBatterParam)
+      ? vsBatterParam
+      : null;
+  let batterName: string | null = null;
+  if (vsBatterId != null) {
+    try {
+      const batterMap = await fetchPersonsCached([vsBatterId]);
+      batterName = batterMap.get(vsBatterId)?.fullName ?? null;
+    } catch {
+      // Network blip — render the summary without the batter name.
+    }
+  }
+
+  // At-bat playback context (?abGame=…&abNum=…). The replay's game
+  // can differ from the URL's ?game= filter (the matchups panel
+  // jumps the user across games), so we resolve abGame separately.
+  let atBatInfo: {
+    atBatNumber: number;
+    game: { game_date: string; opponentName: string | null };
+  } | null = null;
+  if (sp.abGame && sp.abNum) {
+    const pk = Number(sp.abGame);
+    const num = Number(sp.abNum);
+    if (Number.isFinite(pk) && Number.isFinite(num)) {
+      const info = resolveGameInfo(pk);
+      if (info) atBatInfo = { atBatNumber: num, game: info };
     }
   }
 
@@ -384,6 +437,8 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     game: activeGameInfo,
     veloMin,
     veloMax,
+    batterName,
+    atBat: atBatInfo,
   });
 
   // Schema.org Person markup — helps Google generate richer SERP
