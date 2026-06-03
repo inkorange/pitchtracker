@@ -43,6 +43,13 @@ export interface HeatGridSpec {
   cells: HeatCell[];
   /** Total pitches that fell inside the grid bounds. */
   total: number;
+  /** Aggregate denominator counts — drive the empty-state label so
+   *  users see "Whiff % needs swings" instead of an unexplained
+   *  blank grid when their outcome filter doesn't include any
+   *  swing-producing pitches. */
+  totalSwings: number;
+  totalTakes: number;
+  totalOutOfZonePitches: number;
 }
 
 // Strike zone (Statcast convention).
@@ -118,6 +125,9 @@ export function buildHeatGrid(
   }
 
   let total = 0;
+  let totalSwings = 0;
+  let totalTakes = 0;
+  let totalOutOfZonePitches = 0;
   for (const p of pitches) {
     if (p.plate_x == null || p.plate_z == null) continue;
     if (p.plate_x < xMin || p.plate_x >= xMax) continue;
@@ -130,9 +140,16 @@ export function buildHeatGrid(
     c.total += 1;
     total += 1;
     const d = p.description ?? "";
-    if (SWING_DESCRIPTIONS.has(d)) c.swings += 1;
+    const isSwing = SWING_DESCRIPTIONS.has(d);
+    if (isSwing) {
+      c.swings += 1;
+      totalSwings += 1;
+    } else {
+      totalTakes += 1;
+    }
     if (WHIFF_DESCRIPTIONS.has(d)) c.whiffs += 1;
     if (CALLED_DESCRIPTIONS.has(d)) c.called += 1;
+    if (!c.inZone) totalOutOfZonePitches += 1;
   }
 
   // Second pass: compute the active metric per cell.
@@ -140,8 +157,48 @@ export function buildHeatGrid(
     c.value = computeMetric(c, metric);
   }
 
-  return { cols, rows, xMin, xMax, zMin, zMax, metric, cells, total };
+  return {
+    cols,
+    rows,
+    xMin,
+    xMax,
+    zMin,
+    zMax,
+    metric,
+    cells,
+    total,
+    totalSwings,
+    totalTakes,
+    totalOutOfZonePitches,
+  };
 }
+
+/** Sum of the denominator events the active metric needs to compute.
+ *  When zero, every cell ends up NaN and the grid renders blank —
+ *  the label should explain why instead of just showing a pitch
+ *  count over an empty grid. */
+export function heatMetricDenominator(grid: HeatGridSpec): number {
+  switch (grid.metric) {
+    case "whiff":
+      return grid.totalSwings;
+    case "chase":
+      return grid.totalOutOfZonePitches;
+    case "called":
+      return grid.totalTakes;
+    case "csw":
+      return grid.total;
+  }
+}
+
+export const HEAT_METRIC_EMPTY_HINTS: Record<HeatMetric, string> = {
+  whiff:
+    "Whiff % needs swings — include whiffs, fouls, or in-play in the outcome filter.",
+  chase:
+    "Chase % needs out-of-zone pitches in the selection.",
+  called:
+    "Called strike % needs takes — include balls or called strikes in the outcome filter.",
+  csw: "CSW % needs pitches in the selection.",
+};
 
 function computeMetric(c: HeatCell, metric: HeatMetric): number {
   switch (metric) {

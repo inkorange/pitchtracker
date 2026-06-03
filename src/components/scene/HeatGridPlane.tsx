@@ -4,7 +4,12 @@ import { useEffect, useMemo } from "react";
 import { CanvasTexture, DoubleSide, LinearFilter } from "three";
 import { Html } from "@react-three/drei";
 import { statcastToThree } from "@/lib/viz/coords";
-import { type HeatGridSpec, HEAT_METRIC_LABELS } from "@/lib/pitch/heatGrid";
+import {
+  HEAT_METRIC_EMPTY_HINTS,
+  HEAT_METRIC_LABELS,
+  heatMetricDenominator,
+  type HeatGridSpec,
+} from "@/lib/pitch/heatGrid";
 
 // Renders the heat grid as a textured plane positioned at the strike
 // zone. The texture is drawn on a canvas every render with cell
@@ -92,14 +97,7 @@ export function HeatGridPlane({ grid }: HeatGridPlaneProps) {
         />
       </mesh>
       <Html position={labelAnchor} zIndexRange={[10, 0]} center>
-        <div className="px-2 py-1 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-[10px] tabular-nums whitespace-nowrap pointer-events-none shadow-lg text-white/90">
-          <span className="text-[#5fc7d8] font-semibold">
-            {HEAT_METRIC_LABELS[grid.metric]}
-          </span>
-          <span className="text-white/55 ml-1.5">
-            {grid.total} pitch{grid.total === 1 ? "" : "es"}
-          </span>
-        </div>
+        <HeatGridLabel grid={grid} />
       </Html>
       {/* (w, h) referenced so the texture sizing math participates in
           react-three-fiber's reconciliation. */}
@@ -177,6 +175,38 @@ function drawHeatGrid(
       ctx.fillText(`n=${cell.total}`, x + cellW / 2, y + cellH / 2);
     }
   }
+}
+
+// Floating chip above the grid. When the active metric's
+// denominator is zero (e.g., user selected only "ball" outcomes and
+// the active metric is whiff %), shows an actionable hint instead
+// of the metric name + pitch count so the blank grid isn't
+// mysterious.
+function HeatGridLabel({ grid }: { grid: HeatGridSpec }) {
+  const denominator = heatMetricDenominator(grid);
+  const hasData = denominator > 0;
+  return (
+    <div
+      className={`px-2 py-1 rounded bg-black/80 backdrop-blur-sm border text-[10px] tabular-nums whitespace-nowrap pointer-events-none shadow-lg ${
+        hasData ? "border-white/15 text-white/90" : "border-amber-300/35"
+      }`}
+    >
+      {hasData ? (
+        <>
+          <span className="text-[#5fc7d8] font-semibold">
+            {HEAT_METRIC_LABELS[grid.metric]}
+          </span>
+          <span className="text-white/55 ml-1.5">
+            {grid.total} pitch{grid.total === 1 ? "" : "es"}
+          </span>
+        </>
+      ) : (
+        <span className="text-amber-300/90">
+          {HEAT_METRIC_EMPTY_HINTS[grid.metric]}
+        </span>
+      )}
+    </div>
+  );
 }
 
 // Color ramp: transparent at value=0, yellow at mid, red at high.
