@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { CanvasTexture, DoubleSide, NearestFilter } from "three";
+import { CanvasTexture, DoubleSide, LinearFilter } from "three";
 import { Html } from "@react-three/drei";
 import { statcastToThree } from "@/lib/viz/coords";
 import { type HeatGridSpec, HEAT_METRIC_LABELS } from "@/lib/pitch/heatGrid";
@@ -22,10 +22,11 @@ interface HeatGridPlaneProps {
   grid: HeatGridSpec;
 }
 
-// Pixels per cell in the canvas texture. Higher = sharper edges
-// (since we render NearestFilter), but the underlying data is still
-// just cols × rows.
-const TEXEL_PER_CELL = 64;
+// Pixels per cell in the canvas texture. 256 keeps text + borders
+// crisp under the user's zoom (was 64 with NearestFilter and showed
+// visible chunkiness). Total texture: cols × rows × 256² ≈ 6 MP at
+// the default 5×5 grid — acceptable GPU footprint for one texture.
+const TEXEL_PER_CELL = 256;
 
 export function HeatGridPlane({ grid }: HeatGridPlaneProps) {
   const { texture, w, h } = useMemo(() => {
@@ -37,10 +38,12 @@ export function HeatGridPlane({ grid }: HeatGridPlaneProps) {
     const ctx = c.getContext("2d")!;
     drawHeatGrid(ctx, grid, w, h);
     const tex = new CanvasTexture(c);
-    // NearestFilter keeps cell edges crisp at any camera distance —
-    // we want the grid to read as a 5×5 quilt, not a soft blur.
-    tex.magFilter = NearestFilter;
-    tex.minFilter = NearestFilter;
+    // LinearFilter scales the canvas-rendered text + cell borders
+    // smoothly as the camera zooms in/out. The 256 px/cell texture
+    // resolution gives the linear sampler enough source pixels that
+    // edges stay sharp at typical zoom levels.
+    tex.magFilter = LinearFilter;
+    tex.minFilter = LinearFilter;
     tex.needsUpdate = true;
     return { texture: tex, w, h };
   }, [grid]);
@@ -117,6 +120,10 @@ function drawHeatGrid(
   ctx.clearRect(0, 0, w, h);
   const cellW = w / grid.cols;
   const cellH = h / grid.rows;
+  // Line widths scale with cell size so the grid + zone outlines
+  // stay visible no matter what TEXEL_PER_CELL gets set to.
+  const cellBorderW = Math.max(1, cellW * 0.025);
+  const zoneOutlineW = Math.max(2, cellW * 0.045);
   for (const cell of grid.cells) {
     const x = cell.col * cellW;
     // Canvas Y is top-down; our row 0 is the bottom (low strike-zone
@@ -126,14 +133,24 @@ function drawHeatGrid(
     ctx.fillRect(x, y, cellW, cellH);
     // Cell border: faint to read as a "grid".
     ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x + 1, y + 1, cellW - 2, cellH - 2);
+    ctx.lineWidth = cellBorderW;
+    ctx.strokeRect(
+      x + cellBorderW / 2,
+      y + cellBorderW / 2,
+      cellW - cellBorderW,
+      cellH - cellBorderW,
+    );
     // Strike-zone cells: thicker white outline so the zone is
     // visually distinguishable from the chase margin.
     if (cell.inZone) {
       ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(x + 2, y + 2, cellW - 4, cellH - 4);
+      ctx.lineWidth = zoneOutlineW;
+      ctx.strokeRect(
+        x + zoneOutlineW / 2,
+        y + zoneOutlineW / 2,
+        cellW - zoneOutlineW,
+        cellH - zoneOutlineW,
+      );
     }
     // Value label — small, centered.
     if (Number.isFinite(cell.value) && cell.total > 0) {
