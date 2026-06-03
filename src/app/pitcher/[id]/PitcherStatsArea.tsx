@@ -34,7 +34,13 @@ const FALLBACK_TOP_PX = 224; // ~14rem (collapsed pitcher card bottom)
 //
 // On desktop (lg+), the stats area lives to the right of the card at
 // a fixed top offset; the card's height doesn't displace it.
-export function PitcherStatsArea() {
+export function PitcherStatsArea({
+  filterSummary,
+}: {
+  /** Server-rendered scope text passed through to the stats banner
+   *  so it mirrors the TopNav title. */
+  filterSummary: string;
+}) {
   const [view] = usePitcherView();
   const isDesktop = useSyncExternalStore(
     subscribeIsDesktop,
@@ -76,7 +82,7 @@ export function PitcherStatsArea() {
       className="absolute left-3 right-3 bottom-3 sm:top-16 sm:left-[23.5rem] sm:right-6 sm:bottom-6 z-10 overflow-y-auto pointer-events-auto pt-1 pb-4"
       aria-label="Pitcher stats"
     >
-      <PitcherStatsView />
+      <PitcherStatsView filterSummary={filterSummary} />
     </section>
   );
 }

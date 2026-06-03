@@ -30,20 +30,26 @@ import type { ArsenalRadar as ArsenalRadarData } from "@/lib/pitch/arsenalRadar"
 // below is wrapped in <LazyMount> so the SVG mounts only when it
 // scrolls into view — keeps first paint fast on phones without
 // hiding content behind tabs.
-export function PitcherStatsView() {
+export function PitcherStatsView({
+  filterSummary,
+}: {
+  /** Pre-rendered scope text from the page server. Mirrors the
+   *  TopNav title so the banner reflects every active URL filter
+   *  (game / pitch / outcome / event / hand / velo / batter /
+   *  at-bat), not just season + vsBatter. */
+  filterSummary: string;
+}) {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
   const id = params?.id;
-  // Season + vsBatter drive the scope banner above the cards. We
-  // also write back to ?vsBatter via the same hook so the banner's X
-  // can clear batter scope without reaching into the matchups panel.
-  // shallow:false so the banner's Clear action triggers a server
-  // re-render — the page server reads ?vsBatter to scope the
-  // pitcher card's per-pitch aggregates. Without this, clearing the
-  // batter would leave those numbers stale.
-  const [{ season, vsBatter }, setUrl] = useQueryStates(
+  // We still read vsBatter so the banner's Clear action can drop
+  // it (and at-bat playback) in one click. shallow:false so the URL
+  // write triggers a server re-render — the page server reads
+  // vsBatter to scope the pitcher card's per-pitch aggregates AND
+  // it owns filterSummary text; without this, clearing the batter
+  // would leave both stale.
+  const [, setUrl] = useQueryStates(
     {
-      season: parseAsInteger,
       vsBatter: parseAsInteger,
       // Clearing batter scope also leaves at-bat mode — otherwise the
       // AtBatHeader / inline matchups list would be stranded without
@@ -53,7 +59,11 @@ export function PitcherStatsView() {
     },
     { shallow: false },
   );
-  const seasonLabel = season ?? new Date().getFullYear();
+  const vsBatterStr = searchParams.get("vsBatter");
+  const vsBatter =
+    vsBatterStr && !Number.isNaN(Number(vsBatterStr))
+      ? Number(vsBatterStr)
+      : null;
   const clearBatterScope = () =>
     setUrl({ vsBatter: null, abGame: null, abNum: null });
 
@@ -159,8 +169,7 @@ export function PitcherStatsView() {
     return (
       <div className="space-y-3">
         <StatsScopeBanner
-          seasonLabel={seasonLabel}
-          batterName={sequenceBatterName}
+          summary={filterSummary}
           batterScoped={vsBatter != null}
           onClearBatter={clearBatterScope}
         />
@@ -175,14 +184,14 @@ export function PitcherStatsView() {
 
   return (
     <div className="space-y-3">
-      {/* Scope banner at the very top — "vs <BATTER> · <YEAR>" when
-          batter-scoped, otherwise just the season. Gives the user an
-          unambiguous read of what the cards below are scoped to. */}
+      {/* Scope banner at the very top — mirrors the TopNav title's
+          filter-summary string so the cards' scope is unambiguous.
+          Includes every active URL filter, not just season +
+          vsBatter. */}
       <StatsScopeBanner
-        seasonLabel={seasonLabel}
-        batterName={sequenceBatterName}
+        summary={filterSummary}
         batterScoped={vsBatter != null}
-        onClearBatter={() => setUrl({ vsBatter: null })}
+        onClearBatter={clearBatterScope}
       />
       {/* Headline spans full width on every breakpoint. */}
       <StatsHeadline total={aggregated.total} />

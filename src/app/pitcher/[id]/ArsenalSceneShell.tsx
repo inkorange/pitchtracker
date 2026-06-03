@@ -29,6 +29,9 @@ interface CachedPitch {
   pfx_x: number | null;
   pfx_z: number | null;
   release_extension: number | null;
+  /** Flattened from pitch_games.game_date on the arsenal endpoint —
+   *  drives the recency-based render split in the 3D scene. */
+  game_date: string | null;
 }
 
 interface ArsenalResponse {

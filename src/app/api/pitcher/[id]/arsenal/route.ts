@@ -143,9 +143,17 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     pitchTypeSet.size === 0
       ? arsenal
       : arsenal.filter((p) => p.pitch_type != null && pitchTypeSet.has(p.pitch_type));
-  const renderable = filtered.filter(
-    (p) => p.vx0 != null && p.vy0 != null && p.vz0 != null,
-  );
+  // Flatten the joined pitch_games.game_date onto each pitch and
+  // drop the nested object. The 3D scene needs game_date for the
+  // recency-based render split (recent ribbons / historical lines)
+  // and shipping the join nested would duplicate season/game_type
+  // bytes for every pitch.
+  const renderable = filtered
+    .filter((p) => p.vx0 != null && p.vy0 != null && p.vz0 != null)
+    .map(({ pitch_games, ...rest }) => ({
+      ...rest,
+      game_date: pitch_games?.game_date ?? null,
+    }));
 
   // Opt-in: sequencing matrix computed from the PRE-FILTER `cached`
   // pitch set (still scoped to season/hand/game from the SQL query
