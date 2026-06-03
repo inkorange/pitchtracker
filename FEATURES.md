@@ -84,6 +84,108 @@ The url should also reflect this so we can send this to a friend and show them a
 
 The batter selector on mobile will be within the pitcher panel, that is collapsed by deafult. It will be situated in there, with the listing of games showing within the same panel after finding a valid batter.
 
+** DONE **
+
+## Rankings
+
+Since we get game data daily, can we also run a query to do daily rankings with different categories for the top 5 pitchers who rank on:
+
+1. Top 5 Velo
+2. Top 5 Whiff Rates
+3. Top 5 Most Strikeouts
+
+Any other suggestions
+
+### UX
+
+This should be listed on the homepage
+
+** DONE **
+
+
 ## AI Integration
 
-### TDB
+### Purpose
+
+A truly immersive analytics tool would work best if we are able to open a chat input and naturally type the analysis we want, or use a speech to text feature, using AI to describe the analytcis. An example query would be, "Show me all of Nolan McLean's curveballs that resulted in a strikeout in 2026", or "Get me all of the match-ups between Paul Skenes and Francisco Lindor"
+
+### UX
+
+I'd like a colorful icon sitting in the lower-left, and when we click it, it opens up into a prompt at the bottom of the page for the user to either type in what they want, or offer a mic icon where they can talk to type thier request.
+
+The AI analyzes what they asked for, and constructs the smrt url and redirects to that page to show the data they want
+
+
+### Technology
+
+I am looking for suggestions on how to implement this, on my othjer projects I have used Vercel's AI to do this, but it needs to be very gated to only respond to requests for our app. Ity needs to interpret an ask, and run APIs to get the ids of the pitchers or batters, and construct the url that will present the data.
+
+It might require extending some of the url params to be able to retrieve data more easily. One issue I see already is that there is no url parameter for turning on the tunneling on the pitcher page, so we would need to add that to the url, if the user asks in this chat, show me the tunneling for these pitches.
+
+We might want to write a SKILL.md file that explains how every new feature or option we add to this project requires a URL param to either A. Share the snapshot of the data we are visualizing directly wioth someone else, or B. make it easy for an Ai to construct a visualization page from a text prompt.
+
+### Sample Entries
+
+"Show me all of Paul Skenes curveballs in 2025"
+"Now add fastballs to this pitch spread and show me tunneling"
+"show me all the fastballs thrown against left handed hitters"
+
+"Show me all the matchups between Cease and Lindor"
+
+"Show me yesterday's games"
+"Show me all the hitting matchups form yesterday for Juan Soto"
+
+## Batter-aware Pitch Sequencing
+
+Extension of the season-level Sequencing card on `/pitcher/[id]?view=stats`.
+When a batter is selected via the existing `?vsBatter=<mlb_id>` URL param, the
+sequencing matrix narrows to pitches thrown to that specific batter only —
+answering "how does Skenes attack Soto specifically, and what does he go to
+after the fastball-up?".
+
+### Scope
+
+- Server-side: the arsenal endpoint accepts `vsBatter`, adds `batter_id` to
+  the SELECT, and filters `cached` by batter before passing into
+  `buildSequencingMatrix`.
+- Card hint shows the batter context ("Sequencing · 12 ABs vs Witt Jr.")
+  when scoped.
+- Help / AI prompt translation rule: "his sequencing vs <batter>" →
+  `/pitcher/<id>?view=stats&vsBatter=<batter mlb_id>`.
+
+### Why later
+
+The first sequencing PR ships the season-level matrix only — it's enough to
+prove out the UI and the data path. The batter-aware version is a clean
+data-narrowing follow-up, not a rebuild.
+
+## Sequencing Consistency Across Games
+
+Per-game variance / drift in a pitcher's sequencing patterns. Answers "is he
+calling the same pattern every game, or has he changed his approach?".
+
+### Two visualization candidates
+
+- **Per-game small multiples**: one tiny matrix per game in the selection,
+  laid out as a grid. Visual scan for "same shape every time" vs
+  game-to-game variance. Heavy at 30+ games per season; works best for
+  shorter windows (last 5 starts, etc.).
+- **Variance timeline**: a single chart with one line per matrix row,
+  showing per-game KL-divergence (or entropy delta) of that game's matrix
+  vs the season's. Spikes = "changed his approach that day". Compact, one
+  card.
+
+### Scope
+
+- New stats card next to the season-level Sequencing card.
+- Reuses the same `buildSequencingMatrix` function, called per-game on the
+  bucketed pitches.
+- URL param to switch view (`?seqView=multiples|timeline`?) — TBD.
+- Combines cleanly with `?vsBatter=` once that's wired: "how has his
+  approach to this batter shifted across the season?".
+
+### Why later
+
+Needs the season-level + batter-aware matrices in place first so the
+"variance vs what?" baseline is well-defined. Ship those, then build this on
+top.

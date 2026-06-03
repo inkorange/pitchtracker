@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
+import {
+  buildSequencingMatrix,
+  type SequencingMatrix,
+} from "@/lib/pitch/sequencingMatrix";
 
 // JSON arsenal endpoint backing the persistent Scene shell on the
 // pitcher route. Mirrors the pitch-fetch + filter logic that lived
@@ -111,10 +115,24 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     (p) => p.vx0 != null && p.vy0 != null && p.vz0 != null,
   );
 
+  // Opt-in: sequencing matrix computed from the PRE-FILTER `cached`
+  // pitch set (still scoped to season/hand/game from the SQL query
+  // but ignoring outcome / pitch_type / event filters). The matrix
+  // needs unbroken pitch sequences within each at-bat — applying
+  // the outcome filter here would erase intermediate pitches and
+  // produce nonsense transitions. Off by default to keep the
+  // response payload small for callers that only want the
+  // renderable pitches.
+  let sequenceMatrix: SequencingMatrix | null = null;
+  if (sp.get("includeSequence") === "1") {
+    sequenceMatrix = buildSequencingMatrix(cached);
+  }
+
   return NextResponse.json(
     {
       pitches: renderable,
       pitcherLabel: pitcherLastName(pitcher),
+      sequenceMatrix,
     },
     {
       headers: {
