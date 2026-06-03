@@ -122,27 +122,29 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
   }
 
   const inAtBatMode = atBat.abGame != null && atBat.abNum != null;
-  const showInline = inAtBatMode && vsBatter != null;
+  const batterScoped = vsBatter != null;
+  const showInline = inAtBatMode && batterScoped;
 
   return (
     <div className="space-y-2">
+      {batterScoped ? (
+        // vsBatter chip card — anchors the matchup context with a
+        // headshot + name + an X that cleanly exits vsBatter mode
+        // (also clears at-bat mode so the inline list / AtBatHeader
+        // don't end up stranded without a batter). Replaces the
+        // previous "Browse matchups · <name>" button so the user has
+        // an obvious exit affordance at all times, not just during
+        // at-bat playback.
+        <VsBatterChip
+          batterId={vsBatter}
+          batterName={batterName}
+          onChange={() => setDialogOpen(true)}
+          onClear={clearMatchup}
+        />
+      ) : null}
+
       {showInline ? (
         <>
-          <div className="flex items-baseline justify-between gap-2 px-1">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-white/55 truncate">
-              Matchups
-              {batterName ? (
-                <span className="text-white/85"> · {batterName}</span>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => setDialogOpen(true)}
-              className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white"
-            >
-              Change
-            </button>
-          </div>
           <InlineMatchupsList
             matchups={matchups}
             loading={matchupsLoading}
@@ -154,34 +156,23 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
               setAtBat({ abGame: ab.game_pk, abNum: ab.at_bat_number })
             }
           />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={exitAtBat}
-              className="flex-1 px-2.5 py-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.1] text-[10px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
-            >
-              Exit at-bat mode
-            </button>
-            <button
-              type="button"
-              onClick={clearMatchup}
-              className="px-2 py-1.5 rounded-md border border-white/10 text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white"
-            >
-              Clear
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={exitAtBat}
+            className="w-full px-2.5 py-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.1] text-[10px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
+          >
+            Exit at-bat mode
+          </button>
         </>
-      ) : (
+      ) : !batterScoped ? (
         <button
           type="button"
           onClick={() => setDialogOpen(true)}
           className="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[11px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
         >
-          {vsBatter != null && batterName
-            ? `Browse matchups · ${batterName}`
-            : "Find at-bats"}
+          Find at-bats
         </button>
-      )}
+      ) : null}
 
       {dialogOpen ? (
         <MatchupsDialog
@@ -203,6 +194,76 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
           }}
         />
       ) : null}
+    </div>
+  );
+}
+
+// ─── vsBatter chip ───────────────────────────────────────────────
+// Visible whenever ?vsBatter is set on the pitcher page. Anchors the
+// matchup context with the batter's headshot + name, an X to exit
+// vsBatter mode cleanly (also drops at-bat playback so the inline
+// list / AtBatHeader don't strand without a batter), and a small
+// Change action to reopen the matchups picker.
+function VsBatterChip({
+  batterId,
+  batterName,
+  onChange,
+  onClear,
+}: {
+  batterId: number;
+  batterName: string | null;
+  onChange: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-white/[0.04] border border-white/10 pl-1.5 pr-1 py-1">
+      <div className="relative w-9 h-9 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+        <Image
+          src={personHeadshotUrl(batterId, 72)}
+          alt=""
+          fill
+          sizes="36px"
+          className="object-cover"
+          unoptimized
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[9px] uppercase tracking-[0.14em] text-white/45 leading-none">
+          vs Batter
+        </div>
+        <div className="text-[13px] text-white/95 truncate leading-tight mt-0.5">
+          {batterName ?? "Selected batter"}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onChange}
+        className="text-[9px] uppercase tracking-[0.14em] text-white/55 hover:text-white px-1.5 py-1 rounded hover:bg-white/[0.06] transition-colors flex-shrink-0"
+        aria-label="Change batter"
+      >
+        Change
+      </button>
+      <button
+        type="button"
+        onClick={onClear}
+        className="inline-flex items-center justify-center w-7 h-7 rounded-md text-white/55 hover:text-white hover:bg-white/[0.08] transition-colors flex-shrink-0"
+        aria-label="Exit vsBatter mode"
+        title="Exit vsBatter mode"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
     </div>
   );
 }
