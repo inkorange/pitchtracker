@@ -65,6 +65,14 @@ export function HeatGridPlane({ grid }: HeatGridPlaneProps) {
     0.15,
     centerZ,
   ]);
+  // Anchor the metric label at world-space TOP of the grid, slightly
+  // floated above it so the chip sits cleanly clear of the topmost
+  // cells regardless of camera angle.
+  const labelAnchor: [number, number, number] = statcastToThree([
+    centerX,
+    0.15,
+    grid.zMax + 0.35,
+  ]);
 
   return (
     <group>
@@ -80,13 +88,8 @@ export function HeatGridPlane({ grid }: HeatGridPlaneProps) {
           depthWrite={false}
         />
       </mesh>
-      <Html position={centerPlane} zIndexRange={[10, 0]} center>
-        <div
-          className="px-2 py-1 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-[10px] tabular-nums whitespace-nowrap pointer-events-none shadow-lg text-white/90"
-          style={{
-            transform: `translate(0, ${(planeHeight / 2) * 24 + 18}px)`,
-          }}
-        >
+      <Html position={labelAnchor} zIndexRange={[10, 0]} center>
+        <div className="px-2 py-1 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-[10px] tabular-nums whitespace-nowrap pointer-events-none shadow-lg text-white/90">
           <span className="text-[#5fc7d8] font-semibold">
             {HEAT_METRIC_LABELS[grid.metric]}
           </span>
