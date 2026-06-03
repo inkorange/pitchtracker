@@ -52,6 +52,11 @@ interface AtBatSummary {
 interface MatchupsPanelProps {
   /** The currently selected season on the pitcher page. */
   season: number;
+  /** When the URL filter narrows to a single game (?game=…), this is
+   *  that game's opponent team_id — used to pre-select the team
+   *  filter in the matchups dialog so opening "Find at-bats" lands
+   *  on that game's lineup rather than the season's most-faced. */
+  defaultTeamId?: number | null;
 }
 
 // Compact "Find at-bats" entry point on the pitcher card. Opens a
@@ -59,7 +64,7 @@ interface MatchupsPanelProps {
 // typeahead dropdown isn't clipped by the pitcher panel's scroll
 // container. URL state survives the dialog closing — `?vsBatter` +
 // `?abGame` + `?abNum` are the source of truth.
-export function MatchupsPanel({ season }: MatchupsPanelProps) {
+export function MatchupsPanel({ season, defaultTeamId }: MatchupsPanelProps) {
   const params = useParams<{ id?: string }>();
   const pitcherId = params?.id ? Number(params.id) : null;
 
@@ -194,6 +199,7 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
           matchups={matchups}
           matchupsLoading={matchupsLoading}
           matchupsError={matchupsError}
+          defaultTeamId={defaultTeamId ?? null}
           onClose={() => setDialogOpen(false)}
           onPickBatter={(b) => {
             setVsBatter(b.id);
@@ -294,6 +300,7 @@ function MatchupsDialog({
   matchups,
   matchupsLoading,
   matchupsError,
+  defaultTeamId,
   onClose,
   onPickBatter,
   onPickAtBat,
@@ -305,6 +312,7 @@ function MatchupsDialog({
   matchups: AtBatSummary[];
   matchupsLoading: boolean;
   matchupsError: string | null;
+  defaultTeamId: number | null;
   onClose: () => void;
   onPickBatter: (b: BatterResult) => void;
   onPickAtBat: (ab: AtBatSummary) => void;
@@ -352,6 +360,7 @@ function MatchupsDialog({
           <BatterSearchBody
             pitcherId={pitcherId}
             season={season}
+            defaultTeamId={defaultTeamId}
             onPick={(b) => {
               onPickBatter(b);
               setForceSearch(false);
@@ -425,10 +434,16 @@ interface TeamResult {
 function BatterSearchBody({
   pitcherId,
   season,
+  defaultTeamId,
   onPick,
 }: {
   pitcherId: number | null;
   season: number;
+  /** When the pitcher page has a single-game filter active, this is
+   *  that game's opponent team_id — pre-selected as the team filter
+   *  so opening "Find at-bats" lands on the right team's lineup
+   *  instead of the season's most-faced suggestions. */
+  defaultTeamId: number | null;
   onPick: (b: BatterResult) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -459,13 +474,22 @@ function BatterSearchBody({
           teams?: TeamResult[];
         };
         setSuggestions(body.batters ?? []);
-        setTeams(body.teams ?? []);
+        const teamList = body.teams ?? [];
+        setTeams(teamList);
+        // Pre-select the active game's opponent (if any). Only fires
+        // on first arrival of the teams list — once the user navigates
+        // (typeahead, clear, picks another team) we leave their state
+        // alone.
+        if (defaultTeamId != null) {
+          const match = teamList.find((t) => t.id === defaultTeamId);
+          if (match) setSelectedTeam((cur) => cur ?? match);
+        }
       })
       .catch(() => {
         /* ignore */
       });
     return () => ctrl.abort();
-  }, [pitcherId, season]);
+  }, [pitcherId, season, defaultTeamId]);
 
   // Fetch the full batter roster for the selected team.
   useEffect(() => {

@@ -355,7 +355,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // and the at-bat-replay (?abGame) summary.
   function resolveGameInfo(
     gamePk: number,
-  ): { game_date: string; opponentName: string | null } | null {
+  ): {
+    game_date: string;
+    opponentName: string | null;
+    opponentId: number | null;
+  } | null {
     const meta = gameByPk.get(gamePk);
     if (!meta) return null;
     const opponentId =
@@ -367,12 +371,17 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     return {
       game_date: meta.game_date,
       opponentName: opponentId ? (teamFullName.get(opponentId) ?? null) : null,
+      opponentId: opponentId ?? null,
     };
   }
 
   // Resolve the currently-filtered game (if any) to a date + opponent
   // name for the filter-summary banner.
   const activeGameInfo = sp.game ? resolveGameInfo(Number(sp.game)) : null;
+  // When a single game is filtered, default the matchups dialog's
+  // team picker to that game's opponent — the user is asking "find
+  // at-bats in THIS game", not "find at-bats from any game".
+  const defaultMatchupTeamId = activeGameInfo?.opponentId ?? null;
 
   // Batter scope (?vsBatter=<id>) — resolve to a display name so the
   // filter-summary banner can say "vs James Wood" instead of
@@ -652,7 +661,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
               matchups={
                 /* Pitcher-vs-batter matchups: typeahead → at-bat list → playback. */
                 <div className="border-t border-white/[0.08] pt-3 space-y-2">
-                  <MatchupsPanel season={season} />
+                  <MatchupsPanel
+                    season={season}
+                    defaultTeamId={defaultMatchupTeamId}
+                  />
                 </div>
               }
             />
