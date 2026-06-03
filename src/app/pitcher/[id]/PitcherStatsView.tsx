@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { parseAsInteger, useQueryStates } from "nuqs";
 import { aggregate, type StatPitch } from "./stats/aggregations";
 import { LazyMount } from "./stats/LazyMount";
 import { StatsHeadline } from "./stats/StatsHeadline";
+import { StatsScopeBanner } from "./stats/StatsScopeBanner";
 import { ArsenalCard } from "./stats/ArsenalCard";
 import { MovementPlot } from "./stats/MovementPlot";
 import { VelocityHistograms } from "./stats/VelocityHistograms";
@@ -30,6 +32,21 @@ export function PitcherStatsView() {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
   const id = params?.id;
+  // Season + vsBatter drive the scope banner above the cards. We
+  // also write back to ?vsBatter via the same hook so the banner's X
+  // can clear batter scope without reaching into the matchups panel.
+  const [{ season, vsBatter }, setUrl] = useQueryStates({
+    season: parseAsInteger,
+    vsBatter: parseAsInteger,
+    // Clearing batter scope also leaves at-bat mode — otherwise the
+    // AtBatHeader / inline matchups list would be stranded without a
+    // batter context.
+    abGame: parseAsInteger,
+    abNum: parseAsInteger,
+  });
+  const seasonLabel = season ?? new Date().getFullYear();
+  const clearBatterScope = () =>
+    setUrl({ vsBatter: null, abGame: null, abNum: null });
 
   // Mirror the arsenal-shell stripping (drop at-bat-mode params + view)
   // so the unscoped fetches share a browser cache hit with the 3D
@@ -111,14 +128,33 @@ export function PitcherStatsView() {
 
   if (pitches.length === 0) {
     return (
-      <div className="text-[11px] text-white/55 italic px-1 py-3">
-        No pitches in the current filter.
+      <div className="space-y-3">
+        <StatsScopeBanner
+          seasonLabel={seasonLabel}
+          batterName={sequenceBatterName}
+          batterScoped={vsBatter != null}
+          onClearBatter={clearBatterScope}
+        />
+        <div className="text-[11px] text-white/55 italic px-1 py-3">
+          {vsBatter != null && sequenceBatterName
+            ? `No pitches to ${sequenceBatterName} in the current filter.`
+            : "No pitches in the current filter."}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      {/* Scope banner at the very top — "vs <BATTER> · <YEAR>" when
+          batter-scoped, otherwise just the season. Gives the user an
+          unambiguous read of what the cards below are scoped to. */}
+      <StatsScopeBanner
+        seasonLabel={seasonLabel}
+        batterName={sequenceBatterName}
+        batterScoped={vsBatter != null}
+        onClearBatter={() => setUrl({ vsBatter: null })}
+      />
       {/* Headline spans full width on every breakpoint. */}
       <StatsHeadline total={aggregated.total} />
       {/* The two headline cards — Arsenal (per-pitch stats + league

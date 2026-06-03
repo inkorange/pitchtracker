@@ -120,6 +120,16 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     if (veloMax != null && (p.release_speed == null || p.release_speed > veloMax)) {
       return false;
     }
+    // Batter scope: when ?vsBatter=<id> is set, narrow the renderable
+    // pitch set (and therefore every client-side stats card that
+    // aggregates from it — headline, arsenal tiles, movement, velo
+    // histograms, release cluster, heat grid, VAA bars) to pitches
+    // thrown to that batter only. The 3D scene shell strips this
+    // param before fetching, so the arsenal canvas remains
+    // season-wide.
+    if (vsBatter != null && p.batter_id !== vsBatter) {
+      return false;
+    }
     return true;
   });
   const pitchTypes = pitchTypesParam.split(",").filter(Boolean);
@@ -162,8 +172,13 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // windowed per pitch_type. Pitchers with fewer than
   // MIN_LEAGUE_PITCHES of a given pitch are excluded from the
   // percentile pool so tiny samples don't poison the distribution.
+  //
+  // Skipped when batter-scoped: the radar's whole point is league
+  // context, which doesn't translate to a single-matchup sample of
+  // (typically) 20–100 pitches. The Arsenal card falls back to
+  // tiles-only when radar is null.
   let arsenalRadar: ArsenalRadar | null = null;
-  if (sp.get("includeRadar") === "1") {
+  if (sp.get("includeRadar") === "1" && vsBatter == null) {
     arsenalRadar = await fetchArsenalRadar(supabase, pitcherId, season);
   }
 

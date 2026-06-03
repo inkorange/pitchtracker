@@ -1,20 +1,17 @@
 "use client";
 
-import {
-  parseAsInteger,
-  parseAsStringEnum,
-  useQueryState,
-  useQueryStates,
-} from "nuqs";
+import { parseAsStringEnum, useQueryState } from "nuqs";
 
 // Segmented control in the pitcher card header that flips the page
 // between the 3D arsenal view (default) and the Stats analytics view.
 // URL-backed via ?view=arsenal|stats so the choice survives refresh
 // and is shareable.
 //
-// In at-bat playback (?abGame + ?abNum set) the toggle is hidden — the
-// page is dedicated to the 3D playback in that mode and stats would
-// be a context switch.
+// The toggle stays visible even in at-bat playback (?abGame + ?abNum)
+// because the stats view is contextually useful there — the
+// Sequencing card narrows to the selected batter, so an analyst
+// watching a replay can flip over to see "what's his season pattern
+// vs this hitter?" without losing their place.
 
 export type PitcherView = "arsenal" | "stats";
 
@@ -27,12 +24,6 @@ export function usePitcherView() {
 
 export function StatsModeToggle() {
   const [view, setView] = usePitcherView();
-  const [{ abGame, abNum }] = useQueryStates({
-    abGame: parseAsInteger,
-    abNum: parseAsInteger,
-  });
-  const inAtBatMode = abGame != null && abNum != null;
-  if (inAtBatMode) return null;
   return (
     <div className="inline-flex rounded-full bg-white/[0.04] border border-white/10 p-0.5 text-[10px] uppercase tracking-[0.14em]">
       <button
