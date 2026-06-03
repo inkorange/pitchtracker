@@ -413,7 +413,7 @@ export function PitcherArsenalScene({
           />
           <HeatToggle
             metric={heatMetric}
-            onToggle={() => setHeatParam(heatMetric ? null : "whiff")}
+            onSelect={(m) => setHeatParam(m)}
           />
           {hasSelection && (
             <button
@@ -652,12 +652,17 @@ function CheckboxGlyph({ checked }: { checked: boolean }) {
 // Toggle button + help icon for the plate heat-grid overlay. Sits
 // directly below the Tunnel toggle so both controls share the same
 // right-edge chrome zone.
+// HEAT_METRIC values in the order they're shown in the chip picker.
+// Whiff is the default-on click target since it's the most-asked-for
+// view of pitcher dominance.
+const HEAT_METRIC_OPTIONS: HeatMetric[] = ["whiff", "chase", "called", "csw"];
+
 function HeatToggle({
   metric,
-  onToggle,
+  onSelect,
 }: {
   metric: HeatMetric | null;
-  onToggle: () => void;
+  onSelect: (next: HeatMetric | null) => void;
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const active = metric !== null;
@@ -670,7 +675,7 @@ function HeatToggle({
         <div className="flex items-center gap-1">
           <OverlayToggleButton
             active={active}
-            onClick={onToggle}
+            onClick={() => onSelect(active ? null : "whiff")}
             label={label}
             title="Show a per-zone heat grid across the current pitch selection."
           />
@@ -680,6 +685,32 @@ function HeatToggle({
             onClick={() => setHelpOpen(true)}
           />
         </div>
+        {active ? (
+          <div className="flex items-center gap-1 mt-0.5" role="radiogroup" aria-label="Heat metric">
+            {HEAT_METRIC_OPTIONS.map((m) => {
+              const isActive = m === metric;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  onClick={() => onSelect(m)}
+                  className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] backdrop-blur-md border transition-colors ${
+                    isActive
+                      ? "bg-[#5fc7d8]/30 border-[#5fc7d8]/55 text-white"
+                      : "bg-[#081a32]/45 border-white/10 text-white/55 hover:text-white hover:bg-[#0e2a4d]/70 hover:border-white/20"
+                  }`}
+                  title={HEAT_METRIC_LABELS[m]}
+                >
+                  {/* Short chip label — drop the trailing "%" to keep
+                      the picker compact. */}
+                  {HEAT_METRIC_LABELS[m].replace(" %", "")}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
       {helpOpen ? (
         <HeatHelp metric={metric} onClose={() => setHelpOpen(false)} />
