@@ -19,7 +19,6 @@ import { FiltersGate } from "./FiltersGate";
 import { MatchupsPanel } from "./MatchupsPanel";
 import { PitcherCardCollapse } from "./PitcherCardCollapse";
 import { AtBatHeader } from "./AtBatHeader";
-import { PitcherOutcomeLegend } from "./PitcherOutcomeLegend";
 import { PitcherBody } from "./PitcherBody";
 import { StatsModeToggle } from "./StatsModeToggle";
 import { PitcherFilters } from "@/components/filters/PitcherFilters";
@@ -430,7 +429,6 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       <PitcherOutcomeLegendGate>
         <OutcomeLegend />
       </PitcherOutcomeLegendGate>
-      <PitcherOutcomeLegend />
 
       <TopNav
         back={{ href: "/", label: "Home" }}
