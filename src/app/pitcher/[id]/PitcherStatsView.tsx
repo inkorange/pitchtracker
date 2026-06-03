@@ -35,15 +35,22 @@ export function PitcherStatsView() {
   // Season + vsBatter drive the scope banner above the cards. We
   // also write back to ?vsBatter via the same hook so the banner's X
   // can clear batter scope without reaching into the matchups panel.
-  const [{ season, vsBatter }, setUrl] = useQueryStates({
-    season: parseAsInteger,
-    vsBatter: parseAsInteger,
-    // Clearing batter scope also leaves at-bat mode — otherwise the
-    // AtBatHeader / inline matchups list would be stranded without a
-    // batter context.
-    abGame: parseAsInteger,
-    abNum: parseAsInteger,
-  });
+  // shallow:false so the banner's Clear action triggers a server
+  // re-render — the page server reads ?vsBatter to scope the
+  // pitcher card's per-pitch aggregates. Without this, clearing the
+  // batter would leave those numbers stale.
+  const [{ season, vsBatter }, setUrl] = useQueryStates(
+    {
+      season: parseAsInteger,
+      vsBatter: parseAsInteger,
+      // Clearing batter scope also leaves at-bat mode — otherwise the
+      // AtBatHeader / inline matchups list would be stranded without
+      // a batter context.
+      abGame: parseAsInteger,
+      abNum: parseAsInteger,
+    },
+    { shallow: false },
+  );
   const seasonLabel = season ?? new Date().getFullYear();
   const clearBatterScope = () =>
     setUrl({ vsBatter: null, abGame: null, abNum: null });

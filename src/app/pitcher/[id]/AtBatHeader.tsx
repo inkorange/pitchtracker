@@ -32,11 +32,18 @@ interface AtBatSummary {
 export function AtBatHeader({ season }: { season: number }) {
   const params = useParams<{ id?: string }>();
   const pitcherId = params?.id ? Number(params.id) : null;
-  const [{ vsBatter, abGame, abNum }, setUrl] = useQueryStates({
-    vsBatter: parseAsInteger,
-    abGame: parseAsInteger,
-    abNum: parseAsInteger,
-  });
+  // shallow:false so URL writes from this header (Prev/Next AB,
+  // exit-at-bat actions) trigger a server re-render — the page
+  // server reads ?vsBatter for the per-pitch card aggregates and
+  // ?abGame for the filter-summary banner.
+  const [{ vsBatter, abGame, abNum }, setUrl] = useQueryStates(
+    {
+      vsBatter: parseAsInteger,
+      abGame: parseAsInteger,
+      abNum: parseAsInteger,
+    },
+    { shallow: false },
+  );
 
   const [batterName, setBatterName] = useState<string | null>(null);
   const [atBat, setAtBat] = useState<AtBatSummary | null>(null);

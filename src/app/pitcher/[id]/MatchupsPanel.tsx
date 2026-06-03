@@ -63,11 +63,22 @@ export function MatchupsPanel({ season }: MatchupsPanelProps) {
   const params = useParams<{ id?: string }>();
   const pitcherId = params?.id ? Number(params.id) : null;
 
-  const [vsBatter, setVsBatter] = useQueryState("vsBatter", parseAsInteger);
-  const [atBat, setAtBat] = useQueryStates({
-    abGame: parseAsInteger,
-    abNum: parseAsInteger,
-  });
+  // shallow:false so URL writes trigger a server re-render — the page
+  // server now reads ?vsBatter to scope the per-pitch card aggregates,
+  // and ?abGame to resolve the filter-summary banner. Without this,
+  // nuqs does history.replaceState only and the server-rendered card
+  // shows stale numbers after the user picks / clears a batter.
+  const [vsBatter, setVsBatter] = useQueryState(
+    "vsBatter",
+    parseAsInteger.withOptions({ shallow: false }),
+  );
+  const [atBat, setAtBat] = useQueryStates(
+    {
+      abGame: parseAsInteger,
+      abNum: parseAsInteger,
+    },
+    { shallow: false },
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [batterName, setBatterName] = useState<string | null>(null);
