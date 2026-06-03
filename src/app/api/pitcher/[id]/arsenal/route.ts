@@ -252,22 +252,29 @@ async function fetchArsenalRadar(
   pitcherId: number,
   season: number,
 ): Promise<ArsenalRadar | null> {
-  // Pull every pitcher × pitch_type aggregate for the season — no
-  // SQL-level sample-size filter, so this pitcher's own row is
-  // always returned even if they only threw a handful of a given
-  // pitch type. The MIN_LEAGUE_PITCHES floor is applied IN JS,
-  // strictly to the percentile pool, below. Previously the SQL
-  // filter dropped sub-threshold rows entirely — including the
-  // pitcher's own — which meant low-volume pitchers got the
-  // arsenal card's "No league data" empty state for every pitch
-  // type even when we had perfectly good data to rank.
+  // Pull every pitcher × pitch_type aggregate for the season. Two
+  // things to call out:
+  //   1. NO SQL-level sample-size filter — the pitcher's own row is
+  //      always returned even if they only threw a handful of a
+  //      given pitch type. The MIN_LEAGUE_PITCHES floor is applied
+  //      IN JS strictly to the percentile pool below. Previously
+  //      the SQL filter dropped sub-threshold rows entirely
+  //      including the pitcher's, so low-volume pitchers got
+  //      "No league data" on every tile.
+  //   2. .range(0, 9999) — Supabase's default cap is 1000 rows; the
+  //      qualifying season pool is ~2100 rows, so the previous
+  //      query was silently truncating half the league. Whichever
+  //      half pitcher 694973 fell into determined whether his
+  //      tiles got data, hence the "even Four-Seam shows No league
+  //      data" symptom that no threshold change could fix.
   const { data, error } = await supabase
     .from("pitch_pitcher_aggregates")
     .select(
       "pitcher_id, pitch_type, avg_velocity, avg_spin_rate, avg_induced_vertical_break, avg_horizontal_break, whiff_rate, pitch_count",
     )
     .eq("season", season)
-    .eq("batter_hand", "*");
+    .eq("batter_hand", "*")
+    .range(0, 9999);
   if (error || !data) return null;
 
   type Row = {
