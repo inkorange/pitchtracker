@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { parseAsBoolean, useQueryState } from "nuqs";
+import { parseAsBoolean, parseAsString, useQueryState } from "nuqs";
 import { useRouter } from "next/navigation";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
@@ -9,6 +9,7 @@ import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { TunnelMesh } from "@/components/scene/TunnelMesh";
+import { HeatGridPlane } from "@/components/scene/HeatGridPlane";
 import { Batter, frontPresetForStand } from "@/components/scene/BatterSilhouette";
 import { statcastToThree } from "@/lib/viz/coords";
 import { getOutcomeColor, getPitchLabel } from "@/lib/viz/colors";
@@ -17,6 +18,13 @@ import {
   buildTunnelEnvelope,
   type TunnelEnvelope,
 } from "@/lib/pitch/tunnelEnvelope";
+import {
+  buildHeatGrid,
+  HEAT_METRIC_DESCRIPTIONS,
+  HEAT_METRIC_LABELS,
+  parseHeatMetric,
+  type HeatMetric,
+} from "@/lib/pitch/heatGrid";
 import type { ReplayPitch } from "@/app/at-bat/[gamePk]/[atBatNumber]/AtBatReplayScene";
 import {
   AtBatPlaybackBar,
@@ -114,10 +122,24 @@ export function PitcherArsenalScene({
     parseAsBoolean.withDefault(false),
   );
 
+  // Heat grid overlay (?heat=whiff|chase|called|csw). String so we
+  // can extend with more metrics without breaking existing links; an
+  // unknown / absent value renders no overlay.
+  const [heatParam, setHeatParam] = useQueryState(
+    "heat",
+    parseAsString.withDefault(""),
+  );
+  const heatMetric = parseHeatMetric(heatParam);
+
   const tunnelEnvelope = useMemo<TunnelEnvelope | null>(() => {
     if (!tunnelOn) return null;
     return buildTunnelEnvelope(pitches);
   }, [tunnelOn, pitches]);
+
+  const heatGrid = useMemo(() => {
+    if (!heatMetric) return null;
+    return buildHeatGrid(pitches, heatMetric);
+  }, [heatMetric, pitches]);
 
   const entries: PitchEntry[] = useMemo(() => {
     return pitches
@@ -370,6 +392,7 @@ export function PitcherArsenalScene({
             <TunnelStatsLabel envelope={tunnelEnvelope} />
           </>
         ) : null}
+        {!inAtBatMode && heatGrid ? <HeatGridPlane grid={heatGrid} /> : null}
       </Scene>
       {/* Bottom-of-screen controls swap with the mode. Camera pad +
           tunnel toggle for arsenal browsing; transport bar for
@@ -386,6 +409,10 @@ export function PitcherArsenalScene({
             active={tunnelOn}
             unavailable={tunnelOn && !tunnelEnvelope}
             onToggle={() => setTunnelOn((v) => !v)}
+          />
+          <HeatToggle
+            metric={heatMetric}
+            onToggle={() => setHeatParam(heatMetric ? null : "whiff")}
           />
           {hasSelection && (
             <button
@@ -538,6 +565,155 @@ function TunnelToggle({
       </div>
       {helpOpen ? <TunnelHelp onClose={() => setHelpOpen(false)} /> : null}
     </>
+  );
+}
+
+// Toggle button + help icon for the plate heat-grid overlay. Sits
+// directly below the Tunnel toggle so both controls share the same
+// right-edge chrome zone.
+function HeatToggle({
+  metric,
+  onToggle,
+}: {
+  metric: HeatMetric | null;
+  onToggle: () => void;
+}) {
+  const [helpOpen, setHelpOpen] = useState(false);
+  const active = metric !== null;
+  const label = active ? `Heat: ${HEAT_METRIC_LABELS[metric].replace(" %", "")}` : "Heat off";
+  return (
+    <>
+      <div className="absolute bottom-32 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-pressed={active}
+            className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors ${
+              active
+                ? "bg-[#5fc7d8]/20 border-[#5fc7d8]/45 text-white"
+                : "bg-[#081a32]/80 border-white/10 text-white/65 hover:text-white hover:bg-[#0e2a4d]/80"
+            }`}
+            title="Show a per-zone heat grid across the current pitch selection."
+          >
+            {label}
+          </button>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            aria-label="What is the heat grid?"
+            className="w-7 h-7 rounded-full text-[12px] font-semibold backdrop-blur-md border bg-[#081a32]/80 border-white/10 text-white/65 hover:text-white hover:bg-[#0e2a4d]/80 transition-colors flex items-center justify-center"
+            title="How the heat grid works"
+          >
+            ?
+          </button>
+        </div>
+      </div>
+      {helpOpen ? (
+        <HeatHelp metric={metric} onClose={() => setHelpOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+// Heat-grid modal explainer. Same shape as the tunnel one — black
+// backdrop, click-outside or ESC to dismiss.
+function HeatHelp({
+  metric,
+  onClose,
+}: {
+  metric: HeatMetric | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const activeMetric: HeatMetric = metric ?? "whiff";
+
+  return (
+    <div
+      className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 pointer-events-auto"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="heat-help-title"
+    >
+      <div
+        className="w-full max-w-xl bg-[#0a0e14] border border-white/15 rounded-lg shadow-2xl max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3 border-b border-white/[0.08] sticky top-0 bg-[#0a0e14]">
+          <h2
+            id="heat-help-title"
+            className="text-base font-semibold text-white tracking-tight"
+          >
+            Plate heat grid
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-white/55 hover:text-white text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-5 text-[13px] text-white/85 leading-relaxed">
+          <section className="space-y-2">
+            <h3 className="text-[11px] uppercase tracking-[0.16em] text-[#5fc7d8]">
+              What you&apos;re looking at
+            </h3>
+            <p>
+              A 5×5 grid covering the strike zone and a small chase
+              margin around it. Cells inside the zone have a brighter
+              white outline so you can read the chase border at a
+              glance. Each cell is colored by the active metric and
+              labeled with the percentage plus the pitch count (n=…)
+              behind that cell.
+            </p>
+            <p className="text-white/70">
+              The grid respects the page-level filters — pitch types,
+              batter hand, game, outcome chips, AI deep-links. Change
+              a filter and the grid recomputes.
+            </p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="text-[11px] uppercase tracking-[0.16em] text-[#5fc7d8]">
+              Active metric — {HEAT_METRIC_LABELS[activeMetric]}
+            </h3>
+            <p>{HEAT_METRIC_DESCRIPTIONS[activeMetric]}</p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="text-[11px] uppercase tracking-[0.16em] text-[#5fc7d8]">
+              Other metrics
+            </h3>
+            <p className="text-white/70">
+              Deep-link via <code className="text-[12px] text-[#5fc7d8]">?heat=whiff | chase | called | csw</code>{" "}
+              on the pitcher URL. The toggle button cycles to
+              <code className="text-[12px] text-[#5fc7d8] ml-1">whiff</code> as
+              the default; more metric pickers in a follow-up pass.
+            </p>
+          </section>
+          <section className="space-y-2">
+            <h3 className="text-[11px] uppercase tracking-[0.16em] text-[#5fc7d8]">
+              Color scale
+            </h3>
+            <p>
+              Low values render transparent / dim yellow; high values
+              hot orange-to-red. Cells with no data (no swings for
+              whiff%, in-zone cells for chase%) render blank rather
+              than a default zero — empty data and a real zero have
+              different stories.
+            </p>
+          </section>
+        </div>
+      </div>
+    </div>
   );
 }
 
