@@ -252,18 +252,22 @@ async function fetchArsenalRadar(
   pitcherId: number,
   season: number,
 ): Promise<ArsenalRadar | null> {
-  // Pull every pitcher × pitch_type aggregate for the season above
-  // the league sample-size floor, then bucket per-pitch-type so we
-  // can compute percentiles in JS — Supabase RPC isn't strictly
-  // necessary for a one-shot computation this small.
+  // Pull every pitcher × pitch_type aggregate for the season — no
+  // SQL-level sample-size filter, so this pitcher's own row is
+  // always returned even if they only threw a handful of a given
+  // pitch type. The MIN_LEAGUE_PITCHES floor is applied IN JS,
+  // strictly to the percentile pool, below. Previously the SQL
+  // filter dropped sub-threshold rows entirely — including the
+  // pitcher's own — which meant low-volume pitchers got the
+  // arsenal card's "No league data" empty state for every pitch
+  // type even when we had perfectly good data to rank.
   const { data, error } = await supabase
     .from("pitch_pitcher_aggregates")
     .select(
       "pitcher_id, pitch_type, avg_velocity, avg_spin_rate, avg_induced_vertical_break, avg_horizontal_break, whiff_rate, pitch_count",
     )
     .eq("season", season)
-    .eq("batter_hand", "*")
-    .gte("pitch_count", MIN_LEAGUE_PITCHES);
+    .eq("batter_hand", "*");
   if (error || !data) return null;
 
   type Row = {
@@ -278,24 +282,30 @@ async function fetchArsenalRadar(
   };
   const rows = data as Row[];
 
-  // Bucket all rows by pitch_type. We need every league row to
-  // compute percentile rank for THIS pitcher's row.
-  const byType = new Map<string, Row[]>();
+  // Bucket rows by pitch_type, keeping ONLY rows above the sample
+  // threshold in the percentile pool — those are the "league" we
+  // rank against. The pitcher's own row may or may not be in the
+  // pool; if it isn't, we still produce a radar for them, ranked
+  // against the qualifying pool.
+  const poolByType = new Map<string, Row[]>();
   for (const r of rows) {
     if (!r.pitch_type) continue;
-    const arr = byType.get(r.pitch_type) ?? [];
+    if ((r.pitch_count ?? 0) < MIN_LEAGUE_PITCHES) continue;
+    const arr = poolByType.get(r.pitch_type) ?? [];
     arr.push(r);
-    byType.set(r.pitch_type, arr);
+    poolByType.set(r.pitch_type, arr);
   }
 
   // The pitcher's own rows, in display order — most-thrown first so
-  // the small-multiples render the busiest pitches first.
+  // the small-multiples render the busiest pitches first. No sample
+  // floor here; even a low-volume pitch type gets a radar so the
+  // user always sees what we have.
   const mine = rows
     .filter((r) => r.pitcher_id === pitcherId)
     .sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
 
   const out: RadarPitch[] = mine.map((row) => {
-    const pool = byType.get(row.pitch_type!) ?? [];
+    const pool = poolByType.get(row.pitch_type!) ?? [];
     const raw: Record<RadarAxis, number | null> = {
       velo: row.avg_velocity,
       spin: row.avg_spin_rate,
