@@ -54,12 +54,24 @@ export function PitcherStatsView() {
   // the sequencing matrix server-side ("his sequencing vs <batter>");
   // when present this becomes a distinct cache key from the shell's
   // unscoped fetch, which is fine (two requests vs one).
+  //
+  // Also drop `game` and `hand` whenever vsBatter is set: matchup
+  // analysis is inherently cross-game ("how does he attack this
+  // hitter all season"), and the URL's ?game= filter can be left
+  // over from a prior single-game view — without stripping it the
+  // user lands on "no pitches to <batter>" when the pitcher didn't
+  // face that batter in the filtered game. Hand is implied by the
+  // batter so it's also redundant.
   const arsenalQuery = (() => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.delete("abGame");
     sp.delete("abNum");
     sp.delete("batterQ");
     sp.delete("view");
+    if (sp.get("vsBatter")) {
+      sp.delete("game");
+      sp.delete("hand");
+    }
     sp.set("includeSequence", "1");
     sp.set("includeRadar", "1");
     return sp.toString();
