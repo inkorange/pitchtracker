@@ -31,15 +31,16 @@ export function PitcherStatsView() {
   const searchParams = useSearchParams();
   const id = params?.id;
 
-  // Build a query that mirrors the arsenal-shell stripping (drop the
-  // at-bat-mode params + view) so the cache hit is identical. Add
-  // includeSequence=1 so the response carries the server-computed
-  // pitch sequencing matrix for the Sequencing card below.
+  // Mirror the arsenal-shell stripping (drop at-bat-mode params + view)
+  // so the unscoped fetches share a browser cache hit with the 3D
+  // shell. KEEP `vsBatter` though — the stats view uses it to narrow
+  // the sequencing matrix server-side ("his sequencing vs <batter>");
+  // when present this becomes a distinct cache key from the shell's
+  // unscoped fetch, which is fine (two requests vs one).
   const arsenalQuery = (() => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.delete("abGame");
     sp.delete("abNum");
-    sp.delete("vsBatter");
     sp.delete("batterQ");
     sp.delete("view");
     sp.set("includeSequence", "1");
@@ -50,6 +51,9 @@ export function PitcherStatsView() {
   const [pitches, setPitches] = useState<StatPitch[]>([]);
   const [sequenceMatrix, setSequenceMatrix] =
     useState<SequencingMatrixData | null>(null);
+  const [sequenceBatterName, setSequenceBatterName] = useState<string | null>(
+    null,
+  );
   const [arsenalRadar, setArsenalRadar] =
     useState<ArsenalRadarData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,17 +73,20 @@ export function PitcherStatsView() {
         const body = (await res.json()) as {
           pitches: StatPitch[];
           sequenceMatrix: SequencingMatrixData | null;
+          sequenceBatterName: string | null;
           arsenalRadar: ArsenalRadarData | null;
         };
         if (cancelled) return;
         setPitches(body.pitches ?? []);
         setSequenceMatrix(body.sequenceMatrix ?? null);
+        setSequenceBatterName(body.sequenceBatterName ?? null);
         setArsenalRadar(body.arsenalRadar ?? null);
       })
       .catch(() => {
         if (cancelled) return;
         setPitches([]);
         setSequenceMatrix(null);
+        setSequenceBatterName(null);
         setArsenalRadar(null);
       })
       .finally(() => {
@@ -123,7 +130,7 @@ export function PitcherStatsView() {
         totalPitches={aggregated.total.pitches}
       />
       <LazyMount minHeight={300}>
-        <SequencingMatrix data={sequenceMatrix} />
+        <SequencingMatrix data={sequenceMatrix} batterName={sequenceBatterName} />
       </LazyMount>
       {/* Supporting analytical cards — 2-col grid only at lg+
           (1024px+). Below that, every card stacks single-column so
