@@ -11,7 +11,7 @@ import {
   getPitchColor,
   type OutcomeCategory,
 } from "@/lib/viz/colors";
-import { PitcherSearch } from "@/components/search/PitcherSearch";
+import { PitcherSearchPopover } from "@/components/chrome/PitcherSearchPopover";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
 import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
 import { TopNav } from "@/components/chrome/TopNav";
@@ -437,20 +437,17 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         title="Pitcher"
         summary={filterSummary}
         rightSlot={
-          <Link
-            href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
-            className="px-2.5 py-1 rounded-md bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-white text-[10px] uppercase tracking-[0.14em] transition-colors"
-          >
-            Compare
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
+              className="px-2.5 py-1 rounded-md bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-white text-[10px] uppercase tracking-[0.14em] transition-colors"
+            >
+              Compare
+            </Link>
+            <PitcherSearchPopover />
+          </div>
         }
       />
-      {/* Pitcher search docked just below the nav on desktop; hidden
-          on mobile to free vertical space. */}
-      <div className="hidden sm:block absolute top-14 right-6 w-80 z-20 pointer-events-auto">
-        <PitcherSearch placeholder="Search another pitcher…" />
-      </div>
-
 
       {/* Card column. Absolute wrapper that holds the pitcher card AND
           the mobile-only summary banner stacked below it. Flex-col so
