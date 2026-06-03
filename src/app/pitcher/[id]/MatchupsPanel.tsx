@@ -661,7 +661,7 @@ function BatterPickList({
           <button
             type="button"
             onClick={() => onPick(b)}
-            className="w-full flex items-center gap-2.5 text-left px-2 py-1.5 rounded hover:bg-white/[0.06] transition-colors text-sm text-white/95"
+            className="w-full flex items-start gap-2.5 text-left px-2 py-1.5 rounded hover:bg-white/[0.06] transition-colors text-sm text-white/95"
           >
             <div className="relative w-8 h-8 flex-shrink-0">
               <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden">
@@ -687,19 +687,26 @@ function BatterPickList({
                 </div>
               ) : null}
             </div>
-            <span className="truncate flex-1 min-w-0">{b.fullName}</span>
-            {b.results.length > 0 ? (
-              <span className="flex items-center gap-1 flex-shrink-0">
-                {b.results.map((r, i) => (
-                  <span
-                    key={i}
-                    className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold tracking-[0.04em] ${RESULT_PILL_STYLE[r] ?? "bg-white/[0.06] border-white/15 text-white/65"}`}
-                  >
-                    {r}
-                  </span>
-                ))}
-              </span>
-            ) : null}
+            {/* Name on its own line so it gets the full row width, then
+                result chips wrap below. Prior single-row layout had the
+                chips on the right with `flex-shrink-0`, which squeezed
+                long names ("Andrew Benintendi" / "J.T. Realmuto") down
+                to a single initial when six results sat next to them. */}
+            <span className="flex-1 min-w-0 flex flex-col gap-1 pt-0.5">
+              <span className="truncate leading-tight">{b.fullName}</span>
+              {b.results.length > 0 ? (
+                <span className="flex flex-wrap items-center gap-1">
+                  {b.results.map((r, i) => (
+                    <span
+                      key={i}
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold tracking-[0.04em] ${RESULT_PILL_STYLE[r] ?? "bg-white/[0.06] border-white/15 text-white/65"}`}
+                    >
+                      {r}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+            </span>
           </button>
         </li>
       ))}
