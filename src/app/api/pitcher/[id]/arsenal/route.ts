@@ -173,12 +173,15 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // MIN_LEAGUE_PITCHES of a given pitch are excluded from the
   // percentile pool so tiny samples don't poison the distribution.
   //
-  // Skipped when batter-scoped: the radar's whole point is league
-  // context, which doesn't translate to a single-matchup sample of
-  // (typically) 20–100 pitches. The Arsenal card falls back to
-  // tiles-only when radar is null.
+  // Always loaded when requested — including in batter-scoped mode.
+  // The radar reads season-wide league percentile from the
+  // pre-aggregated `pitch_pitcher_aggregates` table, which is
+  // independent of the batter filter on `pitches` above. Showing
+  // "here's how his slider ranks league-wide" alongside the
+  // batter-scoped tile counts is complementary context, not a
+  // contradictory one.
   let arsenalRadar: ArsenalRadar | null = null;
-  if (sp.get("includeRadar") === "1" && vsBatter == null) {
+  if (sp.get("includeRadar") === "1") {
     arsenalRadar = await fetchArsenalRadar(supabase, pitcherId, season);
   }
 
