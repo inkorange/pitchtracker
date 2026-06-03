@@ -135,36 +135,22 @@ We might want to write a SKILL.md file that explains how every new feature or op
 "Show me yesterday's games"
 "Show me all the hitting matchups form yesterday for Juan Soto"
 
-## Sequencing Consistency Across Games
+## Sequencing Consistency: small-multiples mode (deferred)
 
-Per-game variance / drift in a pitcher's sequencing patterns. Answers "is he
-calling the same pattern every game, or has he changed his approach?".
+The **variance timeline** version of per-game sequencing consistency
+shipped as the `Sequencing drift` card under the season matrix on
+`/pitcher/[id]?view=stats`. The companion **per-game small-multiples**
+mode — a grid of tiny matrices, one per game — is still useful for
+short windows (last 5 starts, "show me the K-heavy games") where a
+visual scan of full distributions beats a single drift number.
 
-### Two visualization candidates
+### When to add it
 
-- **Per-game small multiples**: one tiny matrix per game in the selection,
-  laid out as a grid. Visual scan for "same shape every time" vs
-  game-to-game variance. Heavy at 30+ games per season; works best for
-  shorter windows (last 5 starts, etc.).
-- **Variance timeline**: a single chart with one line per matrix row,
-  showing per-game KL-divergence (or entropy delta) of that game's matrix
-  vs the season's. Spikes = "changed his approach that day". Compact, one
-  card.
-
-### Scope
-
-- New stats card next to the season-level Sequencing card.
-- Reuses the same `buildSequencingMatrix` function, called per-game on the
-  bucketed pitches.
-- URL param to switch view (`?seqView=multiples|timeline`?) — TBD.
-- Combines cleanly with `?vsBatter=` once that's wired: "how has his
-  approach to this batter shifted across the season?".
-
-### Why later
-
-Needs the season-level + batter-aware matrices in place first so the
-"variance vs what?" baseline is well-defined. Ship those, then build this on
-top.
+When users actually ask for it. The timeline already answers "did
+his approach change", which was the original ask. Small multiples
+would answer the narrower "show me each start's pattern" but adds
+real estate cost. Likely paired with a `?seqView=multiples|timeline`
+toggle on the existing card so the user picks the view they want.
 
 ## 3D Scene Rendering Performance (high pitch counts)
 
