@@ -331,10 +331,11 @@ export function PitcherArsenalScene({
         ) : null}
         {!inAtBatMode && entries.map((e) => {
           const isSelected = selectedEntry?.id === e.id;
-          // Tunnel mode dims pitches to 0.1 so the cone reads as the
-          // dominant element. Selection still pulls focus when
-          // something is clicked, even with the tunnel showing.
-          const baseOpacity = tunnelOn ? 0.1 : 1;
+          // Tunnel + heat-grid modes both dim pitches to 0.1 so the
+          // overlay (cone / grid) reads as the dominant element.
+          // Selection still pulls focus when something is clicked,
+          // even with an overlay showing.
+          const baseOpacity = tunnelOn || heatMetric !== null ? 0.1 : 1;
           const opacity = !hasSelection
             ? baseOpacity
             : isSelected
