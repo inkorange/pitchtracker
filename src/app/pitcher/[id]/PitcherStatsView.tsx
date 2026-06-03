@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { parseAsInteger, useQueryStates } from "nuqs";
 import { aggregate, type StatPitch } from "./stats/aggregations";
 import { LazyMount } from "./stats/LazyMount";
 import { StatsHeadline } from "./stats/StatsHeadline";
+import { StatsScopeBanner } from "./stats/StatsScopeBanner";
 import { ArsenalCard } from "./stats/ArsenalCard";
 import { MovementPlot } from "./stats/MovementPlot";
 import { VelocityHistograms } from "./stats/VelocityHistograms";
@@ -30,18 +32,46 @@ export function PitcherStatsView() {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
   const id = params?.id;
+  // Season + vsBatter drive the scope banner above the cards. We
+  // also write back to ?vsBatter via the same hook so the banner's X
+  // can clear batter scope without reaching into the matchups panel.
+  const [{ season, vsBatter }, setUrl] = useQueryStates({
+    season: parseAsInteger,
+    vsBatter: parseAsInteger,
+    // Clearing batter scope also leaves at-bat mode — otherwise the
+    // AtBatHeader / inline matchups list would be stranded without a
+    // batter context.
+    abGame: parseAsInteger,
+    abNum: parseAsInteger,
+  });
+  const seasonLabel = season ?? new Date().getFullYear();
+  const clearBatterScope = () =>
+    setUrl({ vsBatter: null, abGame: null, abNum: null });
 
-  // Build a query that mirrors the arsenal-shell stripping (drop the
-  // at-bat-mode params + view) so the cache hit is identical. Add
-  // includeSequence=1 so the response carries the server-computed
-  // pitch sequencing matrix for the Sequencing card below.
+  // Mirror the arsenal-shell stripping (drop at-bat-mode params + view)
+  // so the unscoped fetches share a browser cache hit with the 3D
+  // shell. KEEP `vsBatter` though — the stats view uses it to narrow
+  // the sequencing matrix server-side ("his sequencing vs <batter>");
+  // when present this becomes a distinct cache key from the shell's
+  // unscoped fetch, which is fine (two requests vs one).
+  //
+  // Also drop `game` and `hand` whenever vsBatter is set: matchup
+  // analysis is inherently cross-game ("how does he attack this
+  // hitter all season"), and the URL's ?game= filter can be left
+  // over from a prior single-game view — without stripping it the
+  // user lands on "no pitches to <batter>" when the pitcher didn't
+  // face that batter in the filtered game. Hand is implied by the
+  // batter so it's also redundant.
   const arsenalQuery = (() => {
     const sp = new URLSearchParams(searchParams.toString());
     sp.delete("abGame");
     sp.delete("abNum");
-    sp.delete("vsBatter");
     sp.delete("batterQ");
     sp.delete("view");
+    if (sp.get("vsBatter")) {
+      sp.delete("game");
+      sp.delete("hand");
+    }
     sp.set("includeSequence", "1");
     sp.set("includeRadar", "1");
     return sp.toString();
@@ -50,6 +80,9 @@ export function PitcherStatsView() {
   const [pitches, setPitches] = useState<StatPitch[]>([]);
   const [sequenceMatrix, setSequenceMatrix] =
     useState<SequencingMatrixData | null>(null);
+  const [sequenceBatterName, setSequenceBatterName] = useState<string | null>(
+    null,
+  );
   const [arsenalRadar, setArsenalRadar] =
     useState<ArsenalRadarData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,17 +102,20 @@ export function PitcherStatsView() {
         const body = (await res.json()) as {
           pitches: StatPitch[];
           sequenceMatrix: SequencingMatrixData | null;
+          sequenceBatterName: string | null;
           arsenalRadar: ArsenalRadarData | null;
         };
         if (cancelled) return;
         setPitches(body.pitches ?? []);
         setSequenceMatrix(body.sequenceMatrix ?? null);
+        setSequenceBatterName(body.sequenceBatterName ?? null);
         setArsenalRadar(body.arsenalRadar ?? null);
       })
       .catch(() => {
         if (cancelled) return;
         setPitches([]);
         setSequenceMatrix(null);
+        setSequenceBatterName(null);
         setArsenalRadar(null);
       })
       .finally(() => {
@@ -104,14 +140,33 @@ export function PitcherStatsView() {
 
   if (pitches.length === 0) {
     return (
-      <div className="text-[11px] text-white/55 italic px-1 py-3">
-        No pitches in the current filter.
+      <div className="space-y-3">
+        <StatsScopeBanner
+          seasonLabel={seasonLabel}
+          batterName={sequenceBatterName}
+          batterScoped={vsBatter != null}
+          onClearBatter={clearBatterScope}
+        />
+        <div className="text-[11px] text-white/55 italic px-1 py-3">
+          {vsBatter != null && sequenceBatterName
+            ? `No pitches to ${sequenceBatterName} in the current filter.`
+            : "No pitches in the current filter."}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
+      {/* Scope banner at the very top — "vs <BATTER> · <YEAR>" when
+          batter-scoped, otherwise just the season. Gives the user an
+          unambiguous read of what the cards below are scoped to. */}
+      <StatsScopeBanner
+        seasonLabel={seasonLabel}
+        batterName={sequenceBatterName}
+        batterScoped={vsBatter != null}
+        onClearBatter={() => setUrl({ vsBatter: null })}
+      />
       {/* Headline spans full width on every breakpoint. */}
       <StatsHeadline total={aggregated.total} />
       {/* The two headline cards — Arsenal (per-pitch stats + league
@@ -123,7 +178,7 @@ export function PitcherStatsView() {
         totalPitches={aggregated.total.pitches}
       />
       <LazyMount minHeight={300}>
-        <SequencingMatrix data={sequenceMatrix} />
+        <SequencingMatrix data={sequenceMatrix} batterName={sequenceBatterName} />
       </LazyMount>
       {/* Supporting analytical cards — 2-col grid only at lg+
           (1024px+). Below that, every card stacks single-column so

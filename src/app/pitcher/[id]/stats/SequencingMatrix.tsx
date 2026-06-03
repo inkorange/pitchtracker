@@ -22,14 +22,20 @@ import { StatCard } from "./StatCard";
 
 interface SequencingMatrixProps {
   data: SequencingMatrixData | null;
+  /** When the matrix was narrowed to a specific batter via
+   *  `?vsBatter=<id>`, the batter's display name. Surfaces in the
+   *  card hint as the scope ("12 AB vs Witt Jr."). */
+  batterName?: string | null;
 }
 
-export function SequencingMatrix({ data }: SequencingMatrixProps) {
+export function SequencingMatrix({ data, batterName }: SequencingMatrixProps) {
   if (!data || data.pitchTypes.length === 0 || data.totalAtBats === 0) {
     return (
       <StatCard title="Sequencing">
         <div className="text-[11px] text-white/55 italic">
-          Not enough data to build the sequencing matrix.
+          {batterName
+            ? `No pitches to ${batterName} in the current filter.`
+            : "Not enough data to build the sequencing matrix."}
         </div>
       </StatCard>
     );
@@ -44,13 +50,15 @@ export function SequencingMatrix({ data }: SequencingMatrixProps) {
   // 2-col stats grid on lg+ without horizontal scroll.
   const cols = `1fr ${"minmax(48px, 1fr) ".repeat(pitchTypes.length)}auto`;
 
+  const abLabel = batterName
+    ? `${data.totalAtBats} AB vs ${batterName}`
+    : `${data.totalAtBats} AB`;
+  const hint = `${abLabel} · ${data.totalTransitions} pair${
+    data.totalTransitions === 1 ? "" : "s"
+  }`;
+
   return (
-    <StatCard
-      title="Sequencing"
-      hint={`${data.totalAtBats} AB · ${data.totalTransitions} pair${
-        data.totalTransitions === 1 ? "" : "s"
-      }`}
-    >
+    <StatCard title="Sequencing" hint={hint}>
       <div className="space-y-4">
         {/* First-pitch distribution. Horizontal stacked bars per
             pitch type — each pitcher's first-pitch arsenal at a

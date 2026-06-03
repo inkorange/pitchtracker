@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AI_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import { checkAiRateLimit, clientIpFromRequest } from "@/lib/ai/rate-limit";
 import { getPitchLabel } from "@/lib/viz/colors";
+import { buildSequencingMatrix } from "@/lib/pitch/sequencingMatrix";
 
 export const maxDuration = 30;
 
@@ -213,6 +214,90 @@ export async function POST(request: Request) {
             return { games: data ?? [] };
           },
         }),
+        get_pitcher_sequencing: tool({
+          description:
+            "Return the pitcher's pitch-sequencing matrix for a season, optionally narrowed to a specific batter. Use this when the user asks you to EXPLAIN / DESCRIBE / SUMMARIZE how a pitcher attacks at-bats — either overall ('how does Sandy sequence his pitches') or vs a specific batter ('explain his sequencing vs James Wood'). Returns first-pitch distribution and the conditional (after pitch X → next pitch Y) matrix as percentages with raw counts. Reply with a SHORT data-driven summary (3-5 sentences max) — do NOT navigate, the user wants the analysis in chat, not a page jump.",
+          inputSchema: z.object({
+            pitcher_id: z.number().int(),
+            batter_id: z
+              .number()
+              .int()
+              .optional()
+              .describe(
+                "When set, narrows the matrix to ABs where this batter faced the pitcher. Pull from the page-context vsBatter line when the user is on the pitcher page with a batter selected.",
+              ),
+            season: z
+              .number()
+              .int()
+              .optional()
+              .describe("Defaults to the current MLB season."),
+          }),
+          execute: async ({ pitcher_id, batter_id, season }) => {
+            const s = season ?? new Date().getFullYear();
+            let q = supabase
+              .from("pitch_game_pitches")
+              .select(
+                "game_pk, at_bat_number, pitch_number, pitch_type, pitch_games!inner(season, game_type)",
+              )
+              .eq("pitcher_id", pitcher_id)
+              .eq("pitch_games.season", s)
+              .eq("pitch_games.game_type", "R")
+              .range(0, 4999);
+            if (batter_id != null) q = q.eq("batter_id", batter_id);
+            const { data, error } = await q;
+            if (error) return { error: error.message };
+            const matrix = buildSequencingMatrix(data ?? []);
+            // Flatten to a model-friendly shape: percent + raw count
+            // per cell, pitch labels included so the model doesn't
+            // have to translate Statcast codes.
+            const firstPitchTotal = matrix.firstPitchCounts.reduce(
+              (s, n) => s + n,
+              0,
+            );
+            return {
+              season: s,
+              batter_id: batter_id ?? null,
+              total_at_bats: matrix.totalAtBats,
+              total_pairs: matrix.totalTransitions,
+              first_pitch: matrix.pitchTypes
+                .map((pt, i) => ({
+                  pitch_type: pt,
+                  label: getPitchLabel(pt),
+                  count: matrix.firstPitchCounts[i],
+                  pct:
+                    firstPitchTotal > 0
+                      ? Math.round(
+                          (matrix.firstPitchCounts[i] / firstPitchTotal) * 100,
+                        )
+                      : 0,
+                }))
+                .filter((r) => r.count > 0),
+              after: matrix.pitchTypes
+                .map((pt, i) => {
+                  const rowTotal = matrix.transitionTotals[i];
+                  return {
+                    from_pitch_type: pt,
+                    from_label: getPitchLabel(pt),
+                    total: rowTotal,
+                    next: matrix.pitchTypes
+                      .map((next, j) => ({
+                        pitch_type: next,
+                        label: getPitchLabel(next),
+                        count: matrix.transitions[i][j],
+                        pct:
+                          rowTotal > 0
+                            ? Math.round(
+                                (matrix.transitions[i][j] / rowTotal) * 100,
+                              )
+                            : 0,
+                      }))
+                      .filter((r) => r.count > 0),
+                  };
+                })
+                .filter((r) => r.total > 0),
+            };
+          },
+        }),
         navigate: tool({
           description:
             "Send the user to a URL on pitchtracker. Always a relative path starting with /.",
@@ -251,18 +336,50 @@ async function derivePageContext(
 ): Promise<string> {
   if (!currentUrl) return "";
   const pathname = currentUrl.split("?")[0] ?? currentUrl;
+  // Best-effort query parse — currentUrl may be relative ("/pitcher/X?…")
+  // so we prepend a dummy origin to keep URL constructor happy.
+  let queryParams: URLSearchParams;
+  try {
+    queryParams = new URL(currentUrl, "http://x").searchParams;
+  } catch {
+    queryParams = new URLSearchParams();
+  }
 
   // /pitcher/{id} — pitcher_id is right there in the URL.
   const pitcherMatch = pathname.match(/^\/pitcher\/(\d+)/);
   if (pitcherMatch) {
     const pitcherId = Number(pitcherMatch[1]);
-    const { data } = await supabase
-      .from("pitch_pitchers")
-      .select("mlb_id, full_name")
-      .eq("mlb_id", pitcherId)
-      .maybeSingle();
-    if (data) {
-      return `Active pitcher in context: ${data.full_name} (mlb_id: ${data.mlb_id}). When the user says "his/her", they mean this pitcher.`;
+    const vsBatterRaw = queryParams.get("vsBatter");
+    const vsBatterId = vsBatterRaw ? Number(vsBatterRaw) : null;
+    const seasonRaw = queryParams.get("season");
+    const season =
+      seasonRaw && !Number.isNaN(Number(seasonRaw)) ? Number(seasonRaw) : null;
+    const [{ data: p }, { data: b }] = await Promise.all([
+      supabase
+        .from("pitch_pitchers")
+        .select("mlb_id, full_name")
+        .eq("mlb_id", pitcherId)
+        .maybeSingle(),
+      vsBatterId != null && Number.isFinite(vsBatterId)
+        ? supabase
+            .from("pitch_batters")
+            .select("mlb_id, full_name")
+            .eq("mlb_id", vsBatterId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    if (p) {
+      const parts: string[] = [];
+      parts.push(
+        `Active pitcher in context: ${p.full_name} (mlb_id: ${p.mlb_id}). When the user says "his/her", they mean this pitcher.`,
+      );
+      if (b) {
+        parts.push(
+          `Active batter in context (vsBatter): ${b.full_name} (mlb_id: ${b.mlb_id}). When the user asks about "his sequencing here" or "how he attacks this batter", pass BOTH pitcher_id and batter_id to get_pitcher_sequencing.`,
+        );
+      }
+      if (season != null) parts.push(`Season in context: ${season}.`);
+      return parts.join("\n");
     }
   }
 

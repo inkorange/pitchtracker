@@ -19,6 +19,20 @@ export interface FilterSummaryInput {
   game: { game_date: string; opponentName: string | null } | null;
   veloMin: number | null;
   veloMax: number | null;
+  /** Resolved name for `?vsBatter=<id>`. When present, the summary
+   *  injects "vs <batter>" so the user knows the view is narrowed
+   *  to that matchup. Hand and game filters still render normally. */
+  batterName?: string | null;
+  /** At-bat playback context (?abGame=…&abNum=…). When set, the
+   *  summary collapses to a single AB-description phrase — the
+   *  pitch-type / outcome / event filters don't apply during a
+   *  one-AB replay so they're omitted. The game is the AB's own
+   *  game, NOT the URL's `?game=` filter (those can differ when a
+   *  matchups-list jump lands the user in a different game). */
+  atBat?: {
+    atBatNumber: number;
+    game: { game_date: string; opponentName: string | null };
+  } | null;
 }
 
 // Hand-curated plurals so the summary reads naturally — bare "+s" mangles
@@ -52,6 +66,17 @@ function joinWithPlus(items: string[]): string {
 }
 
 export function buildFilterSummary(input: FilterSummaryInput): string {
+  // At-bat playback short-circuits everything else — the user is
+  // looking at ONE at-bat, so pitch-type / outcome / event filters
+  // are irrelevant noise. Describe what's actually on screen.
+  if (input.atBat) {
+    const batter = input.batterName ? ` vs ${input.batterName}` : "";
+    const opp = input.atBat.game.opponentName
+      ? ` vs ${input.atBat.game.opponentName}`
+      : "";
+    return `At-bat #${input.atBat.atBatNumber}${batter} from ${input.atBat.game.game_date}${opp}`;
+  }
+
   const parts: string[] = [];
 
   // Subject. Priority: at-bat result → outcome → pitch type → fallback.
@@ -98,8 +123,16 @@ export function buildFilterSummary(input: FilterSummaryInput): string {
     parts.push(`under ${input.veloMax} mph`);
   }
 
-  if (input.hand === "L") parts.push("vs LHB");
-  else if (input.hand === "R") parts.push("vs RHB");
+  // Batter scope: "vs James Wood" reads cleaner than a hand
+  // qualifier, and a specific batter implies their handedness — so
+  // when both are present, batter wins.
+  if (input.batterName) {
+    parts.push(`vs ${input.batterName}`);
+  } else if (input.hand === "L") {
+    parts.push("vs LHB");
+  } else if (input.hand === "R") {
+    parts.push("vs RHB");
+  }
 
   if (input.game) {
     const opp = input.game.opponentName ? ` vs ${input.game.opponentName}` : "";

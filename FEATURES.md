@@ -135,30 +135,6 @@ We might want to write a SKILL.md file that explains how every new feature or op
 "Show me yesterday's games"
 "Show me all the hitting matchups form yesterday for Juan Soto"
 
-## Batter-aware Pitch Sequencing
-
-Extension of the season-level Sequencing card on `/pitcher/[id]?view=stats`.
-When a batter is selected via the existing `?vsBatter=<mlb_id>` URL param, the
-sequencing matrix narrows to pitches thrown to that specific batter only —
-answering "how does Skenes attack Soto specifically, and what does he go to
-after the fastball-up?".
-
-### Scope
-
-- Server-side: the arsenal endpoint accepts `vsBatter`, adds `batter_id` to
-  the SELECT, and filters `cached` by batter before passing into
-  `buildSequencingMatrix`.
-- Card hint shows the batter context ("Sequencing · 12 ABs vs Witt Jr.")
-  when scoped.
-- Help / AI prompt translation rule: "his sequencing vs <batter>" →
-  `/pitcher/<id>?view=stats&vsBatter=<batter mlb_id>`.
-
-### Why later
-
-The first sequencing PR ships the season-level matrix only — it's enough to
-prove out the UI and the data path. The batter-aware version is a clean
-data-narrowing follow-up, not a rebuild.
-
 ## Sequencing Consistency Across Games
 
 Per-game variance / drift in a pitcher's sequencing patterns. Answers "is he

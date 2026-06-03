@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
+import { fetchPersonsCached } from "@/lib/statsapi/client";
 import {
   buildSequencingMatrix,
   type SequencingMatrix,
@@ -41,6 +42,15 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   const eventParam = sp.get("event") ?? "";
   const veloMinParam = sp.get("veloMin");
   const veloMaxParam = sp.get("veloMax");
+  // Batter scope: when set, narrows the sequencing matrix to pitches
+  // thrown TO that specific batter. Other parts of the arsenal
+  // response (renderable pitches, arsenalRadar) are NOT scoped — the
+  // 3D scene + per-pitch tiles still reflect the full season.
+  const vsBatterParam = sp.get("vsBatter");
+  const vsBatter =
+    vsBatterParam && !Number.isNaN(Number(vsBatterParam))
+      ? Number(vsBatterParam)
+      : null;
 
   const supabase = await createClient();
 
@@ -58,7 +68,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       let q = supabase
         .from("pitch_game_pitches")
         .select(
-          "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type)",
+          "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, batter_id, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type)",
         )
         .eq("pitcher_id", pitcherId)
         .eq("pitch_games.season", season)
@@ -110,6 +120,16 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     if (veloMax != null && (p.release_speed == null || p.release_speed > veloMax)) {
       return false;
     }
+    // Batter scope: when ?vsBatter=<id> is set, narrow the renderable
+    // pitch set (and therefore every client-side stats card that
+    // aggregates from it — headline, arsenal tiles, movement, velo
+    // histograms, release cluster, heat grid, VAA bars) to pitches
+    // thrown to that batter only. The 3D scene shell strips this
+    // param before fetching, so the arsenal canvas remains
+    // season-wide.
+    if (vsBatter != null && p.batter_id !== vsBatter) {
+      return false;
+    }
     return true;
   });
   const pitchTypes = pitchTypesParam.split(",").filter(Boolean);
@@ -131,8 +151,19 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // response payload small for callers that only want the
   // renderable pitches.
   let sequenceMatrix: SequencingMatrix | null = null;
+  let sequenceBatterName: string | null = null;
   if (sp.get("includeSequence") === "1") {
-    sequenceMatrix = buildSequencingMatrix(cached);
+    // Batter-scoped matrix: filter `cached` to pitches thrown to the
+    // specified batter before building the matrix. The unscoped
+    // matrix uses all the pre-filter pitches as before.
+    const sequencePool = vsBatter != null
+      ? cached.filter((p) => p.batter_id === vsBatter)
+      : cached;
+    sequenceMatrix = buildSequencingMatrix(sequencePool);
+    if (vsBatter != null) {
+      const batterMap = await fetchPersonsCached([vsBatter]);
+      sequenceBatterName = batterMap.get(vsBatter)?.fullName ?? null;
+    }
   }
 
   // Opt-in: arsenal radar — pitcher's league percentile per pitch
@@ -141,8 +172,13 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // windowed per pitch_type. Pitchers with fewer than
   // MIN_LEAGUE_PITCHES of a given pitch are excluded from the
   // percentile pool so tiny samples don't poison the distribution.
+  //
+  // Skipped when batter-scoped: the radar's whole point is league
+  // context, which doesn't translate to a single-matchup sample of
+  // (typically) 20–100 pitches. The Arsenal card falls back to
+  // tiles-only when radar is null.
   let arsenalRadar: ArsenalRadar | null = null;
-  if (sp.get("includeRadar") === "1") {
+  if (sp.get("includeRadar") === "1" && vsBatter == null) {
     arsenalRadar = await fetchArsenalRadar(supabase, pitcherId, season);
   }
 
@@ -151,6 +187,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       pitches: renderable,
       pitcherLabel: pitcherLastName(pitcher),
       sequenceMatrix,
+      sequenceBatterName,
       arsenalRadar,
     },
     {
