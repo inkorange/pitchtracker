@@ -6,6 +6,10 @@ import { AI_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import { checkAiRateLimit, clientIpFromRequest } from "@/lib/ai/rate-limit";
 import { getPitchLabel } from "@/lib/viz/colors";
 import { buildSequencingMatrix } from "@/lib/pitch/sequencingMatrix";
+import {
+  buildSequencingDrift,
+  type DriftPitch,
+} from "@/lib/pitch/sequencingDrift";
 
 export const maxDuration = 30;
 
@@ -295,6 +299,70 @@ export async function POST(request: Request) {
                   };
                 })
                 .filter((r) => r.total > 0),
+            };
+          },
+        }),
+        get_pitcher_sequencing_drift: tool({
+          description:
+            "Return the per-game sequencing drift timeline for a pitcher's season — how much each start's sequence pattern departed from the season baseline (Total Variation Distance, 0=same, 1=completely different). Use this when the user asks about CONSISTENCY / CHANGES in approach across games: 'has he changed his approach', 'when did he start mixing differently', 'spike games', 'is he sequencing the same every start', 'did anything change after the all-star break'. Returns one entry per game with date, AB count, pitch count, and drift value. Reply with a short data-driven narrative — call out specific dates / opponents with high drift, note the typical baseline, and any visible trend. Do NOT navigate.",
+          inputSchema: z.object({
+            pitcher_id: z.number().int(),
+            season: z
+              .number()
+              .int()
+              .optional()
+              .describe("Defaults to the current MLB season."),
+          }),
+          execute: async ({ pitcher_id, season }) => {
+            const s = season ?? new Date().getFullYear();
+            const { data, error } = await supabase
+              .from("pitch_game_pitches")
+              .select(
+                "game_pk, at_bat_number, pitch_number, pitch_type, pitch_games!inner(season, game_type, game_date)",
+              )
+              .eq("pitcher_id", pitcher_id)
+              .eq("pitch_games.season", s)
+              .eq("pitch_games.game_type", "R")
+              .range(0, 4999);
+            if (error) return { error: error.message };
+            type Row = {
+              game_pk: number;
+              at_bat_number: number;
+              pitch_number: number;
+              pitch_type: string | null;
+              pitch_games: { game_date: string } | null;
+            };
+            const driftPitches: DriftPitch[] = (data ?? [])
+              .map((r) => r as unknown as Row)
+              .filter((r): r is Row & { pitch_games: { game_date: string } } =>
+                !!r.pitch_games?.game_date,
+              )
+              .map((r) => ({
+                game_pk: r.game_pk,
+                at_bat_number: r.at_bat_number,
+                pitch_number: r.pitch_number,
+                pitch_type: r.pitch_type,
+                game_date: r.pitch_games.game_date,
+              }));
+            const drift = buildSequencingDrift(driftPitches);
+            return {
+              season: s,
+              min_pitches_per_game: drift.minPitchesPerGame,
+              min_transitions_per_game: drift.minTransitionsPerGame,
+              season_at_bats: drift.seasonAtBats,
+              games: drift.games
+                .filter(
+                  (g) =>
+                    g.pitchCount >= drift.minPitchesPerGame &&
+                    g.transitionCount >= drift.minTransitionsPerGame,
+                )
+                .map((g) => ({
+                  game_pk: g.game_pk,
+                  game_date: g.game_date,
+                  pitch_count: g.pitchCount,
+                  ab_count: g.atBatCount,
+                  drift_pct: Math.round(g.drift * 100),
+                })),
             };
           },
         }),

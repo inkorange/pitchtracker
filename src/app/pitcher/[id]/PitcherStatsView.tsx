@@ -14,7 +14,9 @@ import { ReleaseCluster } from "./stats/ReleaseCluster";
 import { HeatMapGrid } from "./stats/HeatMapGrid";
 import { VAABars } from "./stats/VAABars";
 import { SequencingMatrix } from "./stats/SequencingMatrix";
+import { SequencingDrift } from "./stats/SequencingDrift";
 import type { SequencingMatrix as SequencingMatrixData } from "@/lib/pitch/sequencingMatrix";
+import type { SequencingDrift as SequencingDriftData } from "@/lib/pitch/sequencingDrift";
 import type { ArsenalRadar as ArsenalRadarData } from "@/lib/pitch/arsenalRadar";
 
 // Top-level Stats view. Fetches the same arsenal payload the 3D
@@ -81,6 +83,9 @@ export function PitcherStatsView() {
     }
     sp.set("includeSequence", "1");
     sp.set("includeRadar", "1");
+    // Per-game drift series — server skips it under vsBatter, but
+    // we always request so the same arsenalQuery serves both views.
+    sp.set("includeSequenceVariance", "1");
     return sp.toString();
   })();
 
@@ -92,6 +97,8 @@ export function PitcherStatsView() {
   );
   const [arsenalRadar, setArsenalRadar] =
     useState<ArsenalRadarData | null>(null);
+  const [sequenceDrift, setSequenceDrift] =
+    useState<SequencingDriftData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -111,12 +118,14 @@ export function PitcherStatsView() {
           sequenceMatrix: SequencingMatrixData | null;
           sequenceBatterName: string | null;
           arsenalRadar: ArsenalRadarData | null;
+          sequenceDrift: SequencingDriftData | null;
         };
         if (cancelled) return;
         setPitches(body.pitches ?? []);
         setSequenceMatrix(body.sequenceMatrix ?? null);
         setSequenceBatterName(body.sequenceBatterName ?? null);
         setArsenalRadar(body.arsenalRadar ?? null);
+        setSequenceDrift(body.sequenceDrift ?? null);
       })
       .catch(() => {
         if (cancelled) return;
@@ -124,6 +133,7 @@ export function PitcherStatsView() {
         setSequenceMatrix(null);
         setSequenceBatterName(null);
         setArsenalRadar(null);
+        setSequenceDrift(null);
       })
       .finally(() => {
         if (cancelled) return;
@@ -186,6 +196,16 @@ export function PitcherStatsView() {
       />
       <LazyMount minHeight={300}>
         <SequencingMatrix data={sequenceMatrix} batterName={sequenceBatterName} />
+      </LazyMount>
+      {/* Drift timeline lives directly under the season matrix —
+          reads as "here's his season pattern; here's where he
+          departed from it". Full width because the chronological
+          x-axis benefits from horizontal room. */}
+      <LazyMount minHeight={260}>
+        <SequencingDrift
+          data={sequenceDrift}
+          batterScoped={vsBatter != null}
+        />
       </LazyMount>
       {/* Supporting analytical cards — 2-col grid only at lg+
           (1024px+). Below that, every card stacks single-column so

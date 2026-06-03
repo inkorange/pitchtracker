@@ -28,10 +28,36 @@ interface SequencingMatrixProps {
   batterName?: string | null;
 }
 
+const SEQUENCING_HELP = (
+  <>
+    <p>
+      How the pitcher attacks at-bats. Two views stacked in one card.
+    </p>
+    <p>
+      <strong>First pitch</strong>: distribution of what he opens
+      at-bats with — share of ABs where each pitch type was the
+      first pitch thrown.
+    </p>
+    <p>
+      <strong>After this → next pitch</strong>: the conditional
+      matrix. Each row asks &quot;given pitch X was just thrown,
+      what came next?&quot; Cells are <strong>row-normalized</strong>{" "}
+      percentages and shaded yellow→red so the busiest tendencies
+      pop visually. Each row sums to 100% across its non-empty cells.
+    </p>
+    <p>
+      Scoping: the matrix uses every consecutive pitch pair in the
+      current at-bat-level filter — outcome / pitch-type filters
+      are deliberately bypassed because removing mid-AB pitches
+      would break the pair walk.
+    </p>
+  </>
+);
+
 export function SequencingMatrix({ data, batterName }: SequencingMatrixProps) {
   if (!data || data.pitchTypes.length === 0 || data.totalAtBats === 0) {
     return (
-      <StatCard title="Sequencing">
+      <StatCard title="Sequencing" help={SEQUENCING_HELP}>
         <div className="text-[11px] text-white/55 italic">
           {batterName
             ? `No pitches to ${batterName} in the current filter.`
@@ -58,7 +84,7 @@ export function SequencingMatrix({ data, batterName }: SequencingMatrixProps) {
   }`;
 
   return (
-    <StatCard title="Sequencing" hint={hint}>
+    <StatCard title="Sequencing" hint={hint} help={SEQUENCING_HELP}>
       <div className="space-y-4">
         {/* First-pitch distribution. Horizontal stacked bars per
             pitch type — each pitcher's first-pitch arsenal at a

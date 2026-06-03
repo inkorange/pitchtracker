@@ -41,7 +41,28 @@ export function ReleaseCluster({ pitches }: { pitches: StatPitch[] }) {
   const orderedTypes = Array.from(types).sort();
 
   return (
-    <StatCard title="Release point" hint="ft · catcher's POV">
+    <StatCard
+      title="Release point"
+      hint="ft · catcher's POV"
+      help={
+        <>
+          <p>
+            Where the ball comes out of the hand — release point in
+            feet, viewed from the catcher.
+            <strong> X-axis</strong> = horizontal position relative
+            to the rubber centerline;
+            <strong> Y-axis</strong> = height off the ground.
+          </p>
+          <p>
+            <strong>Tight clusters across pitch types</strong> =
+            tunneled release. Every pitch comes out of the same slot
+            and the batter can&apos;t read pitch type by hand
+            position alone. <strong>Spread out</strong> = the batter
+            has a free tell.
+          </p>
+        </>
+      }
+    >
       <div className="w-full">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
