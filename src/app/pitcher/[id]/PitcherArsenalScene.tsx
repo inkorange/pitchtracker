@@ -748,28 +748,12 @@ function HeatHelp({
               labeled with the percentage plus the pitch count (n=…)
               behind that cell.
             </p>
-            <p className="text-white/70">
-              The grid respects the page-level filters — pitch types,
-              batter hand, game, outcome chips, AI deep-links. Change
-              a filter and the grid recomputes.
-            </p>
           </section>
           <section className="space-y-2">
             <h3 className="text-[11px] uppercase tracking-[0.16em] text-[#5fc7d8]">
               Active metric — {HEAT_METRIC_LABELS[activeMetric]}
             </h3>
             <p>{HEAT_METRIC_DESCRIPTIONS[activeMetric]}</p>
-          </section>
-          <section className="space-y-2">
-            <h3 className="text-[11px] uppercase tracking-[0.16em] text-[#5fc7d8]">
-              Other metrics
-            </h3>
-            <p className="text-white/70">
-              Deep-link via <code className="text-[12px] text-[#5fc7d8]">?heat=whiff | chase | called | csw</code>{" "}
-              on the pitcher URL. The toggle button cycles to
-              <code className="text-[12px] text-[#5fc7d8] ml-1">whiff</code> as
-              the default; more metric pickers in a follow-up pass.
-            </p>
           </section>
           <section className="space-y-2">
             <h3 className="text-[11px] uppercase tracking-[0.16em] text-[#5fc7d8]">
