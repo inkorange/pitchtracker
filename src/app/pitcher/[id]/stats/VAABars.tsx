@@ -17,11 +17,29 @@ const W = 280;
 const ROW_H = 22;
 const VAA_RANGE = 14; // degrees from 0 to -14
 
+const VAA_HELP = (
+  <>
+    <p>
+      <strong>Vertical Approach Angle</strong> = the steepness of the
+      pitch as it crosses the plate, measured in degrees off
+      horizontal. 0° = perfectly flat; more negative = steeper
+      descent.
+    </p>
+    <p>
+      Used as a stuff marker. Flat fastballs ({"≈"} -3° to -4°)
+      that ride the top of the zone are elite; steep curveballs
+      ({"≈"} -10°+) generate ground balls and chases below the
+      zone. Two pitches with the same speed but different VAA play
+      very differently to a batter.
+    </p>
+  </>
+);
+
 export function VAABars({ rows }: { rows: PerPitchStats[] }) {
   const usable = rows.filter((r) => r.vaa_mean != null);
   if (usable.length === 0) {
     return (
-      <StatCard title="Approach angle (VAA)">
+      <StatCard title="Approach angle (VAA)" help={VAA_HELP}>
         <div className="text-[11px] text-white/55 italic">
           Not enough data to compute approach angle.
         </div>
@@ -30,7 +48,7 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
   }
   const totalH = usable.length * ROW_H + 12;
   return (
-    <StatCard title="Approach angle (VAA)" hint="0° = flat">
+    <StatCard title="Approach angle (VAA)" hint="0° = flat" help={VAA_HELP}>
       <svg
         viewBox={`0 0 ${W} ${totalH}`}
         width="100%"

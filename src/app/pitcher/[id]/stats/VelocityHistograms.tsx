@@ -28,9 +28,27 @@ export function VelocityHistograms({
   }
   const ordered = perPitch.filter((r) => (byType.get(r.pitch_type)?.length ?? 0) >= 5);
 
+  const help = (
+    <>
+      <p>
+        Velocity distribution per pitch type — one mini histogram per
+        pitch he throws. Bars are pitch counts in 1 mph buckets.
+      </p>
+      <p>
+        Read it as <strong>shape</strong>: a tight bell = consistent
+        velocity; a wide spread = noisier release; a long high-end
+        tail = he flashed something extra a handful of times.
+      </p>
+      <p>
+        All histograms share an x-axis range so two pitches&apos;
+        clouds can be compared directly without rescaling.
+      </p>
+    </>
+  );
+
   if (ordered.length === 0) {
     return (
-      <StatCard title="Velocity">
+      <StatCard title="Velocity" help={help}>
         <div className="text-[11px] text-white/55 italic">
           Not enough velocity samples to plot.
         </div>
@@ -46,7 +64,7 @@ export function VelocityHistograms({
   const binCount = Math.ceil((maxMph - minMph) / BIN_WIDTH_MPH);
 
   return (
-    <StatCard title="Velocity">
+    <StatCard title="Velocity" help={help}>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {ordered.map((r) => {
           const samples = byType.get(r.pitch_type) ?? [];

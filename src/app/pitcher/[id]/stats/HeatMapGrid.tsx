@@ -44,9 +44,25 @@ export function HeatMapGrid({
     byType.set(p.pitch_type, grid);
   }
 
+  const help = (
+    <>
+      <p>
+        Plate-location density per pitch type, viewed from the
+        catcher. One small heat map per pitch — hotter cells mean
+        more pitches landed there.
+      </p>
+      <p>
+        The black rectangle is the rule-book strike zone for an
+        average batter. Concentrations off the corner edges are the
+        pitcher&apos;s preferred chase spots; dense center-zone heat
+        for a swing-and-miss pitch is a warning sign.
+      </p>
+    </>
+  );
+
   if (byType.size === 0) {
     return (
-      <StatCard title="Locations">
+      <StatCard title="Locations" help={help}>
         <div className="text-[11px] text-white/55 italic">
           No location data in the current filter.
         </div>
@@ -66,7 +82,7 @@ export function HeatMapGrid({
   const szMax = H - PADDING - ((3.5 - Z_RANGE[0]) / (Z_RANGE[1] - Z_RANGE[0])) * (H - PADDING * 2);
 
   return (
-    <StatCard title="Locations" hint="catcher's POV">
+    <StatCard title="Locations" hint="catcher's POV" help={help}>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {ordered.map((r) => {
           const grid = byType.get(r.pitch_type)!;

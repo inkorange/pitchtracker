@@ -43,9 +43,33 @@ export function SequencingDrift({ data, batterScoped }: SequencingDriftProps) {
     [data],
   );
 
+  const help = (
+    <>
+      <p>
+        Did he change his approach today? For each qualifying game,
+        we compare that start&apos;s sequencing pattern to the season
+        baseline and plot the difference as one dot on the timeline.
+      </p>
+      <p>
+        Metric is <strong>Total Variation Distance</strong> between
+        the game&apos;s and season&apos;s sequencing matrices (first-pitch
+        distribution + conditional after-pitch matrix), weighted by
+        per-row sample size. <strong>0% = same as season</strong>;
+        higher = more departure. Dot size and color scale with the
+        drift so spike games stand out.
+      </p>
+      <p>
+        Games with fewer than {data?.minPitchesPerGame ?? 20} pitches
+        or {data?.minTransitionsPerGame ?? 10} consecutive-pitch
+        pairs are excluded — small samples produce noisy spikes
+        that aren&apos;t meaningful signal.
+      </p>
+    </>
+  );
+
   if (batterScoped) {
     return (
-      <StatCard title="Sequencing drift">
+      <StatCard title="Sequencing drift" help={help}>
         <div className="text-[11px] text-white/55 italic">
           Drift comparison isn&apos;t computed when a specific batter is
           selected — per-game samples vs one hitter are too small to
@@ -57,7 +81,7 @@ export function SequencingDrift({ data, batterScoped }: SequencingDriftProps) {
 
   if (!data || data.games.length === 0) {
     return (
-      <StatCard title="Sequencing drift">
+      <StatCard title="Sequencing drift" help={help}>
         <div className="text-[11px] text-white/55 italic">
           Not enough games to plot per-game drift yet.
         </div>
@@ -70,6 +94,7 @@ export function SequencingDrift({ data, batterScoped }: SequencingDriftProps) {
       <StatCard
         title="Sequencing drift"
         hint={`Need ≥${data.minPitchesPerGame} pitches per game`}
+        help={help}
       >
         <div className="text-[11px] text-white/55 italic">
           Only {qualified.length} game{qualified.length === 1 ? "" : "s"} meet
@@ -84,6 +109,7 @@ export function SequencingDrift({ data, batterScoped }: SequencingDriftProps) {
     <StatCard
       title="Sequencing drift"
       hint={`${qualified.length} games · per-game vs season baseline`}
+      help={help}
     >
       <DriftPlot games={qualified} />
     </StatCard>

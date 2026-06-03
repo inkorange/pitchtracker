@@ -27,10 +27,35 @@ interface ArsenalCardProps {
   totalPitches: number;
 }
 
+const ARSENAL_HELP = (
+  <>
+    <p>
+      Per-pitch-type breakdown of the pitcher&apos;s arsenal in the
+      current filter scope. One tile per pitch type, sorted by usage.
+    </p>
+    <p>
+      Tile stats: <strong>Velo</strong> = average release speed (mph);
+      <strong> CSW%</strong> = Called + Swinging strike rate (the
+      industry headline for pitching-arsenal quality);
+      <strong> Whiff%</strong> = swings-and-misses divided by swings;
+      <strong> VAA</strong> = vertical approach angle at the plate
+      (more negative = steeper).
+    </p>
+    <p>
+      The mini-radar at the bottom plots <strong>league percentile</strong>{" "}
+      across five axes — Velocity, Spin, induced Vertical Break,
+      Horizontal Break, Whiff% — so you can see where each pitch
+      ranks vs every MLB pitcher who threw that same pitch type
+      this season. Bigger polygon = better stuff. The radar is
+      season-wide (independent of any current filter on the page).
+    </p>
+  </>
+);
+
 export function ArsenalCard({ perPitch, radar, totalPitches }: ArsenalCardProps) {
   if (perPitch.length === 0) {
     return (
-      <StatCard title="Arsenal">
+      <StatCard title="Arsenal" help={ARSENAL_HELP}>
         <div className="text-[11px] text-white/55 italic">
           No pitches in the current filter.
         </div>
@@ -49,7 +74,7 @@ export function ArsenalCard({ perPitch, radar, totalPitches }: ArsenalCardProps)
     : `${totalPitches} pitches`;
 
   return (
-    <StatCard title="Arsenal" hint={hint}>
+    <StatCard title="Arsenal" hint={hint} help={ARSENAL_HELP}>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {perPitch.map((p) => (
           <ArsenalTile

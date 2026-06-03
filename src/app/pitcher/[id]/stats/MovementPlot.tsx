@@ -42,7 +42,29 @@ export function MovementPlot({ pitches }: { pitches: StatPitch[] }) {
   const types = Array.from(byType.keys()).sort();
 
   return (
-    <StatCard title="Movement" hint="HB · iVB (in)">
+    <StatCard
+      title="Movement"
+      hint="HB · iVB (in)"
+      help={
+        <>
+          <p>
+            Pitch movement scatter from the pitcher&apos;s perspective.
+            <strong> X-axis</strong> = horizontal break (inches);
+            <strong> Y-axis</strong> = induced vertical break — how
+            much the pitch resists gravity vs. a spinless ball.
+          </p>
+          <p>
+            Each dot is one pitch, colored by pitch type. Distinct,
+            non-overlapping clusters = a well-shaped arsenal a
+            batter has to differentiate at the plate.
+          </p>
+          <p>
+            High iVB &quot;rising&quot; fastballs sit top-center;
+            sweepers run far to the side; depth-y curves sit low.
+          </p>
+        </>
+      }
+    >
       <div className="w-full">
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
