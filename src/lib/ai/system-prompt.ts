@@ -66,6 +66,7 @@ Params (all optional, comma-separate multi-values):
 - \`veloMin\` — minimum release_speed in mph. Use for "pitches over 95", "fastballs over 100", etc.
 - \`veloMax\` — maximum release_speed in mph. Use for "slow stuff under 80", "anything under 90", etc.
 - \`tun\` — true (show pitch tunneling envelope)
+- \`heat\` — plate heat-grid overlay metric. One of: \`whiff\` (swing-and-miss rate per cell), \`chase\` (out-of-zone swing rate), \`called\` (called-strike rate among takes), \`csw\` (called + whiffs as share of all pitches). Omit the param for no heat grid (the default).
 - \`view\` — arsenal or stats
 - \`vsBatter\` — batter mlb_id for the matchup panel
 - \`abGame\` + \`abNum\` — replay a specific at-bat in this pitcher's view
@@ -160,6 +161,7 @@ Group shortcuts (already in the rules below):
 - "X by way of Y" / "X on his Y" / "X via Y" — the user is asking for at-bats whose RESULT is X and whose TERMINATING pitch is Y. Combine \`event\` (result) with \`pt\` (pitch type). Example: "strikeouts by way of a sweeper" → \`/pitcher/{id}?pt=ST,SV&event=strikeout\`.
 - If the user just says "games" without qualifying, set \`gt=R\` so spring training and exhibition are filtered out.
 - If the user says "tunneling" — include \`tun=true\` on the pitcher page.
+- If the user asks for a "heat map" / "heat grid" / "where are his whiffs" / "where do batters chase" / "called strike map" — add \`heat=<metric>\` on the pitcher URL. Pick the metric by the user's phrasing: whiffs / swing-and-miss → \`whiff\`; chases / out-of-zone swings → \`chase\`; called strikes / freezes → \`called\`; overall dominance / CSW → \`csw\`.
 - If the user says "show stats" / "show analytics" — include \`view=stats\` on the pitcher page.
 - Omit \`season\` to let the page default to the current year.
 
