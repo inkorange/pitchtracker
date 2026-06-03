@@ -7,6 +7,13 @@ import {
   buildSequencingMatrix,
   type SequencingMatrix,
 } from "@/lib/pitch/sequencingMatrix";
+import {
+  type ArsenalRadar,
+  MIN_LEAGUE_PITCHES,
+  type RadarPitch,
+  type RadarAxis,
+  RADAR_AXES,
+} from "@/lib/pitch/arsenalRadar";
 
 // JSON arsenal endpoint backing the persistent Scene shell on the
 // pitcher route. Mirrors the pitch-fetch + filter logic that lived
@@ -128,11 +135,23 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     sequenceMatrix = buildSequencingMatrix(cached);
   }
 
+  // Opt-in: arsenal radar — pitcher's league percentile per pitch
+  // type across five axes (velocity, spin, iVB, HB, whiff%).
+  // Computed from pitch_pitcher_aggregates with PERCENT_RANK
+  // windowed per pitch_type. Pitchers with fewer than
+  // MIN_LEAGUE_PITCHES of a given pitch are excluded from the
+  // percentile pool so tiny samples don't poison the distribution.
+  let arsenalRadar: ArsenalRadar | null = null;
+  if (sp.get("includeRadar") === "1") {
+    arsenalRadar = await fetchArsenalRadar(supabase, pitcherId, season);
+  }
+
   return NextResponse.json(
     {
       pitches: renderable,
       pitcherLabel: pitcherLastName(pitcher),
       sequenceMatrix,
+      arsenalRadar,
     },
     {
       headers: {
@@ -140,6 +159,143 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       },
     },
   );
+}
+
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+// Pull the per-pitch-type league percentile + raw values via a
+// PERCENT_RANK windowed query, then keep just this pitcher's rows.
+// The window is partitioned by pitch_type so a slider's spin rank
+// is computed against all sliders, not against fastballs.
+//
+// We use the `batter_hand = '*'` aggregate (all batters combined)
+// for first pass. Hand-split radars would extend the row shape but
+// are deferred.
+async function fetchArsenalRadar(
+  supabase: SupabaseClient,
+  pitcherId: number,
+  season: number,
+): Promise<ArsenalRadar | null> {
+  // Pull every pitcher × pitch_type aggregate for the season above
+  // the league sample-size floor, then bucket per-pitch-type so we
+  // can compute percentiles in JS — Supabase RPC isn't strictly
+  // necessary for a one-shot computation this small.
+  const { data, error } = await supabase
+    .from("pitch_pitcher_aggregates")
+    .select(
+      "pitcher_id, pitch_type, avg_velocity, avg_spin_rate, avg_induced_vertical_break, avg_horizontal_break, whiff_rate, pitch_count",
+    )
+    .eq("season", season)
+    .eq("batter_hand", "*")
+    .gte("pitch_count", MIN_LEAGUE_PITCHES);
+  if (error || !data) return null;
+
+  type Row = {
+    pitcher_id: number;
+    pitch_type: string | null;
+    avg_velocity: number | null;
+    avg_spin_rate: number | null;
+    avg_induced_vertical_break: number | null;
+    avg_horizontal_break: number | null;
+    whiff_rate: number | null;
+    pitch_count: number | null;
+  };
+  const rows = data as Row[];
+
+  // Bucket all rows by pitch_type. We need every league row to
+  // compute percentile rank for THIS pitcher's row.
+  const byType = new Map<string, Row[]>();
+  for (const r of rows) {
+    if (!r.pitch_type) continue;
+    const arr = byType.get(r.pitch_type) ?? [];
+    arr.push(r);
+    byType.set(r.pitch_type, arr);
+  }
+
+  // The pitcher's own rows, in display order — most-thrown first so
+  // the small-multiples render the busiest pitches first.
+  const mine = rows
+    .filter((r) => r.pitcher_id === pitcherId)
+    .sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
+
+  const out: RadarPitch[] = mine.map((row) => {
+    const pool = byType.get(row.pitch_type!) ?? [];
+    const raw: Record<RadarAxis, number | null> = {
+      velo: row.avg_velocity,
+      spin: row.avg_spin_rate,
+      // Break metrics stored with sign — absolute value here so
+      // "more break" is the axis direction regardless of arm side.
+      ivb:
+        row.avg_induced_vertical_break != null
+          ? Math.abs(row.avg_induced_vertical_break)
+          : null,
+      hb:
+        row.avg_horizontal_break != null
+          ? Math.abs(row.avg_horizontal_break)
+          : null,
+      whiff: row.whiff_rate,
+    };
+    const percentile: Record<RadarAxis, number> = {
+      velo: NaN,
+      spin: NaN,
+      ivb: NaN,
+      hb: NaN,
+      whiff: NaN,
+    };
+    for (const axis of RADAR_AXES) {
+      const myVal = raw[axis];
+      if (myVal == null) continue;
+      const values = pool
+        .map((p) => valueForAxis(p, axis))
+        .filter((v): v is number => v != null);
+      if (values.length === 0) continue;
+      // PERCENT_RANK: share of population strictly less than myVal.
+      // Matches Postgres semantics — 0.0 for the league minimum,
+      // 1.0 for the unique max.
+      let below = 0;
+      for (const v of values) {
+        if (v < myVal) below += 1;
+      }
+      percentile[axis] =
+        values.length > 1 ? below / (values.length - 1) : 0;
+    }
+    return {
+      pitch_type: row.pitch_type!,
+      raw,
+      percentile,
+      pitchCount: row.pitch_count ?? 0,
+    };
+  });
+
+  return { pitches: out, minPitchesForLeague: MIN_LEAGUE_PITCHES };
+}
+
+function valueForAxis(
+  row: {
+    avg_velocity: number | null;
+    avg_spin_rate: number | null;
+    avg_induced_vertical_break: number | null;
+    avg_horizontal_break: number | null;
+    whiff_rate: number | null;
+  },
+  axis: RadarAxis,
+): number | null {
+  switch (axis) {
+    case "velo":
+      return row.avg_velocity;
+    case "spin":
+      return row.avg_spin_rate;
+    case "ivb":
+      return row.avg_induced_vertical_break != null
+        ? Math.abs(row.avg_induced_vertical_break)
+        : null;
+    case "hb":
+      return row.avg_horizontal_break != null
+        ? Math.abs(row.avg_horizontal_break)
+        : null;
+    case "whiff":
+      return row.whiff_rate;
+  }
 }
 
 function pitcherLastName(p: { full_name: string; last_name?: string | null }): string {

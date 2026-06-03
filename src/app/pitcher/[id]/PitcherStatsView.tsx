@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { aggregate, type StatPitch } from "./stats/aggregations";
 import { LazyMount } from "./stats/LazyMount";
 import { StatsHeadline } from "./stats/StatsHeadline";
-import { PerPitchTable } from "./stats/PerPitchTable";
+import { ArsenalCard } from "./stats/ArsenalCard";
 import { MovementPlot } from "./stats/MovementPlot";
 import { VelocityHistograms } from "./stats/VelocityHistograms";
 import { ReleaseCluster } from "./stats/ReleaseCluster";
@@ -13,6 +13,7 @@ import { HeatMapGrid } from "./stats/HeatMapGrid";
 import { VAABars } from "./stats/VAABars";
 import { SequencingMatrix } from "./stats/SequencingMatrix";
 import type { SequencingMatrix as SequencingMatrixData } from "@/lib/pitch/sequencingMatrix";
+import type { ArsenalRadar as ArsenalRadarData } from "@/lib/pitch/arsenalRadar";
 
 // Top-level Stats view. Fetches the same arsenal payload the 3D
 // scene shell uses (browser cache dedups), aggregates client-side
@@ -42,12 +43,15 @@ export function PitcherStatsView() {
     sp.delete("batterQ");
     sp.delete("view");
     sp.set("includeSequence", "1");
+    sp.set("includeRadar", "1");
     return sp.toString();
   })();
 
   const [pitches, setPitches] = useState<StatPitch[]>([]);
   const [sequenceMatrix, setSequenceMatrix] =
     useState<SequencingMatrixData | null>(null);
+  const [arsenalRadar, setArsenalRadar] =
+    useState<ArsenalRadarData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,15 +69,18 @@ export function PitcherStatsView() {
         const body = (await res.json()) as {
           pitches: StatPitch[];
           sequenceMatrix: SequencingMatrixData | null;
+          arsenalRadar: ArsenalRadarData | null;
         };
         if (cancelled) return;
         setPitches(body.pitches ?? []);
         setSequenceMatrix(body.sequenceMatrix ?? null);
+        setArsenalRadar(body.arsenalRadar ?? null);
       })
       .catch(() => {
         if (cancelled) return;
         setPitches([]);
         setSequenceMatrix(null);
+        setArsenalRadar(null);
       })
       .finally(() => {
         if (cancelled) return;
@@ -107,12 +114,22 @@ export function PitcherStatsView() {
     <div className="space-y-3">
       {/* Headline spans full width on every breakpoint. */}
       <StatsHeadline total={aggregated.total} />
-      {/* 2-col grid only at lg+ (1024px+). Below that, every card
-          stacks single-column so the small-multiples (velocity
-          histograms, heat maps) don't get cramped at narrow desktop
-          widths. */}
+      {/* The two headline cards — Arsenal (per-pitch stats + league
+          radar combined) and Sequencing — span full width because
+          they ARE the main view of the pitcher's pitches. */}
+      <ArsenalCard
+        perPitch={aggregated.perPitch}
+        radar={arsenalRadar}
+        totalPitches={aggregated.total.pitches}
+      />
+      <LazyMount minHeight={300}>
+        <SequencingMatrix data={sequenceMatrix} />
+      </LazyMount>
+      {/* Supporting analytical cards — 2-col grid only at lg+
+          (1024px+). Below that, every card stacks single-column so
+          the small-multiples (velocity histograms, heat maps) don't
+          get cramped at narrow desktop widths. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <PerPitchTable rows={aggregated.perPitch} />
         <LazyMount minHeight={340}>
           <MovementPlot pitches={pitches} />
         </LazyMount>
@@ -127,9 +144,6 @@ export function PitcherStatsView() {
         </LazyMount>
         <LazyMount minHeight={220}>
           <VAABars rows={aggregated.perPitch} />
-        </LazyMount>
-        <LazyMount minHeight={300}>
-          <SequencingMatrix data={sequenceMatrix} />
         </LazyMount>
       </div>
     </div>
