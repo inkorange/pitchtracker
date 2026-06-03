@@ -26,6 +26,7 @@ import { PitcherStatsArea } from "./PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "./PitcherOutcomeLegendGate";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
+import { RECENT_RIBBON_CAP } from "@/lib/viz/scene-tuning";
 import {
   fetchPitcherGameLine,
   fetchPersonsCached,
@@ -647,8 +648,18 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                   </div>
 
                   {renderable.length > 0 && (
-                    <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05]">
-                      Rendering {renderable.length} pitch{renderable.length === 1 ? "" : "es"}
+                    <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05] space-y-0.5">
+                      <div>
+                        Rendering {renderable.length} pitch
+                        {renderable.length === 1 ? "" : "es"}
+                      </div>
+                      {renderable.length > RECENT_RIBBON_CAP && (
+                        <div className="text-white/40 text-[10px]">
+                          {RECENT_RIBBON_CAP.toLocaleString()} recent ·{" "}
+                          {(renderable.length - RECENT_RIBBON_CAP).toLocaleString()}{" "}
+                          historical as paths
+                        </div>
+                      )}
                     </div>
                   )}
                   {(cachedPitches ?? []).length === 0 && (

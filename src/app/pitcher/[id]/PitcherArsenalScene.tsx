@@ -7,6 +7,8 @@ import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
+import { HistoricalPitchLines } from "@/components/ribbon/HistoricalPitchLines";
+import { RECENT_RIBBON_CAP } from "@/lib/viz/scene-tuning";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { TunnelMesh } from "@/components/scene/TunnelMesh";
 import { HeatGridPlane } from "@/components/scene/HeatGridPlane";
@@ -75,6 +77,10 @@ interface CachedPitch {
   pfx_x: number | null;
   pfx_z: number | null;
   release_extension: number | null;
+  /** Flattened from pitch_games.game_date on the arsenal endpoint —
+   *  drives the recency-based render split (recent ribbons /
+   *  historical lines). */
+  game_date: string | null;
 }
 
 interface PitcherArsenalSceneProps {
@@ -205,6 +211,33 @@ export function PitcherArsenalScene({
       .filter((e): e is PitchEntry => e !== null);
   }, [pitches]);
 
+  // Recency-based render split. Above the cap, the most recent N
+  // pitches keep the full ribbon treatment; everything older drops
+  // to a single merged LineSegments mesh (one draw call for the
+  // whole cohort). The split auto-collapses when a filter narrows
+  // the visible count under the cap — no special-mode handling, the
+  // user just sees ribbons again. Sort key matches "literal last N
+  // pitches he threw": newest game first, latest AB and pitch
+  // within game first.
+  const { recentEntries, historicalEntries } = useMemo(() => {
+    if (entries.length <= RECENT_RIBBON_CAP) {
+      return { recentEntries: entries, historicalEntries: [] as PitchEntry[] };
+    }
+    const sorted = [...entries].sort((a, b) => {
+      const da = a.source.game_date ?? "";
+      const db = b.source.game_date ?? "";
+      if (da !== db) return db.localeCompare(da);
+      if (a.source.at_bat_number !== b.source.at_bat_number) {
+        return b.source.at_bat_number - a.source.at_bat_number;
+      }
+      return b.source.pitch_number - a.source.pitch_number;
+    });
+    return {
+      recentEntries: sorted.slice(0, RECENT_RIBBON_CAP),
+      historicalEntries: sorted.slice(RECENT_RIBBON_CAP),
+    };
+  }, [entries]);
+
   const selectedEntry = useMemo(
     () => entries.find((e) => e.id === selectedId) ?? null,
     [entries, selectedId],
@@ -214,7 +247,10 @@ export function PitcherArsenalScene({
 
   // Left/right arrows cycle through the visible pitches. Skipped when the
   // user is typing in an input (the search box) so the keys still work
-  // normally there.
+  // normally there. We cycle through `recentEntries` only — historical
+  // pitches render as thin lines (no ribbon or click target) so they
+  // can't be selected via keyboard either; the user narrows the filter
+  // to bring them into the recent set if they want to step through.
   useEffect(() => {
     const handleKeyDown = (ev: KeyboardEvent) => {
       if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
@@ -227,23 +263,25 @@ export function PitcherArsenalScene({
       ) {
         return;
       }
-      if (entries.length === 0) return;
+      if (recentEntries.length === 0) return;
       ev.preventDefault();
       const dir = ev.key === "ArrowRight" ? 1 : -1;
       setSelectedId((curr) => {
-        const idx = curr ? entries.findIndex((entry) => entry.id === curr) : -1;
+        const idx = curr
+          ? recentEntries.findIndex((entry) => entry.id === curr)
+          : -1;
         const next =
           idx === -1
             ? dir === 1
               ? 0
-              : entries.length - 1
-            : (idx + dir + entries.length) % entries.length;
-        return entries[next].id;
+              : recentEntries.length - 1
+            : (idx + dir + recentEntries.length) % recentEntries.length;
+        return recentEntries[next].id;
       });
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [entries]);
+  }, [recentEntries]);
 
   // At-bat playback state — only meaningful when `atBatPitches` is
   // set, but the hook runs unconditionally so the same Scene
@@ -329,7 +367,19 @@ export function PitcherArsenalScene({
             handlers={playback.handlers}
           />
         ) : null}
-        {!inAtBatMode && entries.map((e) => {
+        {!inAtBatMode && historicalEntries.length > 0 ? (
+          <HistoricalPitchLines
+            entries={historicalEntries}
+            opacity={
+              tunnelOn || heatMetric !== null
+                ? 0.05
+                : hasSelection
+                  ? 0.08
+                  : 0.32
+            }
+          />
+        ) : null}
+        {!inAtBatMode && recentEntries.map((e) => {
           const isSelected = selectedEntry?.id === e.id;
           // Tunnel + heat-grid modes both dim pitches to 0.1 so the
           // overlay (cone / grid) reads as the dominant element.
