@@ -165,3 +165,58 @@ calling the same pattern every game, or has he changed his approach?".
 Needs the season-level + batter-aware matrices in place first so the
 "variance vs what?" baseline is well-defined. Ship those, then build this on
 top.
+
+## 3D Scene Rendering Performance (high pitch counts)
+
+Roughly 30% into the 2026 season, top-volume pitchers already accumulate
+1000+ pitches in a season-wide view, and the 3D scene gets noticeably janky
+— frame drops on scroll/rotate, slow filter changes, sluggish ribbon
+animations. By end of season common pitchers will easily hit 2500–3500 in
+a single view, and any "compare two pitchers" or pooled view doubles that.
+We need a rendering strategy that stays smooth at full-season volume.
+
+### Symptoms
+
+- Visible frame drops in the Canvas once renderable pitches exceed
+  ~800–1000.
+- Filter changes (toggling a pitch type) feel sticky — the scene
+  rebuilds its meshes from scratch.
+- Mobile is hit hardest; desktop is degraded but usable.
+
+### Directions to evaluate
+
+- **Instanced rendering** — current implementation almost certainly
+  builds one mesh per pitch (or per ribbon). A single `InstancedMesh`
+  + per-instance color/transform attribute should cut draw calls 100x
+  and is the most likely big win. R3F has `drei/Instances` for this.
+- **GPU-side path generation** — bake the trajectory into a shader so
+  we don't materialize 60+ points per pitch on the CPU. Each pitch
+  becomes a single instance + the shader interpolates along t.
+- **Level-of-detail by camera distance** — fade out / hide pitches
+  that are far from the camera; full detail only for what's actually
+  in the foreground frustum.
+- **Frustum + screen-space culling** — most pitches share the same
+  small zone region; many are off-screen during close-in playback.
+- **Stochastic downsampling for previews** — when count > N, render
+  a uniform random sample (~N pitches) and label the view "showing
+  N of M". Could be the simplest immediate win to ship before a
+  bigger refactor.
+- **Mesh re-use across filter changes** — instead of rebuilding all
+  geometry when the filter changes, keep the full pool mounted and
+  toggle visibility / opacity per pitch. Filter changes become a
+  GPU-cheap visibility toggle.
+- **Color/material consolidation** — if every pitch has its own
+  material instance, that's a lot of state churn. Share materials by
+  pitch type.
+
+### Acceptance
+
+Smooth 60fps on desktop and 30fps+ on mid-range mobile with 3000
+rendered pitches; filter toggle round-trip under 100ms perceived.
+
+### Why later
+
+Not a correctness issue, and the current UI is still usable at
+season-to-date counts. But the curve is exponential through the
+year, so this needs to land well before October when full-season
+views and compare views compound.
