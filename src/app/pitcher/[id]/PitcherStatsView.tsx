@@ -13,6 +13,8 @@ import { HeatMapGrid } from "./stats/HeatMapGrid";
 import { VAABars } from "./stats/VAABars";
 import { SequencingMatrix } from "./stats/SequencingMatrix";
 import type { SequencingMatrix as SequencingMatrixData } from "@/lib/pitch/sequencingMatrix";
+import { ArsenalRadar } from "./stats/ArsenalRadar";
+import type { ArsenalRadar as ArsenalRadarData } from "@/lib/pitch/arsenalRadar";
 
 // Top-level Stats view. Fetches the same arsenal payload the 3D
 // scene shell uses (browser cache dedups), aggregates client-side
@@ -42,12 +44,15 @@ export function PitcherStatsView() {
     sp.delete("batterQ");
     sp.delete("view");
     sp.set("includeSequence", "1");
+    sp.set("includeRadar", "1");
     return sp.toString();
   })();
 
   const [pitches, setPitches] = useState<StatPitch[]>([]);
   const [sequenceMatrix, setSequenceMatrix] =
     useState<SequencingMatrixData | null>(null);
+  const [arsenalRadar, setArsenalRadar] =
+    useState<ArsenalRadarData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -65,15 +70,18 @@ export function PitcherStatsView() {
         const body = (await res.json()) as {
           pitches: StatPitch[];
           sequenceMatrix: SequencingMatrixData | null;
+          arsenalRadar: ArsenalRadarData | null;
         };
         if (cancelled) return;
         setPitches(body.pitches ?? []);
         setSequenceMatrix(body.sequenceMatrix ?? null);
+        setArsenalRadar(body.arsenalRadar ?? null);
       })
       .catch(() => {
         if (cancelled) return;
         setPitches([]);
         setSequenceMatrix(null);
+        setArsenalRadar(null);
       })
       .finally(() => {
         if (cancelled) return;
@@ -130,6 +138,9 @@ export function PitcherStatsView() {
         </LazyMount>
         <LazyMount minHeight={300}>
           <SequencingMatrix data={sequenceMatrix} />
+        </LazyMount>
+        <LazyMount minHeight={320}>
+          <ArsenalRadar data={arsenalRadar} />
         </LazyMount>
       </div>
     </div>
