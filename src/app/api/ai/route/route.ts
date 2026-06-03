@@ -10,6 +10,10 @@ import {
   buildSequencingDrift,
   type DriftPitch,
 } from "@/lib/pitch/sequencingDrift";
+import {
+  buildArsenalShape,
+  type ShapePitch,
+} from "@/lib/pitch/arsenalShape";
 
 export const maxDuration = 30;
 
@@ -366,6 +370,63 @@ export async function POST(request: Request) {
             };
           },
         }),
+        get_pitcher_arsenal_shape: tool({
+          description:
+            "Return per-pitch-type shape data the user is staring at on the stats page: release-point centroid + spread (the Release point cluster card), vertical approach angle (the VAA bars card), and plate-location centroid + in-zone share (the Locations heat map). Use this whenever the user asks about ANY of those three cards — 'what does the release cloud show here', 'is his release tunneled', 'how steep is his curve', 'where does he live with his slider', 'is he in the zone with the fastball'. Each pitch type returns: release_x_avg / release_z_avg / release_x_spread / release_z_spread (ft), vaa_avg (deg, negative = descending), plate_x_avg / plate_z_avg (ft; plate_x positive = third-base side from catcher POV), in_zone_pct. Reply with a 2-3 sentence read using the actual numbers — translate plate_x to arm-side / glove-side using `pitcher_throws`. Do NOT navigate.",
+          inputSchema: z.object({
+            pitcher_id: z.number().int(),
+            season: z
+              .number()
+              .int()
+              .optional()
+              .describe("Defaults to the current MLB season."),
+          }),
+          execute: async ({ pitcher_id, season }) => {
+            const s = season ?? new Date().getFullYear();
+            const [{ data: pitcher }, { data, error }] = await Promise.all([
+              supabase
+                .from("pitch_pitchers")
+                .select("throws")
+                .eq("mlb_id", pitcher_id)
+                .maybeSingle(),
+              supabase
+                .from("pitch_game_pitches")
+                .select(
+                  "pitch_type, release_pos_x, release_pos_z, plate_x, plate_z, vy0, vz0, az, pitch_games!inner(season, game_type)",
+                )
+                .eq("pitcher_id", pitcher_id)
+                .eq("pitch_games.season", s)
+                .eq("pitch_games.game_type", "R")
+                .range(0, 4999),
+            ]);
+            if (error) return { error: error.message };
+            const rows = (data ?? []) as ShapePitch[];
+            const throws =
+              pitcher?.throws === "L" || pitcher?.throws === "R"
+                ? pitcher.throws
+                : null;
+            const shape = buildArsenalShape(rows, throws);
+            // Round to a single decimal so the model isn't tempted to
+            // quote spurious precision back to the user.
+            return {
+              season: s,
+              pitcher_throws: shape.pitcher_throws,
+              pitch_types: shape.pitch_types.map((r) => ({
+                pitch_type: r.pitch_type,
+                label: r.label,
+                count: r.count,
+                release_x_avg: round1(r.release_x_avg),
+                release_z_avg: round1(r.release_z_avg),
+                release_x_spread: round2(r.release_x_spread),
+                release_z_spread: round2(r.release_z_spread),
+                vaa_avg: round1(r.vaa_avg),
+                plate_x_avg: round2(r.plate_x_avg),
+                plate_z_avg: round2(r.plate_z_avg),
+                in_zone_pct: Math.round(r.in_zone_pct),
+              })),
+            };
+          },
+        }),
         navigate: tool({
           description:
             "Send the user to a URL on pitchtracker. Always a relative path starting with /.",
@@ -392,6 +453,16 @@ export async function POST(request: Request) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+// Tool-output rounding helpers. Keeping reply numbers at one decimal
+// (or two for the fine-grained plate/release coords) keeps the model
+// from quoting spurious precision like "2.187 feet" back to the user.
+function round1(n: number | null): number | null {
+  return n == null ? null : Math.round(n * 10) / 10;
+}
+function round2(n: number | null): number | null {
+  return n == null ? null : Math.round(n * 100) / 100;
 }
 
 // Given the URL the user is currently on, look up the "active pitcher"
