@@ -535,28 +535,17 @@ function TunnelToggle({
     <>
       <div className="absolute bottom-20 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
         <div className="flex items-center gap-1">
-          <button
-            type="button"
+          <OverlayToggleButton
+            active={active}
             onClick={onToggle}
-            aria-pressed={active}
-            className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors ${
-              active
-                ? "bg-[#5fc7d8]/20 border-[#5fc7d8]/45 text-white"
-                : "bg-[#081a32]/80 border-white/10 text-white/65 hover:text-white hover:bg-[#0e2a4d]/80"
-            }`}
             title="Show the pitch-tunnel envelope across the current pitch types."
-          >
-            Tunnel {active ? "on" : "off"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setHelpOpen(true)}
-            aria-label="What is pitch tunneling?"
-            className="w-7 h-7 rounded-full text-[12px] font-semibold backdrop-blur-md border bg-[#081a32]/80 border-white/10 text-white/65 hover:text-white hover:bg-[#0e2a4d]/80 transition-colors flex items-center justify-center"
+            label="Tunnel"
+          />
+          <OverlayHelpButton
+            ariaLabel="What is pitch tunneling?"
             title="How tunneling is calculated"
-          >
-            ?
-          </button>
+            onClick={() => setHelpOpen(true)}
+          />
         </div>
         {unavailable ? (
           <span className="text-[10px] text-amber-300/85 px-2 py-0.5 rounded bg-black/40 backdrop-blur-sm">
@@ -566,6 +555,97 @@ function TunnelToggle({
       </div>
       {helpOpen ? <TunnelHelp onClose={() => setHelpOpen(false)} /> : null}
     </>
+  );
+}
+
+// Shared button shape for the scene-chrome overlay toggles (Tunnel,
+// Heat, future siblings). State is read at a glance from the
+// checkbox glyph on the right; the body color shifts from muted dark
+// (off, "inactive") to cyan-glow (on, "active").
+function OverlayToggleButton({
+  active,
+  onClick,
+  label,
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-md text-[11px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors ${
+        active
+          ? "bg-[#5fc7d8]/25 border-[#5fc7d8]/55 text-white"
+          : "bg-[#081a32]/45 border-white/10 text-white/45 hover:text-white/85 hover:bg-[#0e2a4d]/70 hover:border-white/20"
+      }`}
+      title={title}
+    >
+      <span>{label}</span>
+      <CheckboxGlyph checked={active} />
+    </button>
+  );
+}
+
+function OverlayHelpButton({
+  ariaLabel,
+  title,
+  onClick,
+}: {
+  ariaLabel: string;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={title}
+      className="w-7 h-7 rounded-full text-[12px] font-semibold backdrop-blur-md border bg-[#081a32]/45 border-white/10 text-white/55 hover:text-white hover:bg-[#0e2a4d]/70 hover:border-white/20 transition-colors flex items-center justify-center"
+    >
+      ?
+    </button>
+  );
+}
+
+// Inline checkbox icon — empty square for off, square + checkmark
+// for on. `currentColor` picks up the button's text color so it
+// shifts with the rest of the button state.
+function CheckboxGlyph({ checked }: { checked: boolean }) {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+      className="flex-shrink-0"
+    >
+      <rect
+        x="1.75"
+        y="1.75"
+        width="12.5"
+        height="12.5"
+        rx="2.25"
+        stroke="currentColor"
+        strokeOpacity={checked ? 0.95 : 0.55}
+        strokeWidth="1.5"
+      />
+      {checked ? (
+        <path
+          d="M4.25 8.5 L7 11.25 L11.75 5.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : null}
+    </svg>
   );
 }
 
@@ -581,33 +661,24 @@ function HeatToggle({
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const active = metric !== null;
-  const label = active ? `Heat: ${HEAT_METRIC_LABELS[metric].replace(" %", "")}` : "Heat off";
+  const label = active
+    ? `Heat: ${HEAT_METRIC_LABELS[metric].replace(" %", "")}`
+    : "Heat";
   return (
     <>
       <div className="absolute bottom-32 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
         <div className="flex items-center gap-1">
-          <button
-            type="button"
+          <OverlayToggleButton
+            active={active}
             onClick={onToggle}
-            aria-pressed={active}
-            className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors ${
-              active
-                ? "bg-[#5fc7d8]/20 border-[#5fc7d8]/45 text-white"
-                : "bg-[#081a32]/80 border-white/10 text-white/65 hover:text-white hover:bg-[#0e2a4d]/80"
-            }`}
+            label={label}
             title="Show a per-zone heat grid across the current pitch selection."
-          >
-            {label}
-          </button>
-          <button
-            type="button"
-            onClick={() => setHelpOpen(true)}
-            aria-label="What is the heat grid?"
-            className="w-7 h-7 rounded-full text-[12px] font-semibold backdrop-blur-md border bg-[#081a32]/80 border-white/10 text-white/65 hover:text-white hover:bg-[#0e2a4d]/80 transition-colors flex items-center justify-center"
+          />
+          <OverlayHelpButton
+            ariaLabel="What is the heat grid?"
             title="How the heat grid works"
-          >
-            ?
-          </button>
+            onClick={() => setHelpOpen(true)}
+          />
         </div>
       </div>
       {helpOpen ? (
