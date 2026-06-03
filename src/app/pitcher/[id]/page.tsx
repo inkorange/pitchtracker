@@ -507,12 +507,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                 available={availableSeasons.length ? availableSeasons : [season]}
               />
 
-              {/* Arsenal / Stats mode toggle. Hidden during at-bat
-                  playback (the toggle reads ?abGame + ?abNum and
-                  bails on its own). */}
-              <FiltersGate>
-                <StatsModeToggle />
-              </FiltersGate>
+              {/* Arsenal / Stats mode toggle. Rendered OUTSIDE
+                  FiltersGate — the view toggle is not a per-side
+                  filter and must stay reachable in at-bat playback so
+                  the user can flip over to the batter-scoped stats
+                  view without losing the AB context. */}
+              <StatsModeToggle />
             </>
           }
           body={
