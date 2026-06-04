@@ -449,6 +449,8 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
             when it doesn't. */}
         <PitcherMatchupsSidebar
           gamePk={gamePkN}
+          pitcherId={pitcherId}
+          season={game?.season ?? null}
           currentAbN={atBatN}
           allPitcherAbs={pitcherAbDisplay}
         />

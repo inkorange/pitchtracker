@@ -35,12 +35,16 @@ export interface PitcherAbDisplay {
 
 interface Props {
   gamePk: number;
+  pitcherId: number | null;
+  season: number | null;
   currentAbN: number;
   allPitcherAbs: PitcherAbDisplay[];
 }
 
 export function PitcherMatchupsSidebar({
   gamePk,
+  pitcherId,
+  season,
   currentAbN,
   allPitcherAbs,
 }: Props) {
@@ -124,10 +128,43 @@ export function PitcherMatchupsSidebar({
     }
   }, [currentAbN, filtered]);
 
-  if (allPitcherAbs.length <= 1) return null;
+  // No pitcher resolved (rare — usually only when a Savant CSV row's
+  // pitcher_id is missing) and no at-bats to browse: nothing useful to
+  // render in this slot.
+  if (pitcherId == null && allPitcherAbs.length <= 1) return null;
+
+  // Both buttons land on the pitcher page; only the `game` query param
+  // differs ("Go to Game" filters to this game; "Exit At Bat Mode"
+  // shows the full season).
+  const seasonPart = season != null ? `season=${season}` : "";
+  const goToGameQs = [seasonPart, `game=${gamePk}`].filter(Boolean).join("&");
+  const goToGameHref =
+    pitcherId != null ? `/pitcher/${pitcherId}?${goToGameQs}` : null;
+  const exitAtBatHref =
+    pitcherId != null
+      ? `/pitcher/${pitcherId}${seasonPart ? `?${seasonPart}` : ""}`
+      : null;
 
   return (
     <div className="flex-1 min-h-0 flex flex-col mt-2 sm:mt-4">
+      {goToGameHref && exitAtBatHref ? (
+        <div className="flex items-stretch gap-2 mb-2">
+          <Link
+            href={goToGameHref}
+            className="flex-1 text-center px-2 py-1 rounded text-[10px] uppercase tracking-[0.14em] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-white/85 hover:text-white transition-colors"
+          >
+            Go to Game
+          </Link>
+          <Link
+            href={exitAtBatHref}
+            className="flex-1 text-center px-2 py-1 rounded text-[10px] uppercase tracking-[0.14em] bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-white/85 hover:text-white transition-colors"
+          >
+            Exit At Bat Mode
+          </Link>
+        </div>
+      ) : null}
+      {allPitcherAbs.length <= 1 ? null : (
+        <>
       <div className="mb-2">
         <AtBatResultFilter
           active={active}
@@ -207,6 +244,8 @@ export function PitcherMatchupsSidebar({
           })}
         </ul>
       </MatchupsCollapse>
+        </>
+      )}
     </div>
   );
 }
