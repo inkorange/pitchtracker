@@ -252,20 +252,18 @@ async function fetchArsenalRadar(
   pitcherId: number,
   season: number,
 ): Promise<ArsenalRadar | null> {
-  // Pull every pitcher × pitch_type aggregate for the season above
-  // the league sample-size floor, then bucket per-pitch-type so we
-  // can compute percentiles in JS — Supabase RPC isn't strictly
-  // necessary for a one-shot computation this small.
-  const { data, error } = await supabase
-    .from("pitch_pitcher_aggregates")
-    .select(
-      "pitcher_id, pitch_type, avg_velocity, avg_spin_rate, avg_induced_vertical_break, avg_horizontal_break, whiff_rate, pitch_count",
-    )
-    .eq("season", season)
-    .eq("batter_hand", "*")
-    .gte("pitch_count", MIN_LEAGUE_PITCHES);
-  if (error || !data) return null;
-
+  // Split into two queries so neither runs up against PostgREST's
+  // hard 1000-row server-side cap (which `.range(0, 9999)` does NOT
+  // bypass — the cap is enforced by the server-side `max-rows`
+  // config). The season-wide '*' aggregate pool sits at ~3,200 rows
+  // total, so the previous "fetch everything then filter to this
+  // pitcher in JS" pattern silently truncated half the league and
+  // dropped pitcher 694973's rows entirely.
+  //
+  // Step 1: pitcher's own rows. Always tiny (one per pitch type the
+  // pitcher throws, ≤10 in practice), no cap risk. No SQL sample
+  // floor — even sub-25 pitch types get a radar entry; the
+  // MIN_LEAGUE_PITCHES filter applies only to the percentile pool.
   type Row = {
     pitcher_id: number;
     pitch_type: string | null;
@@ -276,26 +274,47 @@ async function fetchArsenalRadar(
     whiff_rate: number | null;
     pitch_count: number | null;
   };
-  const rows = data as Row[];
-
-  // Bucket all rows by pitch_type. We need every league row to
-  // compute percentile rank for THIS pitcher's row.
-  const byType = new Map<string, Row[]>();
-  for (const r of rows) {
-    if (!r.pitch_type) continue;
-    const arr = byType.get(r.pitch_type) ?? [];
-    arr.push(r);
-    byType.set(r.pitch_type, arr);
+  const select =
+    "pitcher_id, pitch_type, avg_velocity, avg_spin_rate, avg_induced_vertical_break, avg_horizontal_break, whiff_rate, pitch_count";
+  const { data: mineData, error: mineErr } = await supabase
+    .from("pitch_pitcher_aggregates")
+    .select(select)
+    .eq("pitcher_id", pitcherId)
+    .eq("season", season)
+    .eq("batter_hand", "*");
+  if (mineErr || !mineData) return null;
+  const mine = (mineData as Row[])
+    .filter((r) => r.pitch_type)
+    .sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
+  if (mine.length === 0) {
+    return { pitches: [], minPitchesForLeague: MIN_LEAGUE_PITCHES };
   }
 
-  // The pitcher's own rows, in display order — most-thrown first so
-  // the small-multiples render the busiest pitches first.
-  const mine = rows
-    .filter((r) => r.pitcher_id === pitcherId)
-    .sort((a, b) => (b.pitch_count ?? 0) - (a.pitch_count ?? 0));
+  // Step 2: league percentile pool, fetched per pitch_type the
+  // pitcher actually throws. The largest single pitch type has ~600
+  // pitchers in the season — safely under the row cap — and only
+  // running the queries we need is faster than always pulling 3,200
+  // rows. Parallel fan-out so the radar latency stays close to one
+  // round-trip.
+  const myTypes = Array.from(
+    new Set(mine.map((r) => r.pitch_type!).filter(Boolean)),
+  );
+  const poolByType = new Map<string, Row[]>();
+  await Promise.all(
+    myTypes.map(async (pt) => {
+      const { data } = await supabase
+        .from("pitch_pitcher_aggregates")
+        .select(select)
+        .eq("season", season)
+        .eq("batter_hand", "*")
+        .eq("pitch_type", pt)
+        .gte("pitch_count", MIN_LEAGUE_PITCHES);
+      poolByType.set(pt, (data ?? []) as Row[]);
+    }),
+  );
 
   const out: RadarPitch[] = mine.map((row) => {
-    const pool = byType.get(row.pitch_type!) ?? [];
+    const pool = poolByType.get(row.pitch_type!) ?? [];
     const raw: Record<RadarAxis, number | null> = {
       velo: row.avg_velocity,
       spin: row.avg_spin_rate,
