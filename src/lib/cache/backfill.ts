@@ -176,12 +176,17 @@ async function doEnsure(
     await supabase.from("pitch_pitcher_games").upsert(chunk);
   }
 
-  // Recompute aggregates so the arsenal panel populates. Cron callers
+  // Recompute aggregates so the arsenal panel populates. Scoped to
+  // this pitcher × season so it walks ~3K rows instead of the full
+  // ~865K table — a per-game backfill firing the unscoped recompute
+  // was what drove the disk-IO spike on 2026-06-04. Cron callers
   // pass skipRecompute=true and rely on the dedicated refresh-aggregates
-  // cron — recomputing per-pitcher inside a batch loop is what was
-  // pushing the precache function over its timeout.
+  // cron.
   if (!skipRecompute) {
-    await supabase.rpc("pitch_recompute_aggregates");
+    await supabase.rpc("pitch_recompute_aggregates", {
+      p_pitcher_id: pitcherId,
+      p_season: season,
+    });
   }
 }
 
@@ -191,18 +196,21 @@ async function doEnsure(
 // "no pitches" stub. Also called by the precache-recent-games cron
 // with force=true to re-pull today/yesterday's games (in case the
 // earlier fetch landed mid-game and missed late innings).
+//
+// Does not refresh pitch_pitcher_aggregates: the only at-bat
+// consumers (the game / at-bat pages) read raw pitches from
+// pitch_game_pitches and never touch the aggregates table. The
+// daily refresh-aggregates cron picks up the newly-cached pitches.
 export async function ensureGameCache(
   gamePk: number,
-  opts: { force?: boolean; skipRecompute?: boolean } = {},
+  opts: { force?: boolean } = {},
 ): Promise<void> {
   const key = `game:${gamePk}:${opts.force ? "force" : "lazy"}`;
   const existing = inFlight.get(key);
   if (existing) return existing;
-  const p = doEnsureGame(
-    gamePk,
-    opts.force === true,
-    opts.skipRecompute === true,
-  ).finally(() => inFlight.delete(key));
+  const p = doEnsureGame(gamePk, opts.force === true).finally(() =>
+    inFlight.delete(key),
+  );
   inFlight.set(key, p);
   return p;
 }
@@ -210,7 +218,6 @@ export async function ensureGameCache(
 async function doEnsureGame(
   gamePk: number,
   force: boolean,
-  skipRecompute: boolean,
 ): Promise<void> {
   const supabase = createAdminClient();
 
@@ -328,12 +335,6 @@ async function doEnsureGame(
   for (let i = 0; i < ppgRows.length; i += 200) {
     const chunk = ppgRows.slice(i, i + 200);
     await supabase.from("pitch_pitcher_games").upsert(chunk);
-  }
-
-  // Same skip rule as the per-pitcher path: cron callers opt out so the
-  // batch loop doesn't pay 1× full recompute per game.
-  if (!skipRecompute) {
-    await supabase.rpc("pitch_recompute_aggregates");
   }
 }
 

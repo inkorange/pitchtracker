@@ -101,11 +101,10 @@ export async function GET(request: Request) {
           // mid-innings has a partial pitch set. Older games are
           // immutable, so the lazy short-circuit saves the Savant call.
           const force = forceAll || g.game_date >= forceCutoff;
-          // skipRecompute: aggregates are recomputed once at the end
-          // of the cron chain by /api/cron/refresh-aggregates; calling
-          // pitch_recompute_aggregates() per game would make the cron
-          // O(games × full-table-scan) and the run timed out at 504.
-          await ensureGameCache(g.game_pk, { force, skipRecompute: true });
+          // ensureGameCache no longer recomputes aggregates — the
+          // dedicated refresh-aggregates cron handles that at the
+          // end of the chain.
+          await ensureGameCache(g.game_pk, { force });
         } catch {
           failures += 1;
         }

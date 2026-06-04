@@ -34,7 +34,15 @@ async function main() {
     await Promise.all(
       batch.map(async (p) => {
         try {
-          await ensurePitcherSeasonCache(p.mlb_id, season);
+          // skipRecompute: the in-loop calls are followed by one
+          // explicit recompute at the end of this script. Without
+          // this flag each per-pitcher backfill would fire its own
+          // scoped recompute — fine in isolation, but redundant
+          // when we're going to walk every pitcher and then
+          // recompute the whole table anyway.
+          await ensurePitcherSeasonCache(p.mlb_id, season, {
+            skipRecompute: true,
+          });
         } catch (err) {
           failed += 1;
           console.warn(
@@ -52,8 +60,11 @@ async function main() {
   }
   console.log(`[precache] done. failed=${failed}`);
 
-  console.log(`[aggregates] recomputing…`);
-  const aggRes = await supabase.rpc("pitch_recompute_aggregates");
+  console.log(`[aggregates] recomputing season ${season}…`);
+  const aggRes = await supabase.rpc("pitch_recompute_aggregates", {
+    p_pitcher_id: null,
+    p_season: season,
+  });
   if (aggRes.error) throw new Error(aggRes.error.message);
   console.log(`[aggregates] done.`);
 

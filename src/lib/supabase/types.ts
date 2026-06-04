@@ -1066,7 +1066,10 @@ export type Database = {
         }
         Returns: number
       }
-      pitch_recompute_aggregates: { Args: never; Returns: undefined }
+      pitch_recompute_aggregates: {
+        Args: { p_pitcher_id?: number | null; p_season?: number | null }
+        Returns: undefined
+      }
       pitch_recompute_rankings: {
         Args: { p_season: number }
         Returns: undefined
