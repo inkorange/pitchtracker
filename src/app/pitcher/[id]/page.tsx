@@ -152,43 +152,71 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // × season yet, pull from Savant on demand. No-op once cached.
   await ensurePitcherSeasonCache(pitcherId, season);
 
-  // Single query scoped to active season: a Postgrest inner-join filter
-  // on pitch_games.season returns only this pitcher's pitches in this
-  // year, with the per-game metadata embedded for the dropdown. No
-  // cross-season fetch, no full-schedule materialization.
+  // Pitches scoped to the active season via a Postgrest inner-join
+  // filter on pitch_games.season. Per-game metadata is embedded so the
+  // game dropdown reads from one fetch.
+  //
+  // Paginated to bypass Supabase's hard 1000-row server-side cap
+  // (`db-max-rows`). `.range(0, N)` cannot raise the cap — the team
+  // already discovered this for the arsenal route (see
+  // src/app/api/pitcher/[id]/arsenal/route.ts:256). A starter with
+  // > 1000 pitches in the season would otherwise silently get a
+  // truncated result set and every in-JS-filtered count (HR events,
+  // arsenal aggregates, the "Rendering N pitches" badge) would be
+  // wrong — e.g. pitcher 642547 in 2026 has 1,242 pitches and the
+  // pre-fix combined fetch dropped 242 rows including two HRs.
+  //
+  // Ordered on the primary key so pages are stable across requests.
   type EmbeddedGame = {
     season: number;
     game_date: string;
     home_team_id: number | null;
     away_team_id: number | null;
   };
-  let pitchQuery = supabase
-    .from("pitch_game_pitches")
-    .select(
-      "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id, game_type)",
-    )
-    .eq("pitcher_id", pitcherId)
-    .eq("pitch_games.season", season)
-    .eq("pitch_games.game_type", "R")
-    .range(0, 4999);
-  if (sp.hand === "L" || sp.hand === "R") {
-    pitchQuery = pitchQuery.eq("stand", sp.hand);
-  }
-  if (sp.game) {
-    pitchQuery = pitchQuery.eq("game_pk", Number(sp.game));
-  }
-  // ?vsBatter: narrow the per-side arsenal aggregates (the per-pitch
-  // list with use% / velo in the pitcher card) to pitches thrown to
-  // the selected batter. Keeps the card in sync with the
-  // filter-summary banner ("All pitches vs <batter>") and with the
-  // 3D scene + stats view, which also respect this param.
-  if (sp.vsBatter && !Number.isNaN(Number(sp.vsBatter))) {
-    pitchQuery = pitchQuery.eq("batter_id", Number(sp.vsBatter));
+  const PITCH_SELECT =
+    "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_date, home_team_id, away_team_id, game_type)";
+  const PITCH_PAGE_SIZE = 1000;
+  // Soft safety cap. Today's heaviest starter season is ~3.5K pitches;
+  // 20 pages = 20K rows. If we ever hit this, something else is wrong.
+  const PITCH_MAX_PAGES = 20;
+
+  function buildPitchPageQuery(page: number) {
+    let q = supabase
+      .from("pitch_game_pitches")
+      .select(PITCH_SELECT)
+      .eq("pitcher_id", pitcherId)
+      .eq("pitch_games.season", season)
+      .eq("pitch_games.game_type", "R")
+      .order("game_pk", { ascending: true })
+      .order("at_bat_number", { ascending: true })
+      .order("pitch_number", { ascending: true })
+      .range(page * PITCH_PAGE_SIZE, (page + 1) * PITCH_PAGE_SIZE - 1);
+    if (sp.hand === "L" || sp.hand === "R") q = q.eq("stand", sp.hand);
+    if (sp.game) q = q.eq("game_pk", Number(sp.game));
+    // ?vsBatter: narrow the per-side arsenal aggregates (the per-pitch
+    // list with use% / velo in the pitcher card) to pitches thrown to
+    // the selected batter. Keeps the card in sync with the
+    // filter-summary banner ("All pitches vs <batter>") and with the
+    // 3D scene + stats view, which also respect this param.
+    if (sp.vsBatter && !Number.isNaN(Number(sp.vsBatter))) {
+      q = q.eq("batter_id", Number(sp.vsBatter));
+    }
+    return q;
   }
 
-  const { data: cachedPitchesRaw } = await pitchQuery;
-  const cachedPitches = cachedPitchesRaw as
-    | (NonNullable<typeof cachedPitchesRaw>[number] & { pitch_games?: EmbeddedGame })[]
+  type PitchPageRow = NonNullable<
+    Awaited<ReturnType<typeof buildPitchPageQuery>>["data"]
+  >[number];
+
+  const cachedPitchesAcc: PitchPageRow[] = [];
+  for (let page = 0; page < PITCH_MAX_PAGES; page++) {
+    const { data, error } = await buildPitchPageQuery(page);
+    if (error || !data) break;
+    cachedPitchesAcc.push(...(data as PitchPageRow[]));
+    if (data.length < PITCH_PAGE_SIZE) break;
+  }
+  const cachedPitches = cachedPitchesAcc as
+    | (PitchPageRow & { pitch_games?: EmbeddedGame })[]
     | null;
 
   // Arsenal totals come from the filter-but-no-pitch-type set so the chips
