@@ -63,33 +63,61 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // pulls from Savant before the SELECT below sees an empty cache.
   await ensurePitcherSeasonCache(pitcherId, season);
 
-  const [{ data: pitcher }, { data: pitchesRaw }] = await Promise.all([
-    supabase
-      .from("pitch_pitchers")
-      .select("mlb_id, full_name, last_name")
-      .eq("mlb_id", pitcherId)
-      .maybeSingle(),
-    (() => {
-      let q = supabase
-        .from("pitch_game_pitches")
-        .select(
-          "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, batter_id, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type, game_date)",
-        )
-        .eq("pitcher_id", pitcherId)
-        .eq("pitch_games.season", season)
-        .eq("pitch_games.game_type", "R")
-        .range(0, 4999);
-      if (hand === "L" || hand === "R") q = q.eq("stand", hand);
-      if (game) q = q.eq("game_pk", Number(game));
-      return q;
-    })(),
-  ]);
+  // Fire the pitcher metadata fetch in parallel with page 1 of the
+  // pitch pagination loop. We await pitcher after the loop finishes.
+  const pitcherPromise = supabase
+    .from("pitch_pitchers")
+    .select("mlb_id, full_name, last_name")
+    .eq("mlb_id", pitcherId)
+    .maybeSingle();
+
+  // Paginate the pitch fetch — Supabase enforces a hard 1000-row
+  // server-side cap (`db-max-rows`) that `.range(0, N)` does NOT
+  // bypass. PR #50 fixed this on src/app/pitcher/[id]/page.tsx; the
+  // same pattern is required here so the Stats view doesn't silently
+  // undercount above 1000 pitches.
+  //
+  // Ordered on the primary key so pages are stable across requests.
+  const PITCH_SELECT =
+    "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, batter_id, delta_run_exp, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type, game_date)";
+  const PITCH_PAGE_SIZE = 1000;
+  const PITCH_MAX_PAGES = 20;
+
+  function buildPitchPageQuery(page: number) {
+    let q = supabase
+      .from("pitch_game_pitches")
+      .select(PITCH_SELECT)
+      .eq("pitcher_id", pitcherId)
+      .eq("pitch_games.season", season)
+      .eq("pitch_games.game_type", "R")
+      .order("game_pk", { ascending: true })
+      .order("at_bat_number", { ascending: true })
+      .order("pitch_number", { ascending: true })
+      .range(page * PITCH_PAGE_SIZE, (page + 1) * PITCH_PAGE_SIZE - 1);
+    if (hand === "L" || hand === "R") q = q.eq("stand", hand);
+    if (game) q = q.eq("game_pk", Number(game));
+    return q;
+  }
+
+  type PitchRow = NonNullable<
+    Awaited<ReturnType<typeof buildPitchPageQuery>>["data"]
+  >[number];
+
+  const pitchesRaw: PitchRow[] = [];
+  for (let page = 0; page < PITCH_MAX_PAGES; page++) {
+    const { data, error } = await buildPitchPageQuery(page);
+    if (error || !data) break;
+    pitchesRaw.push(...(data as PitchRow[]));
+    if (data.length < PITCH_PAGE_SIZE) break;
+  }
+
+  const { data: pitcher } = await pitcherPromise;
 
   if (!pitcher) {
     return NextResponse.json({ error: "Pitcher not found" }, { status: 404 });
   }
 
-  const cached = pitchesRaw ?? [];
+  const cached = pitchesRaw;
   const outcomes = outcomesParam
     .split(",")
     .map((s) => s.trim())
