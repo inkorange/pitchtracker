@@ -96,6 +96,12 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       .range(page * PITCH_PAGE_SIZE, (page + 1) * PITCH_PAGE_SIZE - 1);
     if (hand === "L" || hand === "R") q = q.eq("stand", hand);
     if (game) q = q.eq("game_pk", Number(game));
+    // vsBatter is intentionally NOT filtered here. The 3D scene shell
+    // consumes this endpoint and needs the full season's pitches for
+    // its canvas. vsBatter is applied JS-side downstream (search this
+    // file for `p.batter_id !== vsBatter`) so the same response can
+    // serve both the batter-agnostic 3D scene and the batter-scoped
+    // stats view.
     return q;
   }
 
@@ -106,7 +112,10 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   const pitchesRaw: PitchRow[] = [];
   for (let page = 0; page < PITCH_MAX_PAGES; page++) {
     const { data, error } = await buildPitchPageQuery(page);
-    if (error || !data) break;
+    if (error || !data) {
+      console.error("[arsenal] pitch page", page, error);
+      break;
+    }
     pitchesRaw.push(...(data as PitchRow[]));
     if (data.length < PITCH_PAGE_SIZE) break;
   }
