@@ -57,7 +57,7 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
       >
         {/* 0° axis on the right */}
         <line x1={W - 24} y1={0} x2={W - 24} y2={totalH} stroke="rgba(255,255,255,0.18)" />
-        <text x={W - 22} y={10} fill="rgba(255,255,255,0.45)" fontSize={9}>0°</text>
+        <text x={W - 22} y={10} fill="rgba(255,255,255,0.45)" className="text-[9px]">0°</text>
         {usable.map((r, i) => {
           const vaa = r.vaa_mean!;
           const len = Math.min(W - 60, (Math.abs(vaa) / VAA_RANGE) * (W - 60));
@@ -79,7 +79,7 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
                 x={4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
-                fontSize={10}
+                className="text-[10px]"
                 dominantBaseline="middle"
               >
                 {getPitchLabel(r.pitch_type)}
@@ -89,7 +89,7 @@ export function VAABars({ rows }: { rows: PerPitchStats[] }) {
                 x={W - 28 - len + 4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
-                fontSize={10}
+                className="text-[10px]"
                 dominantBaseline="middle"
               >
                 {vaa.toFixed(1)}°

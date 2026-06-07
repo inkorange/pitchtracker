@@ -116,7 +116,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                 x={4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
-                fontSize={10}
+                className="text-[10px]"
                 dominantBaseline="middle"
               >
                 {getPitchLabel(r.pitch_type)}
@@ -125,7 +125,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                 x={labelCol - 4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.45)"
-                fontSize={9}
+                className="text-[9px]"
                 textAnchor="end"
                 dominantBaseline="middle"
               >
@@ -146,7 +146,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                 x={W - 4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
-                fontSize={10}
+                className="text-[10px]"
                 textAnchor="end"
                 dominantBaseline="middle"
               >
@@ -161,7 +161,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                       ? "rgba(255,180,120,0.85)"
                       : "rgba(255,255,255,0.40)"
                   }
-                  fontSize={8}
+                  className="text-[8px]"
                   textAnchor="end"
                   dominantBaseline="middle"
                 >
@@ -177,7 +177,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
           x={W - 4}
           y={totalH - 4}
           fill="rgba(255,255,255,0.75)"
-          fontSize={10}
+          className="text-[10px]"
           textAnchor="end"
           dominantBaseline="middle"
         >
