@@ -24,8 +24,8 @@ export interface StatPitch {
   az: number | null;
   // Statcast run expectancy delta from the offense's point of view.
   // Negative = pitch reduced offensive run expectancy = good for the
-  // pitcher. RunValueCard sums `-delta_run_exp` so positive numbers
-  // mean "saved runs".
+  // pitcher. Callers sum `-delta_run_exp` so positive numbers mean
+  // "saved runs".
   delta_run_exp: number | null;
 }
 
@@ -85,6 +85,11 @@ export interface AggregatedStats {
   total: TotalStats;
   perPitch: PerPitchStats[];
 }
+
+/** Minimum pitch count with a known delta_run_exp before the /100 rate
+ *  is reliable enough to display. Below this the bucket's rv_per_100
+ *  is suppressed (set to null); rv_sum is still shown. */
+export const RV_PER_100_MIN_N = 10;
 
 export function aggregate(rows: StatPitch[]): AggregatedStats {
   const buckets = new Map<
@@ -154,11 +159,6 @@ export function aggregate(rows: StatPitch[]): AggregatedStats {
     (acc, b) => acc + b.pitches,
     0,
   );
-
-  // Pitches per bucket below this floor have too noisy a rate to
-  // show. The total (`rv_sum`) is still meaningful — it's the season
-  // impact in raw runs — so only `rv_per_100` is suppressed.
-  const RV_PER_100_MIN_N = 10;
 
   const perPitch: PerPitchStats[] = Array.from(buckets.entries())
     .map(([pitch_type, b]) => {

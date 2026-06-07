@@ -80,6 +80,15 @@ describe("aggregate – run value", () => {
     expect(perPitch[0].rv_per_100).toBeNull();
   });
 
+  it("shows rv_per_100 at exactly rv_n = 10 (boundary is inclusive)", () => {
+    const rows = Array.from({ length: 10 }, () =>
+      pitch({ pitch_type: "CH", delta_run_exp: -0.05 }),
+    );
+    const { perPitch } = aggregate(rows);
+    expect(perPitch[0].rv_n).toBe(10);
+    expect(perPitch[0].rv_per_100).toBeCloseTo(5.0, 5);
+  });
+
   it("yields rv_n=0 and rv_sum=null when every delta_run_exp is null", () => {
     const rows = [
       pitch({ pitch_type: "FF", delta_run_exp: null }),
