@@ -450,28 +450,29 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // comes from the MLB boxscore (matches what fans see on MLB.com);
   // XBH is derived from our cached pitch events for this pitcher in
   // this game, since boxscore pitching stats don't break out 2B/3B.
+  //
+  // The XBH count must be GAME-SCOPED, not URL-filter-scoped — `HR` on
+  // the panel comes from the boxscore (unfiltered) so deriving XBH
+  // from the already-?hand/?pitch-narrowed `cachedPitches` produced
+  // the impossible HR=1 / XBH=0 case when the HR was hit by a batter
+  // outside the chip filter. Issue a dedicated query that ignores
+  // the URL chips and just asks: "in this game, how many 2B/3B/HR
+  // events did this pitcher give up?"
   let gameLine: MlbPitcherGameLine | null = null;
   let xbhInGame = 0;
   if (sp.game && activeGameInfo) {
     const activeGamePk = Number(sp.game);
-    try {
-      gameLine = await fetchPitcherGameLine(activeGamePk, pitcherId);
-    } catch {
-      // Network blip — render without the line. Stats panel is hidden.
-    }
-    if (cachedPitches) {
-      for (const p of cachedPitches) {
-        if (
-          p.game_pk === activeGamePk &&
-          p.events != null &&
-          (p.events === "double" ||
-            p.events === "triple" ||
-            p.events === "home_run")
-        ) {
-          xbhInGame += 1;
-        }
-      }
-    }
+    const [lineRes, xbhRes] = await Promise.all([
+      fetchPitcherGameLine(activeGamePk, pitcherId).catch(() => null),
+      supabase
+        .from("pitch_game_pitches")
+        .select("events", { count: "exact", head: true })
+        .eq("pitcher_id", pitcherId)
+        .eq("game_pk", activeGamePk)
+        .in("events", ["double", "triple", "home_run"]),
+    ]);
+    gameLine = lineRes;
+    xbhInGame = xbhRes.count ?? 0;
   }
 
   const filterSummary = buildFilterSummary({
