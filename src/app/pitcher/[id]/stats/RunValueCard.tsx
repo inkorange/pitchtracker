@@ -12,7 +12,7 @@ import { StatCard } from "./StatCard";
 // fills the row. Per-100 cell is muted secondary text and is hidden
 // when rv_n < RV_PER_100_MIN_N (suppressed by aggregations).
 const W = 320;
-const ROW_H = 22;
+const ROW_H = 30;
 // Below this rate (runs per 100 pitches lost), show a warning glyph.
 // Half a run per 100 thrown is bad; 1.0+ is the "this pitch is
 // actively costing him games" threshold.
@@ -68,6 +68,9 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
   // the longest bar fills the row. Half the chart width is available
   // to each side (left for "allowed" / right for "saved").
   const maxAbs = Math.max(...sorted.map((r) => Math.abs(r.rv_sum)));
+  // 28 = footer area: 16 SVG units of clearance above the footer text
+  // (so the zero line doesn't run into the Net label) + 12 for the
+  // footer text row itself.
   const totalH = sorted.length * ROW_H + 28;
   const labelCol = 56; // left-edge text (pitch label + count)
   const valueCol = 96; // right-edge text (total + /100)
@@ -89,7 +92,8 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
         style={{ aspectRatio: `${W} / ${totalH}` }}
         className="block font-sans"
       >
-        {/* Zero line */}
+        {/* Zero line terminates 16 units above the SVG bottom so it
+            doesn't visually collide with the Net footer text. */}
         <line
           x1={zeroX}
           y1={0}
@@ -112,7 +116,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                 x={4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
-                fontSize={10}
+                className="text-[10px]"
                 dominantBaseline="middle"
               >
                 {getPitchLabel(r.pitch_type)}
@@ -121,7 +125,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                 x={labelCol - 4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.45)"
-                fontSize={9}
+                className="text-[9px]"
                 textAnchor="end"
                 dominantBaseline="middle"
               >
@@ -142,7 +146,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                 x={W - 4}
                 y={y + (ROW_H - 8) / 2}
                 fill="rgba(255,255,255,0.85)"
-                fontSize={10}
+                className="text-[10px]"
                 textAnchor="end"
                 dominantBaseline="middle"
               >
@@ -157,7 +161,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
                       ? "rgba(255,180,120,0.85)"
                       : "rgba(255,255,255,0.40)"
                   }
-                  fontSize={8}
+                  className="text-[8px]"
                   textAnchor="end"
                   dominantBaseline="middle"
                 >
@@ -173,7 +177,7 @@ export function RunValueCard({ rows }: { rows: PerPitchStats[] }) {
           x={W - 4}
           y={totalH - 4}
           fill="rgba(255,255,255,0.75)"
-          fontSize={10}
+          className="text-[10px]"
           textAnchor="end"
           dominantBaseline="middle"
         >

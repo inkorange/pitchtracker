@@ -11,6 +11,7 @@ import { ArsenalCard } from "./stats/ArsenalCard";
 import { MovementPlot } from "./stats/MovementPlot";
 import { VelocityHistograms } from "./stats/VelocityHistograms";
 import { ReleaseCluster } from "./stats/ReleaseCluster";
+import { RunValueCard } from "./stats/RunValueCard";
 import { HeatMapGrid } from "./stats/HeatMapGrid";
 import { VAABars } from "./stats/VAABars";
 import { SequencingMatrix } from "./stats/SequencingMatrix";
@@ -235,6 +236,9 @@ export function PitcherStatsView({
         </LazyMount>
         <LazyMount minHeight={220}>
           <VAABars rows={aggregated.perPitch} />
+        </LazyMount>
+        <LazyMount minHeight={260}>
+          <RunValueCard rows={aggregated.perPitch} />
         </LazyMount>
       </div>
     </div>
