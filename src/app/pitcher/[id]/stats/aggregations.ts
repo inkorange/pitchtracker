@@ -22,6 +22,11 @@ export interface StatPitch {
   vy0: number | null;
   vz0: number | null;
   az: number | null;
+  // Statcast run expectancy delta from the offense's point of view.
+  // Negative = pitch reduced offensive run expectancy = good for the
+  // pitcher. Callers sum `-delta_run_exp` so positive numbers mean
+  // "saved runs".
+  delta_run_exp: number | null;
 }
 
 /**
@@ -60,6 +65,14 @@ export interface PerPitchStats {
   csw_pct: number; // (called + swinging strikes) / pitches
   whiff_pct: number; // swinging strikes / pitches
   vaa_mean: number | null;
+  // Run-value math (RunValueCard). Pitcher frame: rv_sum is sum of
+  // -delta_run_exp across pitches in the bucket, so positive = saves
+  // runs. rv_n is the count of pitches whose delta_run_exp was
+  // non-null (denominator for /100). rv_per_100 is suppressed (null)
+  // when rv_n < 10 — too noisy to display.
+  rv_sum: number | null;
+  rv_per_100: number | null;
+  rv_n: number;
 }
 
 export interface TotalStats {
@@ -73,6 +86,11 @@ export interface AggregatedStats {
   perPitch: PerPitchStats[];
 }
 
+/** Minimum pitch count with a known delta_run_exp before the /100 rate
+ *  is reliable enough to display. Below this the bucket's rv_per_100
+ *  is suppressed (set to null); rv_sum is still shown. */
+export const RV_PER_100_MIN_N = 10;
+
 export function aggregate(rows: StatPitch[]): AggregatedStats {
   const buckets = new Map<
     string,
@@ -85,6 +103,8 @@ export function aggregate(rows: StatPitch[]): AggregatedStats {
       whiff: number;
       vaaSum: number;
       vaaN: number;
+      rvSum: number;
+      rvN: number;
     }
   >();
   let totalCalled = 0;
@@ -102,6 +122,8 @@ export function aggregate(rows: StatPitch[]): AggregatedStats {
         whiff: 0,
         vaaSum: 0,
         vaaN: 0,
+        rvSum: 0,
+        rvN: 0,
       };
       buckets.set(p.pitch_type, b);
     }
@@ -124,6 +146,13 @@ export function aggregate(rows: StatPitch[]): AggregatedStats {
       b.vaaSum += vaa;
       b.vaaN += 1;
     }
+    // Run value, pitcher frame: -delta_run_exp. Skip nulls in BOTH
+    // numerator (sum) and denominator (count) so the /100 rate
+    // reflects only pitches whose RV is actually known.
+    if (p.delta_run_exp != null && Number.isFinite(p.delta_run_exp)) {
+      b.rvSum += -p.delta_run_exp;
+      b.rvN += 1;
+    }
   }
 
   const totalPitches = Array.from(buckets.values()).reduce(
@@ -139,6 +168,9 @@ export function aggregate(rows: StatPitch[]): AggregatedStats {
           ? Math.max(0, b.veloSumSq / b.veloN - (veloMean ?? 0) ** 2)
           : null;
       const veloStd = veloVar != null ? Math.sqrt(veloVar) : null;
+      const rvSum = b.rvN > 0 ? b.rvSum : null;
+      const rvPer100 =
+        b.rvN >= RV_PER_100_MIN_N ? (b.rvSum / b.rvN) * 100 : null;
       return {
         pitch_type,
         pitches: b.pitches,
@@ -148,6 +180,9 @@ export function aggregate(rows: StatPitch[]): AggregatedStats {
         csw_pct: b.pitches > 0 ? ((b.called + b.whiff) / b.pitches) * 100 : 0,
         whiff_pct: b.pitches > 0 ? (b.whiff / b.pitches) * 100 : 0,
         vaa_mean: b.vaaN > 0 ? b.vaaSum / b.vaaN : null,
+        rv_sum: rvSum,
+        rv_per_100: rvPer100,
+        rv_n: b.rvN,
       };
     })
     .sort((a, b) => b.pitches - a.pitches);
