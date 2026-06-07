@@ -80,7 +80,7 @@ export function VelocityHistograms({
           const color = getPitchColor(r.pitch_type);
           return (
             <div key={r.pitch_type} className="space-y-1">
-              <div className="flex items-baseline justify-between text-[10px]">
+              <div className="flex items-baseline justify-between text-[11px]">
                 <span className="text-white/85 truncate">
                   {getPitchLabel(r.pitch_type)}
                 </span>

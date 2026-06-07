@@ -104,4 +104,21 @@ describe("aggregate – run value", () => {
     const { perPitch } = aggregate([]);
     expect(perPitch).toEqual([]);
   });
+
+  it("buckets distinct pitch types separately with correct per-bucket rv math", () => {
+    // 1 FF that saved 0.1 runs, 1 SL that gave up 0.2 runs.
+    // Each should land in its own bucket with the correct
+    // pitcher-frame sign.
+    const rows = [
+      pitch({ pitch_type: "FF", delta_run_exp: -0.1 }),
+      pitch({ pitch_type: "SL", delta_run_exp: 0.2 }),
+    ];
+    const { perPitch } = aggregate(rows);
+    expect(perPitch).toHaveLength(2);
+    const byType = new Map(perPitch.map((p) => [p.pitch_type, p]));
+    expect(byType.get("FF")?.rv_sum).toBeCloseTo(0.1, 5);
+    expect(byType.get("FF")?.rv_n).toBe(1);
+    expect(byType.get("SL")?.rv_sum).toBeCloseTo(-0.2, 5);
+    expect(byType.get("SL")?.rv_n).toBe(1);
+  });
 });
