@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPerson, fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, personHeadshotUrl } from "@/lib/viz/headshot";
+import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { eventPillColor } from "@/lib/viz/colors";
@@ -264,7 +265,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
               </div>
               {pitcher ? (
                 <Link
-                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}&game=${gamePkN}`}
+                  href={`${pitcherPagePath(pitcher.mlb_id, pitcher.full_name)}?season=${game?.season ?? ""}&game=${gamePkN}`}
                   className="text-sm font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
                 >
                   {pitcher.full_name}
@@ -327,7 +328,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
             <div className="min-w-0 flex-1">
               {pitcher ? (
                 <Link
-                  href={`/pitcher/${pitcher.mlb_id}?season=${game?.season ?? ""}&game=${gamePkN}`}
+                  href={`${pitcherPagePath(pitcher.mlb_id, pitcher.full_name)}?season=${game?.season ?? ""}&game=${gamePkN}`}
                   className="text-xs font-medium text-white truncate hover:underline underline-offset-2 decoration-white/40 block"
                 >
                   {pitcher.full_name}
@@ -450,6 +451,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         <PitcherMatchupsSidebar
           gamePk={gamePkN}
           pitcherId={pitcherId}
+          pitcherName={pitcher?.full_name ?? null}
           season={game?.season ?? null}
           currentAbN={atBatN}
           allPitcherAbs={pitcherAbDisplay}

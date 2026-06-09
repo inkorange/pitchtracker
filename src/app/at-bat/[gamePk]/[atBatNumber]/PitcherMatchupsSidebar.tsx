@@ -13,6 +13,7 @@ import {
 import { AtBatResultFilter } from "@/components/filters/AtBatResultFilter";
 import { eventPillColor } from "@/lib/viz/colors";
 import { personHeadshotUrl } from "@/lib/viz/headshot";
+import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { MatchupsCollapse } from "./MatchupsCollapse";
 
 // Client-side sidebar for the at-bat replay page. Owns the `?event=`
@@ -36,6 +37,7 @@ export interface PitcherAbDisplay {
 interface Props {
   gamePk: number;
   pitcherId: number | null;
+  pitcherName: string | null;
   season: number | null;
   currentAbN: number;
   allPitcherAbs: PitcherAbDisplay[];
@@ -44,6 +46,7 @@ interface Props {
 export function PitcherMatchupsSidebar({
   gamePk,
   pitcherId,
+  pitcherName,
   season,
   currentAbN,
   allPitcherAbs,
@@ -135,14 +138,22 @@ export function PitcherMatchupsSidebar({
 
   // Both buttons land on the pitcher page; only the `game` query param
   // differs ("Go to Game" filters to this game; "Exit At Bat Mode"
-  // shows the full season).
+  // shows the full season). If we have the pitcher's name in scope,
+  // use the canonical slugged URL; otherwise fall back to the id-only
+  // form (which 308-redirects to the slugged URL).
   const seasonPart = season != null ? `season=${season}` : "";
   const goToGameQs = [seasonPart, `game=${gamePk}`].filter(Boolean).join("&");
-  const goToGameHref =
-    pitcherId != null ? `/pitcher/${pitcherId}?${goToGameQs}` : null;
-  const exitAtBatHref =
+  const pitcherBase =
     pitcherId != null
-      ? `/pitcher/${pitcherId}${seasonPart ? `?${seasonPart}` : ""}`
+      ? pitcherName
+        ? pitcherPagePath(pitcherId, pitcherName)
+        : `/pitcher/${pitcherId}`
+      : null;
+  const goToGameHref =
+    pitcherBase != null ? `${pitcherBase}?${goToGameQs}` : null;
+  const exitAtBatHref =
+    pitcherBase != null
+      ? `${pitcherBase}${seasonPart ? `?${seasonPart}` : ""}`
       : null;
 
   return (

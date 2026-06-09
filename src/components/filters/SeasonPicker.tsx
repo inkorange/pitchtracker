@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { TransitionOverlay } from "@/components/feedback/TransitionOverlay";
 
@@ -13,14 +13,21 @@ interface SeasonPickerProps {
 export function SeasonPicker({ pitcherId, season, available }: SeasonPickerProps) {
   const router = useRouter();
   const params = useSearchParams();
+  const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
 
   const goto = (s: number) => {
     const sp = new URLSearchParams(params.toString());
     sp.set("season", String(s));
     sp.delete("game"); // game ids are season-scoped
+    // Keep the current pathname (which already includes the slug
+    // segment, e.g. /pitcher/694973/paul-skenes) instead of pushing
+    // back to the id-only form — pushing to /pitcher/{id} would
+    // 308-redirect and momentarily strip the slug from the URL bar.
+    // Fall back to id-only if pathname is unexpectedly missing.
+    const path = pathname ?? `/pitcher/${pitcherId}`;
     startTransition(() => {
-      router.push(`/pitcher/${pitcherId}?${sp.toString()}`, { scroll: false });
+      router.push(`${path}?${sp.toString()}`, { scroll: false });
     });
   };
 

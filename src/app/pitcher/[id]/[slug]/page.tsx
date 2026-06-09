@@ -536,7 +536,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         "@type": "ListItem",
         position: 3,
         name: pitcher.full_name,
-        item: `/pitcher/${pitcher.mlb_id}`,
+        item: `/pitcher/${pitcher.mlb_id}/${canonicalSlug}`,
       },
     ],
   };
