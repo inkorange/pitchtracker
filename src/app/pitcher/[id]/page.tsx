@@ -91,25 +91,33 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (throwsLabel) descParts.push(throwsLabel);
   if (teamName) descParts.push(teamName);
   if (pitcher.debut_year) descParts.push(`MLB debut ${pitcher.debut_year}`);
-  const description = descParts.length
-    ? `${pitcher.full_name} — ${descParts.join(", ")}. Pitch-by-pitch 3D arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.`
-    : `${pitcher.full_name}'s pitch arsenal rendered in 3D — movement, velocity, and at-bat replay on pitchtracker.`;
+  // Description leads with the exact "<name> pitch tracking" phrase so
+  // Google can match it when someone searches "<pitcher> pitch
+  // tracking". Stats context (throws / team / debut) comes after so it
+  // still shows up in the SERP snippet but doesn't push the keyword
+  // phrase off the front of the description.
+  const statsLine = descParts.length ? ` ${descParts.join(", ")}.` : "";
+  const description = `${pitcher.full_name} pitch tracking — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
+  // Title gets the same exact-phrase treatment. Renders through the
+  // root layout's `%s · pitchtracker` template, so the final tag reads
+  // e.g. "Paul Skenes pitch tracking · pitchtracker".
+  const titlePhrase = `${pitcher.full_name} pitch tracking`;
   const headshotUrl = pitcherHeadshotUrl(pitcherId, 360);
   const canonical = `/pitcher/${pitcherId}`;
   return {
-    title: pitcher.full_name,
+    title: titlePhrase,
     description,
     alternates: { canonical },
     openGraph: {
       type: "profile",
       url: canonical,
-      title: `${pitcher.full_name} · pitchtracker`,
+      title: `${titlePhrase} · pitchtracker`,
       description,
       images: [{ url: headshotUrl, alt: pitcher.full_name }],
     },
     twitter: {
       card: "summary",
-      title: `${pitcher.full_name} · pitchtracker`,
+      title: `${titlePhrase} · pitchtracker`,
       description,
       images: [headshotUrl],
     },
@@ -580,7 +588,15 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-base font-medium text-white truncate">{pitcher.full_name}</div>
+                  {/* H1 is the pitcher's name; the SEO-friendly
+                      keyword extension ("pitch tracking") sits in a
+                      visually-hidden span so the card still reads as
+                      a name + stats line, but Google sees the full
+                      target phrase as the page's heading. */}
+                  <h1 className="text-base font-medium text-white truncate">
+                    {pitcher.full_name}
+                    <span className="sr-only"> pitch tracking</span>
+                  </h1>
                   <div className="text-[11px] text-white/55 tabular-nums">
                     {pitcher.throws ? `${pitcher.throws}HP` : "—"}
                     {team ? ` · ${team.abbreviation}` : ""}
