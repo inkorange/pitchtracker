@@ -75,6 +75,20 @@ export const metadata: Metadata = {
     : undefined,
 };
 
+// Schema.org WebSite — the strongest signal Google uses to set the
+// "site name" line in search results. Without this, Google falls back
+// to the registrable domain, which for a subdomain like
+// pitchtracker.chriswest.tech renders as "chriswest.tech" — masking
+// pitchtracker entirely in SERPs. The og:site_name and applicationName
+// fields above are secondary signals; the JSON-LD here is what
+// actually wins the site-name slot.
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "pitchtracker",
+  url: SITE_URL,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -86,6 +100,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} antialiased dark`}
     >
       <body className="bg-[#0a0e14] text-white/90">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
         <NuqsAdapter>
           {children}
           <SiteFooter />
