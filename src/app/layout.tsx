@@ -27,15 +27,29 @@ const geistMono = Geist_Mono({
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://pitchtracker.app";
 
+// Single source of truth for the homepage title + description. Used
+// by the `<title>` / `<meta description>` tags AND mirrored into the
+// Open Graph / Twitter blocks below so social previews stay in sync
+// with what Google sees.
+//
+// Description is intentionally long (~260 chars). Google truncates to
+// ~160 in the SERP, but the underlying meta can carry more — Google
+// pulls different snippets per query, so packing in the keywords
+// (in-depth analysis, MLB pitcher data, live Statcast, 3D arsenal,
+// at-bat replay, leaderboards) widens the surface area.
+const HOMEPAGE_TITLE =
+  "pitchtracker · in-depth MLB pitcher analysis with Statcast";
+const HOMEPAGE_DESCRIPTION =
+  "pitchtracker — in-depth analysis of MLB pitcher data using live Statcast feeds. 3D arsenal visualization, pitch-by-pitch at-bat replay, season leaderboards across velo / whiff% / CSW / spin / VAA, and game-by-game stats for every active pitcher.";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: "pitchtracker",
   title: {
-    default: "pitchtracker · MLB pitch trajectories in 3D",
+    default: HOMEPAGE_TITLE,
     template: "%s · pitchtracker",
   },
-  description:
-    "MLB pitch trajectories rendered in 3D — pitcher arsenal comparison, pitch-by-pitch at-bat replay, daily leaderboards.",
+  description: HOMEPAGE_DESCRIPTION,
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -47,9 +61,8 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "pitchtracker",
     url: SITE_URL,
-    title: "pitchtracker · MLB pitch trajectories in 3D",
-    description:
-      "Compare pitcher arsenals side-by-side, replay any at-bat pitch-by-pitch in 3D, and browse season leaderboards across velo, whiff %, CSW, spin, and VAA.",
+    title: HOMEPAGE_TITLE,
+    description: HOMEPAGE_DESCRIPTION,
     images: [
       {
         url: "/logo.png",
@@ -61,9 +74,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "pitchtracker · MLB pitch trajectories in 3D",
-    description:
-      "Compare arsenals, replay at-bats in 3D, and browse season leaderboards.",
+    title: HOMEPAGE_TITLE,
+    description: HOMEPAGE_DESCRIPTION,
     images: ["/logo.png"],
   },
   // Google Search Console verification. Set GOOGLE_SITE_VERIFICATION in
