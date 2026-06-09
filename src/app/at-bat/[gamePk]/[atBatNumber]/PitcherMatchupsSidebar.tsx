@@ -13,7 +13,7 @@ import {
 import { AtBatResultFilter } from "@/components/filters/AtBatResultFilter";
 import { eventPillColor } from "@/lib/viz/colors";
 import { personHeadshotUrl } from "@/lib/viz/headshot";
-import { pitcherPagePath } from "@/lib/url/pitcher-slug";
+import { atBatPath, pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { MatchupsCollapse } from "./MatchupsCollapse";
 
 // Client-side sidebar for the at-bat replay page. Owns the `?event=`
@@ -113,10 +113,18 @@ export function PitcherMatchupsSidebar({
     );
     const url =
       newFiltered.length > 0
-        ? `/at-bat/${gamePk}/${newFiltered[0].at_bat_number}?event=${encodeURIComponent(nextValue)}`
+        ? `${atBatHrefFor(newFiltered[0])}?event=${encodeURIComponent(nextValue)}`
         : `/at-bat/${gamePk}?event=${encodeURIComponent(nextValue)}`;
     router.push(url);
   };
+
+  // Slugged at-bat URL for sibling rows. Pitcher name is constant
+  // across this sidebar (this is the pitcher's outing); batter is
+  // per-row.
+  function atBatHrefFor(ab: PitcherAbDisplay): string {
+    const name = pitcherName ?? "player";
+    return atBatPath(gamePk, ab.at_bat_number, name, ab.batter_name ?? null);
+  }
 
   // Scroll the active at-bat into view inside the MatchupsCollapse's
   // overflow container on mount and whenever the user navigates to a
@@ -197,9 +205,10 @@ export function PitcherMatchupsSidebar({
               ab.final_events,
               ab.final_description,
             );
+            const siblingBase = atBatHrefFor(ab);
             const siblingHref = eventParam
-              ? `/at-bat/${gamePk}/${ab.at_bat_number}?event=${encodeURIComponent(eventParam)}`
-              : `/at-bat/${gamePk}/${ab.at_bat_number}`;
+              ? `${siblingBase}?event=${encodeURIComponent(eventParam)}`
+              : siblingBase;
             return (
               <li key={ab.at_bat_number}>
                 <Link

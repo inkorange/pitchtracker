@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
+import { atBatSlug, slugifyPitcherName } from "@/lib/url/pitcher-slug";
 
 // Next.js builds this at request time and serves it at /sitemap.xml.
 // Anchors:
@@ -56,7 +56,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       supabase.from("pitch_teams").select("mlb_id, updated_at"),
       supabase
         .from("pitch_notable_at_bats")
-        .select("game_pk, at_bat_number, game_date, computed_at")
+        .select(
+          "game_pk, at_bat_number, pitcher_id, batter_id, game_date, computed_at",
+        )
         .order("game_date", { ascending: false })
         .limit(100),
     ]);
@@ -87,12 +89,65 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.5,
     }));
-    notableEntries = (notableRes.data ?? []).map((n) => ({
-      url: `${SITE_URL}/at-bat/${n.game_pk}/${n.at_bat_number}`,
-      lastModified: n.computed_at ? new Date(n.computed_at) : now,
-      changeFrequency: "monthly",
-      priority: 0.6,
-    }));
+    // Batch-resolve pitcher and batter names so notable-AB entries
+    // can emit slugged URLs (`/at-bat/{gamePk}/{atBatNumber}/{pitcher-slug}-vs-{batter-slug}`)
+    // rather than the id-only form. Two extra queries per build —
+    // cheap compared to the 100-AB iteration that would otherwise hit
+    // pitch_game_pitches once per AB.
+    const notableRows = notableRes.data ?? [];
+    const notablePitcherIds = Array.from(
+      new Set(
+        notableRows
+          .map((n) => n.pitcher_id)
+          .filter((id): id is number => id != null),
+      ),
+    );
+    const notableBatterIds = Array.from(
+      new Set(
+        notableRows
+          .map((n) => n.batter_id)
+          .filter((id): id is number => id != null),
+      ),
+    );
+    const [notablePitcherRes, notableBatterRes] = await Promise.all([
+      notablePitcherIds.length > 0
+        ? supabase
+            .from("pitch_pitchers")
+            .select("mlb_id, full_name")
+            .in("mlb_id", notablePitcherIds)
+        : Promise.resolve({ data: [] }),
+      notableBatterIds.length > 0
+        ? supabase
+            .from("pitch_batters")
+            .select("mlb_id, full_name")
+            .in("mlb_id", notableBatterIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+    const notablePitcherNameById = new Map(
+      (notablePitcherRes.data ?? []).map((p) => [p.mlb_id, p.full_name]),
+    );
+    const notableBatterNameById = new Map(
+      (notableBatterRes.data ?? []).map((b) => [b.mlb_id, b.full_name]),
+    );
+    notableEntries = notableRows.map((n) => {
+      const pitcherName =
+        n.pitcher_id != null
+          ? notablePitcherNameById.get(n.pitcher_id) ?? null
+          : null;
+      const batterName =
+        n.batter_id != null
+          ? notableBatterNameById.get(n.batter_id) ?? null
+          : null;
+      const slugTail = pitcherName
+        ? `/${atBatSlug(pitcherName, batterName)}`
+        : "";
+      return {
+        url: `${SITE_URL}/at-bat/${n.game_pk}/${n.at_bat_number}${slugTail}`,
+        lastModified: n.computed_at ? new Date(n.computed_at) : now,
+        changeFrequency: "monthly" as const,
+        priority: 0.6,
+      };
+    });
   } catch {
     // Sitemap build should never break the deploy — if Supabase is
     // unreachable, ship the static entries alone.

@@ -3,6 +3,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { atBatPath } from "@/lib/url/pitcher-slug";
 
 // Compact strip of the latest two daily picks. Renders nothing (without
 // breaking the page) when the cron hasn't been run yet.
@@ -60,10 +61,20 @@ export async function DailyPickStrip() {
         </Link>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {items.map((f) => (
+        {items.map((f) => {
+          const pitcherName = f.pitcher_id
+            ? pitcherById.get(f.pitcher_id) ?? null
+            : null;
+          const batterName = f.batter_id
+            ? batterMap.get(f.batter_id)?.fullName ?? null
+            : null;
+          const href = pitcherName
+            ? `${atBatPath(f.game_pk, f.at_bat_number, pitcherName, batterName)}?pitch=${f.pitch_number}`
+            : `/at-bat/${f.game_pk}/${f.at_bat_number}?pitch=${f.pitch_number}`;
+          return (
           <Link
             key={`${f.feature_kind}-${f.feature_date}`}
-            href={`/at-bat/${f.game_pk}/${f.at_bat_number}?pitch=${f.pitch_number}`}
+            href={href}
             className="flex items-center gap-3 px-4 py-3 rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 transition-colors"
           >
             {f.pitcher_id ? (
@@ -95,7 +106,8 @@ export async function DailyPickStrip() {
               Watch →
             </span>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
