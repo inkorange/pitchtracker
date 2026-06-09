@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { MetricInfo } from "./MetricInfo";
 
 // Server-rendered Rankings strip — reads pitch_rankings (populated
@@ -98,6 +99,12 @@ export async function RankingsStrip() {
   const nameById = new Map<number, string>(
     (pitcherRows ?? []).map((p) => [p.mlb_id, formatPitcherName(p)]),
   );
+  // Slugged-URL map keyed by pitcher_id so each row links directly to
+  // the canonical /pitcher/{id}/{slug} URL instead of taking a 308
+  // hop through the id-only redirect.
+  const hrefById = new Map<number, string>(
+    (pitcherRows ?? []).map((p) => [p.mlb_id, pitcherPagePath(p.mlb_id, p.full_name)]),
+  );
 
   // Group rows by category, preserve rank order.
   const byCategory = new Map<string, RankingRow[]>();
@@ -131,6 +138,7 @@ export async function RankingsStrip() {
               info={cat.info}
               items={items}
               nameById={nameById}
+              hrefById={hrefById}
             />
           );
         })}
@@ -147,6 +155,7 @@ function RankingsCard({
   info,
   items,
   nameById,
+  hrefById,
 }: {
   title: string;
   subtitle: string;
@@ -155,6 +164,7 @@ function RankingsCard({
   info: string;
   items: RankingRow[];
   nameById: Map<number, string>;
+  hrefById: Map<number, string>;
 }) {
   return (
     <div className="rounded-lg bg-white/[0.05] border border-white/10 px-3 py-4 space-y-3">
@@ -173,7 +183,7 @@ function RankingsCard({
         {items.map((r) => (
           <li key={r.pitcher_id}>
             <Link
-              href={`/pitcher/${r.pitcher_id}`}
+              href={hrefById.get(r.pitcher_id) ?? `/pitcher/${r.pitcher_id}`}
               className="flex items-center gap-2.5 px-1 py-1.5 rounded-md hover:bg-white/[0.06] transition-colors"
             >
               <span className="text-[10px] tabular-nums text-white/45 w-3 text-right">

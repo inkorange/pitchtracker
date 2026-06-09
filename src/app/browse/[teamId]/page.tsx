@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { TopNav } from "@/components/chrome/TopNav";
 
 interface PageProps {
@@ -100,7 +101,7 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
     athlete: sortedPitchers.map((p) => ({
       "@type": "Person",
       name: p.full_name,
-      url: `/pitcher/${p.mlb_id}`,
+      url: pitcherPagePath(p.mlb_id, p.full_name),
     })),
   };
   const breadcrumbJsonLd = {
@@ -178,7 +179,7 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
             {sortedPitchers.map((p) => (
               <li key={p.mlb_id}>
                 <Link
-                  href={`/pitcher/${p.mlb_id}?season=${season}`}
+                  href={`${pitcherPagePath(p.mlb_id, p.full_name)}?season=${season}`}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] hover:border-white/15 transition-colors"
                 >
                   <div className="relative w-10 h-10 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
