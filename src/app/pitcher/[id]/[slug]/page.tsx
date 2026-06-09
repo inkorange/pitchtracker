@@ -63,8 +63,27 @@ interface PageProps {
   }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+// SEO-relevant URL params that change the page's CONTENT scope and
+// therefore deserve their own title/description/canonical. We
+// intentionally exclude transient UI state like `abGame`/`abNum`
+// (at-bat replay state) — those don't shift what the page is "about"
+// in a way Google should index.
+const SEO_QUERY_KEYS = [
+  "season",
+  "pitch",
+  "hand",
+  "outcome",
+  "event",
+  "veloMin",
+  "veloMax",
+] as const;
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps): Promise<Metadata> {
   const { id } = await params;
+  const sp = await searchParams;
   const pitcherId = Number(id);
   if (!Number.isFinite(pitcherId)) {
     return { title: "Pitcher" };
@@ -92,21 +111,94 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (throwsLabel) descParts.push(throwsLabel);
   if (teamName) descParts.push(teamName);
   if (pitcher.debut_year) descParts.push(`MLB debut ${pitcher.debut_year}`);
-  // Description leads with the exact "<name> pitch tracking" phrase so
-  // Google can match it when someone searches "<pitcher> pitch
-  // tracking". Stats context (throws / team / debut) comes after so it
-  // still shows up in the SERP snippet but doesn't push the keyword
-  // phrase off the front of the description.
   const statsLine = descParts.length ? ` ${descParts.join(", ")}.` : "";
-  const description = `${pitcher.full_name} pitch tracking — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
-  // Title gets the same exact-phrase treatment. Renders through the
-  // root layout's `%s · pitchtracker` template, so the final tag reads
-  // e.g. "Paul Skenes pitch tracking · pitchtracker".
-  const titlePhrase = `${pitcher.full_name} pitch tracking`;
+
+  // Parse the SEO-content filters out of searchParams so each filter
+  // permalink can advertise its own scope ("strikeouts over 96 mph in
+  // 2026" instead of generic "pitch tracking"). Keeps Google's title /
+  // description / canonical aligned with the actual URL being indexed.
+  const currentYear = new Date().getFullYear();
+  const season = sp.season && !Number.isNaN(Number(sp.season))
+    ? Number(sp.season)
+    : currentYear;
+  const pitchTypes = (sp.pitch ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const outcomes = (sp.outcome ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is OutcomeCategory =>
+      ["whiff", "called", "ball", "foul", "inplay", "other"].includes(s),
+    );
+  const events = (sp.event ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const veloMin =
+    sp.veloMin && !Number.isNaN(Number(sp.veloMin)) ? Number(sp.veloMin) : null;
+  const veloMax =
+    sp.veloMax && !Number.isNaN(Number(sp.veloMax)) ? Number(sp.veloMax) : null;
+  const hand = sp.hand === "L" || sp.hand === "R" ? sp.hand : null;
+  const hasFilter =
+    pitchTypes.length > 0 ||
+    outcomes.length > 0 ||
+    events.length > 0 ||
+    veloMin != null ||
+    veloMax != null ||
+    hand != null;
+
+  // Build the filter phrase via the shared helper used for the
+  // on-page banner. We pass batterName/game/atBat as null to skip
+  // additional DB lookups in this hot path — the unfiltered branches
+  // still render the right copy ("in {season}"), just without the
+  // batter or game-date specificity. Worth doing in a follow-up if
+  // batter-scoped permalinks become popular.
+  const summary = buildFilterSummary({
+    season,
+    pitchTypes,
+    outcomes,
+    events,
+    hand,
+    game: null,
+    veloMin,
+    veloMax,
+    batterName: null,
+    atBat: null,
+  });
+  // Drop the leading "All " so the title reads "{name} strikeouts over
+  // 96 mph in 2026" instead of "{name} All strikeouts over 96 mph in
+  // 2026".
+  const seoPhrase = summary.replace(/^All /, "");
+
+  // Title: filter-aware when scoped, otherwise the original
+  // brand-keyword phrase that ranks for "<name> pitch tracking".
+  // Renders through the root layout's `%s · pitchtracker` template.
+  const titlePhrase = hasFilter
+    ? `${pitcher.full_name} ${seoPhrase}`
+    : `${pitcher.full_name} pitch tracking`;
+
+  // Description: same phrase up front, then the standard features
+  // line + stats line so the SERP snippet still tells the viewer
+  // what the page actually shows.
+  const description = hasFilter
+    ? `${pitcher.full_name} ${seoPhrase} — every pitch in 3D on pitchtracker. Arsenal, movement plot, velocity histograms, and at-bat replay.${statsLine}`
+    : `${pitcher.full_name} pitch tracking — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
+
   const headshotUrl = pitcherHeadshotUrl(pitcherId, 360);
-  // Canonical URL is the slugged path so Google indexes
-  // `/pitcher/{id}/{name-slug}` instead of the id-only fallback.
-  const canonical = `/pitcher/${pitcherId}/${slugifyPitcherName(pitcher.full_name)}`;
+
+  // Canonical: slugged path PLUS the SEO-content query params (sorted
+  // for stability), so each filter permalink has a self-canonical URL
+  // and Google can index it as its own page instead of consolidating
+  // it under the bare slug URL.
+  const canonicalQs = new URLSearchParams();
+  for (const key of SEO_QUERY_KEYS) {
+    const value = sp[key];
+    if (typeof value === "string" && value.length > 0) {
+      canonicalQs.set(key, value);
+    }
+  }
+  canonicalQs.sort();
+  const canonicalPath = `/pitcher/${pitcherId}/${slugifyPitcherName(pitcher.full_name)}`;
+  const canonicalQsString = canonicalQs.toString();
+  const canonical = canonicalQsString
+    ? `${canonicalPath}?${canonicalQsString}`
+    : canonicalPath;
+
   return {
     title: titlePhrase,
     description,
