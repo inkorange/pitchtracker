@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
 
 // Next.js builds this at request time and serves it at /sitemap.xml.
 // Anchors:
@@ -50,7 +51,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const [pitchersRes, teamsRes, notableRes] = await Promise.all([
       supabase
         .from("pitch_pitchers")
-        .select("mlb_id, updated_at")
+        .select("mlb_id, full_name, updated_at")
         .gte("last_active_year", season),
       supabase.from("pitch_teams").select("mlb_id, updated_at"),
       supabase
@@ -59,20 +60,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .order("game_date", { ascending: false })
         .limit(100),
     ]);
+    // Emit the canonical slugged URL `/pitcher/{id}/{slug}` rather
+    // than the id-only form — the id-only path 308-redirects, but
+    // Google should learn the destination directly from the sitemap
+    // so the redirect is a cold-link fallback instead of the steady
+    // state.
     const pitcherBase = (pitchersRes.data ?? []).map((p) => ({
-      url: `${SITE_URL}/pitcher/${p.mlb_id}`,
+      url: `${SITE_URL}/pitcher/${p.mlb_id}/${slugifyPitcherName(p.full_name)}`,
       lastModified: p.updated_at ? new Date(p.updated_at) : now,
       changeFrequency: "daily" as const,
       priority: 0.7,
     }));
-    const pitcherVariants = (pitchersRes.data ?? []).flatMap((p) =>
-      PITCHER_FILTER_VARIANTS.map((v) => ({
-        url: `${SITE_URL}/pitcher/${p.mlb_id}${v.query}`,
+    const pitcherVariants = (pitchersRes.data ?? []).flatMap((p) => {
+      const base = `${SITE_URL}/pitcher/${p.mlb_id}/${slugifyPitcherName(p.full_name)}`;
+      return PITCHER_FILTER_VARIANTS.map((v) => ({
+        url: `${base}${v.query}`,
         lastModified: p.updated_at ? new Date(p.updated_at) : now,
         changeFrequency: "daily" as const,
         priority: v.priority,
-      })),
-    );
+      }));
+    });
     pitcherEntries = [...pitcherBase, ...pitcherVariants];
     teamEntries = (teamsRes.data ?? []).map((t) => ({
       url: `${SITE_URL}/browse/${t.mlb_id}`,

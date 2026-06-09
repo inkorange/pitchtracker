@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 
 interface PitcherResult {
   mlb_id: number;
@@ -114,7 +115,7 @@ export function PitcherSearch({
           {visibleResults.map((p) => (
             <li key={p.mlb_id} role="option" aria-selected={false}>
               <Link
-                href={resultHref ? resultHref(p.mlb_id) : `/pitcher/${p.mlb_id}`}
+                href={resultHref ? resultHref(p.mlb_id) : pitcherPagePath(p.mlb_id, p.full_name)}
                 className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.04] transition-colors"
                 onClick={() => setOpen(false)}
               >
