@@ -11,6 +11,7 @@ import {
 import { AtBatResultFilter } from "@/components/filters/AtBatResultFilter";
 import { categorizeDescription, OUTCOME_COLORS } from "@/lib/viz/colors";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { atBatPath } from "@/lib/url/pitcher-slug";
 
 // Client-side rendering of the at-bat list so chip clicks update the
 // URL shallowly (no server re-fetch) and re-render the list in place.
@@ -153,9 +154,15 @@ function AtBatRow({
   const cat = categorizeDescription(ab.last_description);
   const dotColor = OUTCOME_COLORS[cat];
   const outcome = formatEvent(ab.events) ?? "In progress";
+  const basePath = atBatPath(
+    gamePk,
+    ab.at_bat_number,
+    ab.pitcher_name,
+    ab.batter_name,
+  );
   const href = eventParam
-    ? `/at-bat/${gamePk}/${ab.at_bat_number}?event=${encodeURIComponent(eventParam)}`
-    : `/at-bat/${gamePk}/${ab.at_bat_number}`;
+    ? `${basePath}?event=${encodeURIComponent(eventParam)}`
+    : basePath;
   return (
     <li>
       <Link

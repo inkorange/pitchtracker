@@ -37,3 +37,31 @@ export function slugifyPitcherName(name: string): string {
 export function pitcherPagePath(id: number, name: string): string {
   return `/pitcher/${id}/${slugifyPitcherName(name)}`;
 }
+
+/**
+ * Slug segment for an at-bat URL: `{pitcher-slug}-vs-{batter-slug}` when
+ * we have both names, `{pitcher-slug}` alone otherwise. Both names use
+ * the same slugify rules.
+ *
+ * The "-vs-" joiner is a sentinel readers recognize as "X faced Y" —
+ * keeps the URL parseable to a human ("paul-skenes-vs-francisco-lindor")
+ * AND gives Google two indexable surnames for matchup queries.
+ */
+export function atBatSlug(
+  pitcherName: string,
+  batterName: string | null,
+): string {
+  const pitcherSlug = slugifyPitcherName(pitcherName);
+  if (!batterName) return pitcherSlug;
+  return `${pitcherSlug}-vs-${slugifyPitcherName(batterName)}`;
+}
+
+/** Canonical at-bat page path. */
+export function atBatPath(
+  gamePk: number,
+  atBatNumber: number,
+  pitcherName: string,
+  batterName: string | null,
+): string {
+  return `/at-bat/${gamePk}/${atBatNumber}/${atBatSlug(pitcherName, batterName)}`;
+}

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
+import { atBatPath } from "@/lib/url/pitcher-slug";
 import { TopNav } from "@/components/chrome/TopNav";
 
 export const metadata: Metadata = {
@@ -193,10 +194,25 @@ export default async function DailyPage() {
             </p>
           ) : (
             <ul className="space-y-1.5">
-              {notable.map((ab) => (
+              {notable.map((ab) => {
+                // Pull pitcher name from the Supabase row (when present)
+                // — batterMap is the StatsAPI cache. Either may be null
+                // for at-bats with unresolved players; fall back to the
+                // id-only URL in that case (it 308-redirects via the
+                // thin route).
+                const abPitcherName = ab.pitcher_id
+                  ? pitcherById.get(ab.pitcher_id) ?? null
+                  : null;
+                const abBatterName = ab.batter_id
+                  ? batterMap.get(ab.batter_id)?.fullName ?? null
+                  : null;
+                const href = abPitcherName
+                  ? atBatPath(ab.game_pk, ab.at_bat_number, abPitcherName, abBatterName)
+                  : `/at-bat/${ab.game_pk}/${ab.at_bat_number}`;
+                return (
                 <li key={`${ab.game_pk}-${ab.at_bat_number}`}>
                   <Link
-                    href={`/at-bat/${ab.game_pk}/${ab.at_bat_number}`}
+                    href={href}
                     className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.09] border border-white/10 transition-colors"
                   >
                     <span className="text-[11px] tabular-nums text-white/45 w-20 truncate">
@@ -220,7 +236,8 @@ export default async function DailyPage() {
                     </span>
                   </Link>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           )}
         </section>
@@ -240,7 +257,14 @@ function FeatureCard({
   batterName: string;
   matchup: string;
 }) {
-  const replayHref = `/at-bat/${feature.game_pk}/${feature.at_bat_number}?pitch=${feature.pitch_number}`;
+  // pitcherName / batterName arrive resolved from the parent
+  // (resolveName fallback yields "Player #N" for unresolved cases).
+  // slugifyPitcherName handles that gracefully, but it's not a
+  // canonical name — if both names start with "Player #", we'd rather
+  // fall back to the id-only URL and let the redirect resolve the
+  // real slug. In practice the daily-feature rows have well-resolved
+  // names because the cron is selective.
+  const replayHref = `${atBatPath(feature.game_pk, feature.at_bat_number, pitcherName, batterName)}?pitch=${feature.pitch_number}`;
   const cat = categorizeDescription(null);
   // Outcome color comes from the pre-computed reason; we don't have the
   // raw description here, so the dot stays neutral.
