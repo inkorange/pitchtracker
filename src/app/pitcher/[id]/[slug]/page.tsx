@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
+import { absoluteUrl } from "@/lib/url/site";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import {
@@ -622,13 +623,18 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "/" },
-      { "@type": "ListItem", position: 2, name: "Pitchers", item: "/browse" },
+      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Pitchers",
+        item: absoluteUrl("/browse"),
+      },
       {
         "@type": "ListItem",
         position: 3,
         name: pitcher.full_name,
-        item: `/pitcher/${pitcher.mlb_id}/${canonicalSlug}`,
+        item: absoluteUrl(`/pitcher/${pitcher.mlb_id}/${canonicalSlug}`),
       },
     ],
   };

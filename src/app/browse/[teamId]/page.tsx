@@ -5,6 +5,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
+import { absoluteUrl } from "@/lib/url/site";
 import { TopNav } from "@/components/chrome/TopNav";
 
 interface PageProps {
@@ -97,24 +98,29 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
     name: team.name,
     sport: "Baseball",
     memberOf: { "@type": "SportsOrganization", name: "Major League Baseball" },
-    url: `/browse/${team.mlb_id}`,
+    url: absoluteUrl(`/browse/${team.mlb_id}`),
     athlete: sortedPitchers.map((p) => ({
       "@type": "Person",
       name: p.full_name,
-      url: pitcherPagePath(p.mlb_id, p.full_name),
+      url: absoluteUrl(pitcherPagePath(p.mlb_id, p.full_name)),
     })),
   };
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "/" },
-      { "@type": "ListItem", position: 2, name: "Teams", item: "/browse" },
+      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Teams",
+        item: absoluteUrl("/browse"),
+      },
       {
         "@type": "ListItem",
         position: 3,
         name: team.name,
-        item: `/browse/${team.mlb_id}`,
+        item: absoluteUrl(`/browse/${team.mlb_id}`),
       },
     ],
   };
