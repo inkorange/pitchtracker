@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { TopNav } from "@/components/chrome/TopNav";
+import { absoluteUrl } from "@/lib/url/site";
 import { ExploreClient } from "./ExploreClient";
 
 interface ExplorePageProps {
@@ -60,7 +61,7 @@ const datasetJsonLd = {
   },
   isAccessibleForFree: true,
   license: "https://baseballsavant.mlb.com/",
-  url: "/explore",
+  url: absoluteUrl("/explore"),
 };
 
 export default function ExplorePage() {

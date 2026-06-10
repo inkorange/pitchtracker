@@ -9,6 +9,7 @@ import {
   type MlbGameResult,
 } from "@/lib/statsapi/client";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { absoluteUrl } from "@/lib/url/site";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { AtBatGameList, type AtBatDisplay } from "./AtBatGameList";
@@ -210,20 +211,25 @@ export default async function GameAtBatsPage({ params }: PageProps) {
         awayTeam: awayTeam
           ? { "@type": "SportsTeam", name: awayTeam.name }
           : undefined,
-        url: `/at-bat/${gamePkN}`,
+        url: absoluteUrl(`/at-bat/${gamePkN}`),
       }
     : null;
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: "/" },
-      { "@type": "ListItem", position: 2, name: "Games", item: "/at-bat" },
+      { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Games",
+        item: absoluteUrl("/at-bat"),
+      },
       {
         "@type": "ListItem",
         position: 3,
         name: game?.game_date ?? `Game ${gamePkN}`,
-        item: `/at-bat/${gamePkN}`,
+        item: absoluteUrl(`/at-bat/${gamePkN}`),
       },
     ],
   };

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TopNav } from "@/components/chrome/TopNav";
+import { absoluteUrl } from "@/lib/url/site";
 
 // Public landing page for the AI chat tool. The chat itself lives
 // in the floating icon (rendered by the root layout) and isn't
@@ -101,7 +102,7 @@ export default function AiLandingPage() {
     operatingSystem: "Web browser",
     description:
       "Natural-language assistant for the pitchtracker MLB pitch-visualization tool. Translates voice or text queries into 3D pitch arsenal views, at-bat replays, matchup analyses, and aggregate stat answers.",
-    url: "/ai",
+    url: absoluteUrl("/ai"),
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     featureList: [
       "Natural-language navigation to any pitcher's arsenal",
