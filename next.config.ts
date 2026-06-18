@@ -11,6 +11,25 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    // Vercel CDN cache profile for the public read-only routes (pitcher
+    // detail, at-bat replay, browse, daily, etc.). `s-maxage=300` keeps
+    // the rendered HTML fresh for 5 minutes; `stale-while-revalidate`
+    // serves the stale copy instantly for the next 24 hours while a
+    // background regen runs. Pitch data updates daily via the
+    // refresh-aggregates cron, so 24h SWR aligns with the data cadence.
+    //
+    // Each unique URL — including search-param permutations like
+    // `?event=strikeout&veloMin=96` — is a distinct cache key, so
+    // filter permalinks cache independently of the unfiltered URL.
+    //
+    // This is the lever that lifts Google's per-site crawl ceiling:
+    // cold serverless renders at ~1s TTFB throttle the crawl rate;
+    // CDN HITs at ~20-50ms unlock it. Paired with the cookieless
+    // Supabase server client (see src/lib/supabase/server.ts) so
+    // Next.js doesn't mark the routes as dynamic and skip caching.
+    const PUBLIC_PAGE_CACHE =
+      "public, s-maxage=300, stale-while-revalidate=86400";
+
     return [
       {
         // Long-lived immutable cache for 3D model assets. These are
@@ -31,6 +50,34 @@ const nextConfig: NextConfig = {
             value: "public, max-age=31536000, immutable",
           },
         ],
+      },
+      {
+        source: "/",
+        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
+      },
+      {
+        source: "/pitcher/:path*",
+        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
+      },
+      {
+        source: "/at-bat/:path*",
+        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
+      },
+      {
+        source: "/browse/:path*",
+        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
+      },
+      {
+        source: "/daily",
+        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
+      },
+      {
+        source: "/explore",
+        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
+      },
+      {
+        source: "/ai",
+        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
       },
     ];
   },
