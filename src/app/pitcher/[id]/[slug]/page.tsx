@@ -15,6 +15,7 @@ import {
 } from "@/lib/viz/colors";
 import { PitcherSearchPopover } from "@/components/chrome/PitcherSearchPopover";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
+import { HelpButton } from "../stats/HelpButton";
 import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
 import { TopNav } from "@/components/chrome/TopNav";
 import { FiltersGate } from "../FiltersGate";
@@ -28,6 +29,7 @@ import { PitcherStatsArea } from "../PitcherStatsArea";
 import { PitcherOutcomeLegendGate } from "../PitcherOutcomeLegendGate";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
+import { buildPitcherBio, buildPitcherKeywords } from "@/lib/pitcher/bio";
 import { RECENT_RIBBON_CAP } from "@/lib/viz/scene-tuning";
 import {
   fetchPitcherGameLine,
@@ -92,22 +94,95 @@ export async function generateMetadata({
   const supabase = await createClient();
   const { data: pitcher } = await supabase
     .from("pitch_pitchers")
-    .select("full_name, throws, current_team_id, debut_year")
+    .select("full_name, throws, current_team_id, debut_year, last_active_year")
     .eq("mlb_id", pitcherId)
     .maybeSingle();
   if (!pitcher) {
     return { title: "Pitcher" };
   }
-  let teamName: string | null = null;
-  if (pitcher.current_team_id) {
-    const { data: team } = await supabase
-      .from("pitch_teams")
-      .select("name")
-      .eq("mlb_id", pitcher.current_team_id)
-      .maybeSingle();
-    teamName = team?.name ?? null;
+
+  // Season computed early so the arsenal lookup below can target the
+  // right pitch_pitcher_aggregates rows. The filter parsing further
+  // down also consumes this same value.
+  const currentYear = new Date().getFullYear();
+  const season =
+    sp.season && !Number.isNaN(Number(sp.season))
+      ? Number(sp.season)
+      : currentYear;
+
+  // Team name + per-season arsenal in parallel — the arsenal phrase
+  // turns the unfiltered description into per-pitcher unique content
+  // ("Four-Seam (98 mph), Slider, Curveball, Splitter"), which is
+  // much stronger SEO than every pitcher having the same boilerplate.
+  // We pick the season's `batter_hand='*'` aggregates (both-handed
+  // pool), ordered by usage. Falls back to the pitcher's most recent
+  // active year if the current season has no rows yet (early season /
+  // retired pitcher).
+  const aggregatesSeason =
+    pitcher.last_active_year && pitcher.last_active_year < currentYear
+      ? pitcher.last_active_year
+      : season;
+  const [teamRes, aggregatesRes] = await Promise.all([
+    pitcher.current_team_id
+      ? supabase
+          .from("pitch_teams")
+          .select("name")
+          .eq("mlb_id", pitcher.current_team_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("pitch_pitcher_aggregates")
+      .select("pitch_type, pitch_count, avg_velocity")
+      .eq("pitcher_id", pitcherId)
+      .eq("season", aggregatesSeason)
+      .eq("batter_hand", "*")
+      .order("pitch_count", { ascending: false })
+      .limit(4),
+  ]);
+  const teamName: string | null = teamRes.data?.name ?? null;
+  const topPitches = aggregatesRes.data ?? [];
+  // Lead the first pitch with its average velocity (rounded to whole
+  // mph for the snippet — descriptions don't need 0.1 precision and
+  // round numbers read cleaner). Subsequent pitches are name-only so
+  // the line doesn't get long.
+  let arsenalPhrase: string | null = null;
+  if (topPitches.length > 0) {
+    const lead = topPitches[0];
+    const leadLabel = getPitchLabel(lead.pitch_type);
+    const leadVelo =
+      lead.avg_velocity != null
+        ? `${Math.round(Number(lead.avg_velocity))} mph`
+        : null;
+    const leadStr = leadVelo ? `${leadLabel} (${leadVelo})` : leadLabel;
+    const restStr = topPitches
+      .slice(1)
+      .map((p) => getPitchLabel(p.pitch_type))
+      .join(", ");
+    arsenalPhrase = restStr ? `${leadStr}, ${restStr}` : leadStr;
   }
-  const throwsLabel = pitcher.throws === "L" ? "left-handed" : pitcher.throws === "R" ? "right-handed" : null;
+
+  const throwsLabel =
+    pitcher.throws === "L"
+      ? "left-handed"
+      : pitcher.throws === "R"
+        ? "right-handed"
+        : null;
+  // Compact role tag — "Right-handed Pittsburgh Pirates pitcher" reads
+  // more naturally than the comma list "right-handed, Pittsburgh
+  // Pirates" did. Falls back gracefully when handedness or team is
+  // unknown.
+  const handCap = throwsLabel
+    ? throwsLabel.charAt(0).toUpperCase() + throwsLabel.slice(1)
+    : null;
+  const roleParts: string[] = [];
+  if (handCap) roleParts.push(handCap);
+  if (teamName) roleParts.push(teamName);
+  roleParts.push("pitcher");
+  const roleLine = roleParts.join(" ");
+  const debutLine = pitcher.debut_year ? `, MLB debut ${pitcher.debut_year}` : "";
+  // Legacy stats line kept for the FILTERED description so that path's
+  // copy stays unchanged (filter URLs lead with the filter phrase, the
+  // bio context belongs at the end).
   const descParts: string[] = [];
   if (throwsLabel) descParts.push(throwsLabel);
   if (teamName) descParts.push(teamName);
@@ -118,10 +193,6 @@ export async function generateMetadata({
   // permalink can advertise its own scope ("strikeouts over 96 mph in
   // 2026" instead of generic "pitch tracking"). Keeps Google's title /
   // description / canonical aligned with the actual URL being indexed.
-  const currentYear = new Date().getFullYear();
-  const season = sp.season && !Number.isNaN(Number(sp.season))
-    ? Number(sp.season)
-    : currentYear;
   const pitchTypes = (sp.pitch ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const outcomes = (sp.outcome ?? "")
     .split(",")
@@ -173,14 +244,32 @@ export async function generateMetadata({
     ? `${pitcher.full_name} ${seoPhrase}`
     : `${pitcher.full_name} pitch tracking`;
 
-  // Description: same phrase up front, then the standard features
-  // line + stats line so the SERP snippet still tells the viewer
-  // what the page actually shows.
-  const description = hasFilter
-    ? `${pitcher.full_name} ${seoPhrase} — every pitch in 3D on pitchtracker. Arsenal, movement plot, velocity histograms, and at-bat replay.${statsLine}`
-    : `${pitcher.full_name} pitch tracking — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
+  // Description.
+  //   Filtered URLs keep the filter-aware copy (each permalink already
+  //   has its own unique scope phrase up front, so we don't dilute
+  //   with arsenal data).
+  //
+  //   Unfiltered URLs lead with the pitcher's actual top pitches +
+  //   velocity, then the role (RHP/LHP + team) + debut year. This
+  //   turns a per-pitcher boilerplate into per-pitcher unique content
+  //   that Google can index for "{name} slider", "{name} 99 mph
+  //   fastball", etc. — and gives the SERP snippet real flavor
+  //   instead of the same template across 4,000 pages.
+  let description: string;
+  if (hasFilter) {
+    description = `${pitcher.full_name} ${seoPhrase} — every pitch in 3D on pitchtracker. Arsenal, movement plot, velocity histograms, and at-bat replay.${statsLine}`;
+  } else if (arsenalPhrase) {
+    description = `${pitcher.full_name} pitch tracking — ${arsenalPhrase} arsenal. ${roleLine}${debutLine}. Pitch-by-pitch 3D arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.`;
+  } else {
+    description = `${pitcher.full_name} pitch tracking — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
+  }
 
-  const headshotUrl = pitcherHeadshotUrl(pitcherId, 360);
+  // Headshot at 1200px for the OG / Twitter card. Google prefers
+  // ≥1200px when picking a SERP thumbnail; the 360 we used before
+  // sometimes fell below that bar and no image showed. On-page
+  // <Image> components use their own smaller sizes — this only
+  // changes the meta-tag image URL.
+  const headshotUrl = pitcherHeadshotUrl(pitcherId, 1200);
 
   // Canonical: slugged path PLUS the SEO-content query params (sorted
   // for stability), so each filter permalink has a self-canonical URL
@@ -200,9 +289,20 @@ export async function generateMetadata({
     ? `${canonicalPath}?${canonicalQsString}`
     : canonicalPath;
 
+  // Keywords meta. Google has explicitly ignored <meta name="keywords">
+  // since 2009, but Bing / Yandex factor it lightly and a few smaller
+  // engines still parse it. Costs nothing to ship and keeps the page's
+  // searchable surface honest about what it's actually about.
+  const keywords = buildPitcherKeywords({
+    name: pitcher.full_name,
+    teamName,
+    topPitches: topPitches.map((p) => ({ pitchType: p.pitch_type })),
+  });
+
   return {
     title: titlePhrase,
     description,
+    keywords,
     alternates: { canonical },
     openGraph: {
       type: "profile",
@@ -494,6 +594,28 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         .then((r) => r.data)
     : null;
 
+  // Templated "About" bio for the pitcher card. Rendered inside a
+  // HelpButton popover (hidden behind an (i) on the chrome), so the
+  // text is in the SSR'd HTML for Google + assistive tech but doesn't
+  // clutter the visual layout. Builds from the same data the SERP
+  // description already uses, plus the per-season pitch volume from
+  // `arsenalPitches` (only counted when meaningful, see bio builder).
+  const bioParagraphs = buildPitcherBio({
+    name: pitcher.full_name,
+    throws:
+      pitcher.throws === "L" || pitcher.throws === "R" ? pitcher.throws : null,
+    teamName: team?.name ?? null,
+    debutYear: pitcher.debut_year ?? null,
+    lastActiveYear: pitcher.last_active_year ?? null,
+    season,
+    aggregatesSeason: season,
+    topPitches: aggregates.slice(0, 4).map((a) => ({
+      pitchType: a.pitch_type,
+      avgVelocity: a.avg_velocity,
+    })),
+    seasonPitchCount: totalArsenal,
+  });
+
   // Capture pitcher's current team for the opponent-resolution
   // closure below — TS can't carry the post-notFound() narrowing of
   // `pitcher` into the function body, so a local const sidesteps it.
@@ -714,10 +836,21 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                     {pitcher.full_name}
                     <span className="sr-only"> pitch tracking</span>
                   </h1>
-                  <div className="text-[11px] text-white/55 tabular-nums">
-                    {pitcher.throws ? `${pitcher.throws}HP` : "—"}
-                    {team ? ` · ${team.abbreviation}` : ""}
-                    {pitcher.debut_year ? ` · debut ${pitcher.debut_year}` : ""}
+                  <div className="text-[11px] text-white/55 tabular-nums flex items-center gap-1.5">
+                    <span>
+                      {pitcher.throws ? `${pitcher.throws}HP` : "—"}
+                      {team ? ` · ${team.abbreviation}` : ""}
+                      {pitcher.debut_year
+                        ? ` · debut ${pitcher.debut_year}`
+                        : ""}
+                    </span>
+                    {bioParagraphs.length > 0 ? (
+                      <HelpButton title="About">
+                        {bioParagraphs.map((p, i) => (
+                          <p key={i}>{p}</p>
+                        ))}
+                      </HelpButton>
+                    ) : null}
                   </div>
                 </div>
                 {team ? (
