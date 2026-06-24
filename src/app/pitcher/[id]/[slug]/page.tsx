@@ -237,12 +237,29 @@ export async function generateMetadata({
   // 2026".
   const seoPhrase = summary.replace(/^All /, "");
 
-  // Title: filter-aware when scoped, otherwise the original
-  // brand-keyword phrase that ranks for "<name> pitch tracking".
-  // Renders through the root layout's `%s · pitchtracker` template.
+  // Title: filter-aware when scoped, otherwise leads with the
+  // headline keywords. Renders through the root layout's
+  // `%s · pitchtracker` template.
+  //
+  // "MLB Statcast data" replaces the previous "pitch tracking" phrase
+  // — much higher real-world search volume, and accurately describes
+  // what the page shows (we sit on top of Baseball Savant / Statcast
+  // data via the daily Savant fetch). Nominative fair use: the term is
+  // used descriptively to identify MLB's product, not the brand of
+  // this site. See the SiteFooter for the trademark attribution.
+  //
+  // Team gets parenthesized into the name on the unfiltered title so
+  // the tag matches "<name> <team>" queries ("Logan Gilbert Mariners",
+  // "Paul Skenes Pirates"). Filtered URLs already carry a unique scope
+  // phrase up front, so we don't pile team on top of them and risk
+  // truncation past Google's ~60-char SERP display limit.
+  const nameForTitle =
+    !hasFilter && teamName
+      ? `${pitcher.full_name} (${teamName})`
+      : pitcher.full_name;
   const titlePhrase = hasFilter
     ? `${pitcher.full_name} ${seoPhrase}`
-    : `${pitcher.full_name} pitch tracking`;
+    : `${nameForTitle} MLB Statcast data`;
 
   // Description.
   //   Filtered URLs keep the filter-aware copy (each permalink already
@@ -259,9 +276,9 @@ export async function generateMetadata({
   if (hasFilter) {
     description = `${pitcher.full_name} ${seoPhrase} — every pitch in 3D on pitchtracker. Arsenal, movement plot, velocity histograms, and at-bat replay.${statsLine}`;
   } else if (arsenalPhrase) {
-    description = `${pitcher.full_name} pitch tracking — ${arsenalPhrase} arsenal. ${roleLine}${debutLine}. Pitch-by-pitch 3D arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.`;
+    description = `${pitcher.full_name} MLB Statcast data — ${arsenalPhrase} arsenal. ${roleLine}${debutLine}. Pitch-by-pitch 3D arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.`;
   } else {
-    description = `${pitcher.full_name} pitch tracking — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
+    description = `${pitcher.full_name} MLB Statcast data — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
   }
 
   // Headshot at 1200px for the OG / Twitter card. Google prefers
@@ -828,13 +845,13 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                   {/* H1 is the pitcher's name; the SEO-friendly
-                      keyword extension ("pitch tracking") sits in a
-                      visually-hidden span so the card still reads as
-                      a name + stats line, but Google sees the full
-                      target phrase as the page's heading. */}
+                      keyword extension ("MLB Statcast data") sits in
+                      a visually-hidden span so the card still reads
+                      as a name + stats line, but Google sees the
+                      full target phrase as the page's heading. */}
                   <h1 className="text-base font-medium text-white truncate">
                     {pitcher.full_name}
-                    <span className="sr-only"> pitch tracking</span>
+                    <span className="sr-only"> MLB Statcast data</span>
                   </h1>
                   <div className="text-[11px] text-white/55 tabular-nums flex items-center gap-1.5">
                     <span>
