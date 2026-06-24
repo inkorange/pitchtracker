@@ -240,9 +240,19 @@ export async function generateMetadata({
   // Title: filter-aware when scoped, otherwise the original
   // brand-keyword phrase that ranks for "<name> pitch tracking".
   // Renders through the root layout's `%s · pitchtracker` template.
+  //
+  // Team gets parenthesized into the name on the unfiltered title so
+  // the tag matches "<name> <team>" queries ("Logan Gilbert Mariners",
+  // "Paul Skenes Pirates"). Filtered URLs already carry a unique scope
+  // phrase up front, so we don't pile team on top of them and risk
+  // truncation past Google's ~60-char SERP display limit.
+  const nameForTitle =
+    !hasFilter && teamName
+      ? `${pitcher.full_name} (${teamName})`
+      : pitcher.full_name;
   const titlePhrase = hasFilter
     ? `${pitcher.full_name} ${seoPhrase}`
-    : `${pitcher.full_name} pitch tracking`;
+    : `${nameForTitle} pitch tracking`;
 
   // Description.
   //   Filtered URLs keep the filter-aware copy (each permalink already
