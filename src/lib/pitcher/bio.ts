@@ -136,10 +136,12 @@ export function buildPitcherKeywords(input: {
 }): string {
   const keywords: string[] = [
     input.name,
-    `${input.name} pitch tracking`,
+    `${input.name} MLB Statcast data`,
+    `${input.name} Statcast`,
     `${input.name} stats`,
     `${input.name} arsenal`,
     `${input.name} pitches`,
+    `${input.name} pitch arsenal`,
     `${input.name} 3D`,
   ];
   if (input.teamName) {
@@ -151,10 +153,10 @@ export function buildPitcherKeywords(input: {
   }
   keywords.push(
     "MLB pitcher",
+    "MLB Statcast data",
     "Statcast",
-    "pitch tracking",
-    "baseball analytics",
     "pitch arsenal",
+    "baseball analytics",
   );
   // Dedupe while preserving order.
   return Array.from(new Set(keywords)).join(", ");
