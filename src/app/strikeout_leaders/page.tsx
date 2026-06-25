@@ -200,14 +200,17 @@ export default async function StrikeoutLeadersPage() {
                       alt=""
                       fill
                       sizes="152px"
-                      // brightness(0) crushes every team-logo color to
-                      // black, then invert(1) flips it to white — gives
-                      // every row the same monochrome silhouette,
-                      // which is more readable than mixed-team color
-                      // logos ghosted to 20%. Also rescues teams whose
-                      // marks are dark navy/black (Yankees, Marlins)
-                      // and would otherwise disappear on the dark bg.
-                      className="object-contain object-bottom [filter:brightness(0)_invert(1)]"
+                      // Yankees-only override: their interlocking NY is
+                      // pure navy with no secondary color, so at 20%
+                      // opacity against the dark bg it disappears.
+                      // brightness(0) invert(1) crushes it to white so
+                      // the silhouette stays readable. Every other
+                      // team's primary color reads fine ghosted.
+                      className={`object-contain object-bottom ${
+                        row.team_id === 147
+                          ? "[filter:brightness(0)_invert(1)]"
+                          : ""
+                      }`}
                       unoptimized
                     />
                   </div>
