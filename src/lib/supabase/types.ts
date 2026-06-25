@@ -1074,6 +1074,10 @@ export type Database = {
         Args: { p_season: number }
         Returns: undefined
       }
+      pitch_top_strikeouts: {
+        Args: { p_season: number; p_limit?: number }
+        Returns: { rank: number; pitcher_id: number; strikeouts: number }[]
+      }
       pitch_search_batters: {
         Args: { p_limit?: number; p_query: string }
         Returns: {

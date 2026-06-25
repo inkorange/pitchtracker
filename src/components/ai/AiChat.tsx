@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { isScreenshotRoute } from "@/lib/url/screenshot-routes";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -63,6 +64,11 @@ export function AiChat() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  // Screenshot-target routes (`/strikeout_leaders`, etc.) intentionally
+  // render no chrome — the floating chat trigger would land in the
+  // X.com card. All hooks above this point run unconditionally so the
+  // bail-out doesn't change hook order across renders.
+  const isScreenshot = isScreenshotRoute(pathname);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   // Auto-submit only when the engine ends the session on its own.
@@ -214,6 +220,8 @@ export function AiChat() {
     setMessages([]);
     setError(null);
   };
+
+  if (isScreenshot) return null;
 
   return (
     <>

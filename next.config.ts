@@ -79,6 +79,19 @@ const nextConfig: NextConfig = {
         source: "/ai",
         headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
       },
+      // Screenshot-target leaderboard pages. Rankings only refresh once
+      // per day via the refresh-rankings cron, so a longer s-maxage is
+      // fine and the X.com scheduler skill won't trigger a cold render
+      // on every weekly capture.
+      {
+        source: "/strikeout_leaders",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        ],
+      },
     ];
   },
 };

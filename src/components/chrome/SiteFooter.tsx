@@ -1,3 +1,8 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { isScreenshotRoute } from "@/lib/url/screenshot-routes";
+
 // Site-wide legal disclaimers. Two short paragraphs:
 //
 //   1. "Not affiliated with MLB" + trademark acknowledgement, the
@@ -12,7 +17,13 @@
 // the document. On 3D-canvas pages (`<main className="fixed inset-0">`)
 // the fixed main covers it; the disclaimers are still in the DOM (good
 // for crawlers / accessibility) but don't intrude on the scene.
+//
+// Suppressed on screenshot-target routes (`/strikeout_leaders` and
+// future weekly-leaderboard pages) so the auto-captured X.com image
+// stays scoped to the leaderboard itself.
 export function SiteFooter() {
+  const pathname = usePathname();
+  if (isScreenshotRoute(pathname)) return null;
   return (
     <footer className="border-t border-white/[0.06] px-6 py-6 text-[10px] leading-relaxed tracking-[0.04em] text-white/40">
       <div className="max-w-3xl mx-auto space-y-2">
