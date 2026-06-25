@@ -200,7 +200,14 @@ export default async function StrikeoutLeadersPage() {
                       alt=""
                       fill
                       sizes="152px"
-                      className="object-contain object-bottom"
+                      // brightness(0) crushes every team-logo color to
+                      // black, then invert(1) flips it to white — gives
+                      // every row the same monochrome silhouette,
+                      // which is more readable than mixed-team color
+                      // logos ghosted to 20%. Also rescues teams whose
+                      // marks are dark navy/black (Yankees, Marlins)
+                      // and would otherwise disappear on the dark bg.
+                      className="object-contain object-bottom [filter:brightness(0)_invert(1)]"
                       unoptimized
                     />
                   </div>
