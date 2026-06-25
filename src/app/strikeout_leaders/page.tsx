@@ -172,7 +172,7 @@ export default async function StrikeoutLeadersPage() {
         </header>
 
         {/* Leaderboard rows */}
-        <ol className="relative z-10 flex-1 px-12 py-6 flex flex-col gap-2">
+        <ol className="relative z-10 flex-1 px-12 py-6 flex flex-col gap-3">
           {rows.length === 0 ? (
             <li className="text-[24px] text-white/40 italic text-center mt-12">
               No strikeout data for {season} yet.
@@ -181,7 +181,7 @@ export default async function StrikeoutLeadersPage() {
             rows.map((row) => (
               <li
                 key={row.pitcher_id}
-                className="relative flex items-center gap-4 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] overflow-hidden"
+                className="relative flex items-center gap-4 px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.07] overflow-hidden"
               >
                 {/* Ghosted team logo: large, set in from the right
                     edge so it doesn't sit under the strikeout
