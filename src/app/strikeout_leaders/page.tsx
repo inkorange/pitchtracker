@@ -137,7 +137,7 @@ export default async function StrikeoutLeadersPage() {
         <header className="relative z-10 px-12 pt-12 pb-6 border-b border-white/[0.08]">
           <div className="flex items-start justify-between gap-6">
             <div>
-              <div className="text-[14px] uppercase tracking-[0.32em] text-white/45">
+              <div className="text-[18px] font-semibold uppercase tracking-[0.32em] text-white/60">
                 Top 10
               </div>
               <h1 className="mt-2 text-[60px] leading-[1.04] font-semibold tracking-tight">
