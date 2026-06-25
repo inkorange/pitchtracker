@@ -126,7 +126,7 @@ export default async function StrikeoutLeadersPage() {
 
         {/* Header */}
         <header className="relative z-10 px-12 pt-12 pb-6 border-b border-white/[0.08]">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-start justify-between gap-6">
             <div>
               <div className="text-[14px] uppercase tracking-[0.32em] text-white/45">
                 Top 10
@@ -138,11 +138,24 @@ export default async function StrikeoutLeadersPage() {
                 {season} Regular Season
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-[14px] uppercase tracking-[0.18em] text-white/45">
-                pitchtracker
+            {/* Brand mark sits in the upper-right corner. The logo
+                asset is 256×256 — rendered at 104px so it's prominent
+                in the X.com card thumbnail without crowding the
+                title. URL stays beneath it so anyone screenshotting
+                the post still knows where to land. */}
+            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+              <div className="relative w-[104px] h-[104px]">
+                <Image
+                  src="/logo.png"
+                  alt="pitchtracker"
+                  fill
+                  sizes="104px"
+                  className="object-contain"
+                  unoptimized
+                  priority
+                />
               </div>
-              <div className="text-[12px] text-white/30 mt-1">
+              <div className="text-[12px] text-white/40">
                 pitchtracker.chriswest.tech
               </div>
             </div>
@@ -159,10 +172,10 @@ export default async function StrikeoutLeadersPage() {
             rows.map((row) => (
               <li
                 key={row.pitcher_id}
-                className="flex items-center gap-5 px-5 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.07]"
+                className="flex items-center gap-4 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07]"
               >
                 <span
-                  className={`text-[44px] font-semibold w-[68px] tabular-nums text-center ${
+                  className={`text-[36px] font-semibold w-[56px] tabular-nums text-center ${
                     row.rank === 1
                       ? "text-amber-300"
                       : row.rank <= 3
@@ -172,44 +185,42 @@ export default async function StrikeoutLeadersPage() {
                 >
                   {row.rank}
                 </span>
-                <div className="relative w-[78px] h-[78px] rounded-full bg-white/[0.05] overflow-hidden flex-shrink-0 border border-white/10">
+                <div className="relative w-[64px] h-[64px] rounded-full bg-white/[0.05] overflow-hidden flex-shrink-0 border border-white/10">
                   <Image
                     src={pitcherHeadshotUrl(row.pitcher_id, 240)}
                     alt={row.full_name}
                     fill
-                    sizes="78px"
+                    sizes="64px"
                     className="object-cover"
                     unoptimized
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[28px] font-medium truncate leading-tight">
+                  <div className="text-[24px] font-medium truncate leading-tight">
                     {row.full_name}
                   </div>
-                  <div className="text-[16px] text-white/55 tabular-nums mt-1">
+                  <div className="text-[15px] text-white/55 tabular-nums mt-0.5">
                     {row.team_abbr ?? "FA"}
                     {handLabel(row.throws) ? ` · ${handLabel(row.throws)}` : ""}
                   </div>
                 </div>
                 {row.team_id ? (
-                  <div className="relative w-[56px] h-[56px] flex-shrink-0">
+                  <div className="relative w-[48px] h-[48px] flex-shrink-0">
                     <Image
                       src={teamLogoUrl(row.team_id)}
                       alt={row.team_name ?? row.team_abbr ?? "team"}
                       fill
-                      sizes="56px"
+                      sizes="48px"
                       className="object-contain"
                       unoptimized
                     />
                   </div>
                 ) : null}
-                <div className="text-right tabular-nums min-w-[120px]">
-                  <div className="text-[44px] leading-none font-semibold">
-                    {row.strikeouts}
-                  </div>
-                  <div className="text-[14px] uppercase tracking-[0.16em] text-white/40 mt-1">
-                    K
-                  </div>
+                {/* Just the number — the headline above already says
+                    "Strikeout Leaders", a "K" label here would be
+                    redundant. */}
+                <div className="text-right tabular-nums min-w-[96px] text-[42px] leading-none font-semibold">
+                  {row.strikeouts}
                 </div>
               </li>
             ))
