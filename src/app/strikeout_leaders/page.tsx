@@ -193,7 +193,7 @@ export default async function StrikeoutLeadersPage() {
                 {row.team_id ? (
                   <div
                     aria-hidden
-                    className="pointer-events-none absolute right-[20%] bottom-0 translate-y-[55%] w-[152px] h-[152px] opacity-20"
+                    className="pointer-events-none absolute right-[32%] bottom-0 translate-y-[55%] w-[152px] h-[152px] opacity-20"
                   >
                     <Image
                       src={teamLogoUrl(row.team_id)}
