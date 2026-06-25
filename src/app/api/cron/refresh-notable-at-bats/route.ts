@@ -27,27 +27,63 @@ export async function GET(request: Request) {
   cutoff.setDate(cutoff.getDate() - lookbackDays);
   const cutoffIso = cutoff.toISOString().slice(0, 10);
 
+  // Compute "yesterday in MLB-local time" — the strict window we use
+  // to pick Pitch of the Day. Doing it in ET means a 7:30am ET cron
+  // run (11:30 UTC) consistently looks back at "last night's games"
+  // regardless of UTC date rollover quirks.
+  //
+  // Also derives day-of-week so we can gate Whiff of the Week to a
+  // single weekly refresh (Mondays). Mid-week WoW updates created
+  // noise — the "best whiff of the week" shouldn't change daily.
+  const etDateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const todayET = etDateFormatter.format(today); // "YYYY-MM-DD"
+  const [etYear, etMonth, etDay] = todayET.split("-").map(Number);
+  const todayEtUtc = new Date(Date.UTC(etYear, etMonth - 1, etDay));
+  const yesterdayEtUtc = new Date(todayEtUtc);
+  yesterdayEtUtc.setUTCDate(yesterdayEtUtc.getUTCDate() - 1);
+  const yesterdayET = yesterdayEtUtc.toISOString().slice(0, 10);
+  const isMondayET = todayEtUtc.getUTCDay() === 1; // 0=Sun, 1=Mon
+
   // Source the iteration from pitch_pitcher_games rather than from
   // pitch_games directly — pitch_games holds the full schedule
   // (current + future + historical) and gte(game_date, cutoff) can
   // easily exceed PostgREST's 1000-row cap with thousands of
   // upcoming-schedule rows. pitch_pitcher_games is bounded to
-  // *actually-cached* games and stays well under any cap.
-  const { data: ppgRows, error: ppgErr } = await supabase
-    .from("pitch_pitcher_games")
-    .select("game_pk, pitch_games!inner(game_date)")
-    .gte("pitch_games.game_date", cutoffIso);
-  if (ppgErr) {
-    return NextResponse.json({ error: ppgErr.message }, { status: 500 });
-  }
+  // *actually-cached* games but, at 15 games/day × ~12 pitchers/game
+  // × 7-day window, still pushes ~1,260 rows — above Supabase's hard
+  // 1000-row server-side cap. Paginate by primary-key order so we
+  // catch the most-recent rows that otherwise get dropped (which
+  // would silently mask yesterday's games and freeze the POTD pick).
   type PpgJoinRow = {
     game_pk: number;
     pitch_games: { game_date: string };
   };
-  const ppgJoined = (ppgRows ?? []) as unknown as PpgJoinRow[];
+  const PPG_PAGE_SIZE = 1000;
+  const PPG_MAX_PAGES = 20;
   const gameDateByPk = new Map<number, string>();
-  for (const r of ppgJoined) {
-    gameDateByPk.set(r.game_pk, r.pitch_games.game_date);
+  for (let page = 0; page < PPG_MAX_PAGES; page++) {
+    const { data: pageRows, error: pageErr } = await supabase
+      .from("pitch_pitcher_games")
+      .select("game_pk, pitch_games!inner(game_date)")
+      .gte("pitch_games.game_date", cutoffIso)
+      .order("game_pk", { ascending: true })
+      .range(page * PPG_PAGE_SIZE, (page + 1) * PPG_PAGE_SIZE - 1);
+    if (pageErr) {
+      console.error("[refresh-notable-at-bats] ppg page", page, pageErr);
+      return NextResponse.json({ error: pageErr.message }, { status: 500 });
+    }
+    const rows = (pageRows ?? []) as unknown as PpgJoinRow[];
+    for (const r of rows) {
+      if (!gameDateByPk.has(r.game_pk)) {
+        gameDateByPk.set(r.game_pk, r.pitch_games.game_date);
+      }
+    }
+    if (rows.length < PPG_PAGE_SIZE) break;
   }
   const games = Array.from(gameDateByPk, ([game_pk, game_date]) => ({
     game_pk,
@@ -84,11 +120,14 @@ export async function GET(request: Request) {
   let whiffOfWeek: FeaturePick | null = null;
 
   const todayIso = today.toISOString().slice(0, 10);
-  // Pitch of the Day picks from the most recent cached game date
-  // rather than strict "today" — if our cache is a day or two behind
-  // (offseason, scheduled refresh hasn't run, etc.), the surface
-  // should still populate with the freshest pitches we have.
-  const latestCachedDate = games[0]?.game_date ?? todayIso;
+  // Pitch of the Day picks STRICTLY from yesterday's MLB games (in ET).
+  // The earlier "most recent cached game date" fallback would happily
+  // re-select the same pitch from a 2-day-old game when yesterday's
+  // ingestion hadn't landed yet, freezing the daily feature for days
+  // at a stretch. Strict yesterday means: if yesterday had no MLB
+  // games (off-day, All-Star break) OR Savant hasn't ingested them
+  // by the 11:30 UTC cron, pitchOfDay stays null and the upsert below
+  // is skipped — DailyPickStrip keeps the previous day's pick visible.
 
   for (const g of games) {
     const { data: pitchesRaw } = await supabase
@@ -133,11 +172,13 @@ export async function GET(request: Request) {
       const dre = p.delta_run_exp != null ? Math.abs(Number(p.delta_run_exp)) : 0;
       if (dre > ab.max_abs_delta_run_exp) ab.max_abs_delta_run_exp = dre;
 
-      // Pitch-of-day candidate: best-velocity whiff from the most
-      // recent cached game date. Picks a single defining pitch.
+      // Pitch-of-day candidate: best-velocity whiff from yesterday's
+      // games specifically. Strict date filter means each day's pool
+      // is non-overlapping with the previous day's, so the same pitch
+      // can't be picked twice across consecutive runs.
       if (
         cat === "whiff" &&
-        g.game_date === latestCachedDate &&
+        g.game_date === yesterdayET &&
         p.release_speed != null
       ) {
         const score = Number(p.release_speed);
@@ -155,10 +196,14 @@ export async function GET(request: Request) {
         }
       }
 
-      // Whiff-of-week candidate: any whiff in the lookback window,
-      // ranked by velocity. Tracks separately so the rolling weekly
-      // pick survives even when the daily pick rolls over.
-      if (cat === "whiff" && p.release_speed != null) {
+      // Whiff-of-week candidate: highest-velocity whiff in the 7-day
+      // lookback. Only computed when this cron run is the weekly
+      // refresh (Mondays) — daily WoW updates produce noisy week-over-
+      // week jitter where a single high-velo pitch reshuffles the
+      // headline every morning. On non-Monday runs we leave the
+      // existing WoW row in place via the `if (whiffOfWeek)` guard
+      // around the upsert below.
+      if (isMondayET && cat === "whiff" && p.release_speed != null) {
         const score = Number(p.release_speed);
         if (!whiffOfWeek || score > whiffOfWeek.score) {
           whiffOfWeek = {
