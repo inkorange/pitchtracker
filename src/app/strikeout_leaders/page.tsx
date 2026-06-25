@@ -99,7 +99,16 @@ function handLabel(throws: string | null): string {
 }
 
 export default async function StrikeoutLeadersPage() {
-  const season = new Date().getFullYear();
+  const now = new Date();
+  const season = now.getFullYear();
+  // "Through {date}" framing reads like a stats cutoff. Anchored in ET
+  // so the cache regeneration time matches the MLB calendar day the
+  // numbers were computed against.
+  const dateLabel = now.toLocaleDateString("en-US", {
+    timeZone: "America/New_York",
+    month: "long",
+    day: "numeric",
+  });
   const rows = await loadStrikeoutLeaders();
 
   return (
@@ -135,22 +144,22 @@ export default async function StrikeoutLeadersPage() {
                 MLB Strikeout Leaders
               </h1>
               <div className="mt-3 text-[18px] text-white/55 tabular-nums">
-                {season} Regular Season
+                Through {dateLabel} · {season} Regular Season
               </div>
             </div>
-            {/* Brand mark sits in the upper-right corner. The logo
-                asset is 256×256 — rendered at 104px so it's prominent
-                in the X.com card thumbnail without crowding the
-                title. URL stays beneath it so anyone screenshotting
-                the post still knows where to land. */}
+            {/* Brand wordmark sits in the upper-right corner. The
+                asset is a horizontal SVG (viewBox ~290×50, 5.8:1), so
+                the container matches that ratio at 260×45 — fits the
+                X.com card thumbnail without crowding the title.
+                URL stays beneath it for landing context. */}
             <div className="flex flex-col items-end gap-2 flex-shrink-0">
-              <div className="relative w-[104px] h-[104px]">
+              <div className="relative w-[260px] h-[45px]">
                 <Image
-                  src="/logo.png"
+                  src="/pitchtracker-logo.svg"
                   alt="pitchtracker"
                   fill
-                  sizes="104px"
-                  className="object-contain"
+                  sizes="260px"
+                  className="object-contain object-right"
                   unoptimized
                   priority
                 />
@@ -172,10 +181,32 @@ export default async function StrikeoutLeadersPage() {
             rows.map((row) => (
               <li
                 key={row.pitcher_id}
-                className="flex items-center gap-4 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07]"
+                className="relative flex items-center gap-4 px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.07] overflow-hidden"
               >
+                {/* Ghosted team logo: large, set in from the right
+                    edge so it doesn't sit under the strikeout
+                    number, pushed lower past the row's bottom edge
+                    so it bleeds off the card. overflow-hidden on the
+                    row clips the bottom of the logo to the row's
+                    rounded rectangle — the parts that show inside
+                    the row act as a watermark behind the content. */}
+                {row.team_id ? (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute right-[20%] bottom-0 translate-y-[55%] w-[152px] h-[152px] opacity-20"
+                  >
+                    <Image
+                      src={teamLogoUrl(row.team_id)}
+                      alt=""
+                      fill
+                      sizes="152px"
+                      className="object-contain object-bottom"
+                      unoptimized
+                    />
+                  </div>
+                ) : null}
                 <span
-                  className={`text-[36px] font-semibold w-[56px] tabular-nums text-center ${
+                  className={`relative z-10 text-[36px] font-semibold w-[56px] tabular-nums text-center ${
                     row.rank === 1
                       ? "text-amber-300"
                       : row.rank <= 3
@@ -185,7 +216,7 @@ export default async function StrikeoutLeadersPage() {
                 >
                   {row.rank}
                 </span>
-                <div className="relative w-[64px] h-[64px] rounded-full bg-white/[0.05] overflow-hidden flex-shrink-0 border border-white/10">
+                <div className="relative z-10 w-[64px] h-[64px] rounded-full bg-white/[0.05] overflow-hidden flex-shrink-0 border border-white/10">
                   <Image
                     src={pitcherHeadshotUrl(row.pitcher_id, 240)}
                     alt={row.full_name}
@@ -195,7 +226,7 @@ export default async function StrikeoutLeadersPage() {
                     unoptimized
                   />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="relative z-10 flex-1 min-w-0">
                   <div className="text-[24px] font-medium truncate leading-tight">
                     {row.full_name}
                   </div>
@@ -204,22 +235,10 @@ export default async function StrikeoutLeadersPage() {
                     {handLabel(row.throws) ? ` · ${handLabel(row.throws)}` : ""}
                   </div>
                 </div>
-                {row.team_id ? (
-                  <div className="relative w-[48px] h-[48px] flex-shrink-0">
-                    <Image
-                      src={teamLogoUrl(row.team_id)}
-                      alt={row.team_name ?? row.team_abbr ?? "team"}
-                      fill
-                      sizes="48px"
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </div>
-                ) : null}
                 {/* Just the number — the headline above already says
                     "Strikeout Leaders", a "K" label here would be
                     redundant. */}
-                <div className="text-right tabular-nums min-w-[96px] text-[42px] leading-none font-semibold">
+                <div className="relative z-10 text-right tabular-nums min-w-[96px] text-[42px] leading-none font-semibold">
                   {row.strikeouts}
                 </div>
               </li>
