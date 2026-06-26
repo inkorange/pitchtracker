@@ -1078,6 +1078,15 @@ export type Database = {
         Args: { p_season: number; p_limit?: number }
         Returns: { rank: number; pitcher_id: number; strikeouts: number }[]
       }
+      pitch_top_velocity: {
+        Args: { p_days?: number; p_limit?: number; p_min_pitches?: number }
+        Returns: {
+          rank: number
+          pitcher_id: number
+          avg_velo: number
+          fb_pitches: number
+        }[]
+      }
       pitch_search_batters: {
         Args: { p_limit?: number; p_query: string }
         Returns: {

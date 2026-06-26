@@ -7,6 +7,7 @@
 // leaderboards (velocity_leaders, whiff_leaders, etc.).
 const SCREENSHOT_PATHS = new Set<string>([
   "/strikeout_leaders",
+  "/velocity_leaders",
 ]);
 
 export function isScreenshotRoute(pathname: string | null | undefined): boolean {
