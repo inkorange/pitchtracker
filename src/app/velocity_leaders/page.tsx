@@ -140,14 +140,22 @@ export default async function VelocityLeadersPage() {
         />
 
         {/* Header */}
-        <header className="relative z-10 px-12 pt-12 pb-6 border-b border-white/[0.08]">
+        <header className="relative z-10 px-12 pt-10 pb-4 border-b border-white/[0.08]">
           <div className="flex items-start justify-between gap-6">
             <div>
               <div className="text-[18px] font-semibold uppercase tracking-[0.32em] text-white/60">
                 Top 10
               </div>
-              <h1 className="mt-2 text-[60px] leading-[1.04] font-semibold tracking-tight">
-                MLB Fastball Velocity
+              {/* Two lines via explicit <br/> instead of relying on the
+                  browser's wrap point — Playwright captures need a
+                  deterministic break so the title doesn't shift
+                  between screenshots. Drops from 60px → 52px so the
+                  two-line block fits the existing canvas budget
+                  without squeezing the row stack. */}
+              <h1 className="mt-2 text-[52px] leading-[1.05] font-semibold tracking-tight">
+                Weekly MLB Fastball
+                <br />
+                Velocity Leaders
               </h1>
               <div className="mt-3 text-[18px] text-white/55 tabular-nums">
                 {dateRangeLabel} · {season} Regular Season · Avg FB Velo
@@ -173,7 +181,7 @@ export default async function VelocityLeadersPage() {
         </header>
 
         {/* Leaderboard rows */}
-        <ol className="relative z-10 flex-1 px-12 py-6 flex flex-col gap-3">
+        <ol className="relative z-10 flex-1 px-12 py-4 flex flex-col gap-3">
           {rows.length === 0 ? (
             <li className="text-[24px] text-white/40 italic text-center mt-12">
               No fastball data in the last 7 days.
