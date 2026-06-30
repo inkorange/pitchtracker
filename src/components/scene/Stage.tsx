@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Line } from "@react-three/drei";
 import { MeshStandardMaterial, Path, Shape } from "three";
-import { OutfieldStands } from "./OutfieldStands";
+import { StadiumBowl, wallRadiusAtAngle } from "./StadiumBowl";
 
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
@@ -287,7 +287,7 @@ export function Stage() {
       <HomePlate />
       <Mound />
       <StrikeZone />
-      <OutfieldStands />
+      <StadiumBowl />
     </group>
   );
 }
@@ -500,17 +500,31 @@ function Base({ position }: { position: [number, number, number] }) {
 }
 
 function FoulLines() {
-  // Extends to the outfield-wall radius (350 ft) so the lines visually
-  // terminate at the foul poles where the wall arc meets, instead of
-  // dangling ~30 ft short with a visible gap.
-  const extent = 350;
+  // Foul lines terminate exactly at the bowl wall for their bearing.
+  // The bowl radius now varies by angle (BACKSTOP behind home plate,
+  // OUTFIELD in deep center), so the foul-pole distance is shorter
+  // than the deep-center wall. Pulling wallRadiusAtAngle keeps the
+  // foul line and the wall meeting cleanly without a visible gap or
+  // overshoot if the bowl shape is tweaked later.
+  const foulFirstAngle = -Math.PI / 4; // 1B foul line direction in atan2(z,x)
+  const foulThirdAngle = (-3 * Math.PI) / 4; // 3B foul line direction
+  const firstExtent = wallRadiusAtAngle(foulFirstAngle);
+  const thirdExtent = wallRadiusAtAngle(foulThirdAngle);
   const firstLine: Array<[number, number, number]> = [
     [0, Y_LINE, 0],
-    [extent / Math.SQRT2, Y_LINE, -extent / Math.SQRT2],
+    [
+      firstExtent * Math.cos(foulFirstAngle),
+      Y_LINE,
+      firstExtent * Math.sin(foulFirstAngle),
+    ],
   ];
   const thirdLine: Array<[number, number, number]> = [
     [0, Y_LINE, 0],
-    [-extent / Math.SQRT2, Y_LINE, -extent / Math.SQRT2],
+    [
+      thirdExtent * Math.cos(foulThirdAngle),
+      Y_LINE,
+      thirdExtent * Math.sin(foulThirdAngle),
+    ],
   ];
   // renderOrder pulls these in with the rest of the field — same fix
   // as the grass: transparent objects sort by centroid distance, so

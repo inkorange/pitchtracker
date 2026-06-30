@@ -4,51 +4,59 @@ import { useMemo } from "react";
 import * as THREE from "three";
 import { MeshStandardMaterial } from "three";
 
-// Procedural stadium ring for the outfield. Two curved strips sit on
-// the negative-Z (outfield) side of the field, spanning foul-line to
-// foul-line:
+// Closed stadium bowl encircling the field. A single wall + sloped
+// seating tier sweep the full 360° around home plate, with the wall
+// radius varying smoothly by angle:
 //
-//   1. The outfield wall — a vertical curved strip 8 ft tall at the
-//      WALL_RADIUS, classic ballpark dark green.
-//   2. A sloped seating tier behind the wall — a curved ramp that
-//      rises from the wall's top to TIER_TOP_HEIGHT, with a row/aisle
-//      pattern painted on by a shader patch so it reads as "stands"
-//      without per-seat geometry.
+//   r(θ) = R_MEAN + R_AMP · cos(θ − OUTFIELD_BEARING)
 //
-// Both meshes are single-sided (FrontSide) and wound so the visible
-// face points inward toward home plate. From the back side they'd be
-// invisible, which is fine — the camera lives inside the field.
+// θ = atan2(z, x). When θ aligns with the outfield bearing (−π/2 =
+// dead center, −Z direction), r = OUTFIELD_RADIUS (deepest). At the
+// opposite angle (+π/2, behind home plate), r = BACKSTOP_RADIUS
+// (tightest — the catcher's backstop). The foul-line sides land at
+// the mean, so the bowl reads as an oval elongated toward the outfield
+// — matching the classic horseshoe-with-closed-back shape.
 //
-// Coordinate convention matches Stage.tsx: plate at (0,0,0), outfield
-// in the -Z direction. The arc spans -135° → -45° measured from +X
-// (1B foul-pole at angle -45°, 3B foul-pole at -135°, dead center at
-// angle -90° / position (0, 0, -WALL_RADIUS)).
+// Both meshes are FrontSide with inward-facing winding; their normals
+// point toward home plate. From outside the bowl they're invisible —
+// the camera lives inside the field and the CameraRig clamp keeps it
+// from poking past the backstop wall.
 
-const WALL_RADIUS = 350; // ft from home plate
-const WALL_HEIGHT = 8; // ~classic outfield wall height
-const TIER_INNER_RADIUS = WALL_RADIUS + 2; // small gap behind the wall
-const TIER_DEPTH = 24; // ramp depth (radial)
-const TIER_RISE = 22; // total vertical rise of the tier
-const TIER_BASE_HEIGHT = WALL_HEIGHT; // tier inner edge sits at wall top
+export const BACKSTOP_RADIUS = 85;
+export const OUTFIELD_RADIUS = 350;
+const R_MEAN = (BACKSTOP_RADIUS + OUTFIELD_RADIUS) / 2;
+const R_AMP = (OUTFIELD_RADIUS - BACKSTOP_RADIUS) / 2;
+// −π/2: deep center is in the −Z direction in this scene's coords.
+const OUTFIELD_BEARING = -Math.PI / 2;
+
+const WALL_HEIGHT = 8;
+const TIER_INNER_OFFSET = 2;
+const TIER_DEPTH = 24;
+const TIER_RISE = 22;
+const TIER_BASE_HEIGHT = WALL_HEIGHT;
 const TIER_TOP_HEIGHT = TIER_BASE_HEIGHT + TIER_RISE;
-const TIER_OUTER_RADIUS = TIER_INNER_RADIUS + TIER_DEPTH;
-const ARC_START = (-3 * Math.PI) / 4; // -135° = 3B foul line at the wall
-const ARC_END = -Math.PI / 4; // -45° = 1B foul line at the wall
-const ARC_SEGMENTS = 96; // smoothness of the curve
 
-const WALL_COLOR = "#1c3b1c"; // deep ballpark green
-const WALL_TRIM_COLOR = "#e6c945"; // yellow homer-line at the top
+const ARC_SEGMENTS = 256;
+const SEGMENT_ANGLE = (2 * Math.PI) / ARC_SEGMENTS;
 
-// Curved vertical wall: two-vertex column per segment (bottom + top).
+const WALL_COLOR = "#1c3b1c";
+const WALL_TRIM_COLOR = "#e6c945";
+
+// Wall radius at any bearing around home plate. Exported so other
+// scene components (e.g. FoulLines) can terminate cleanly at the wall.
+export function wallRadiusAtAngle(angle: number): number {
+  return R_MEAN + R_AMP * Math.cos(angle - OUTFIELD_BEARING);
+}
+
 function useWallGeometry() {
   return useMemo(() => {
     const positions: number[] = [];
     const indices: number[] = [];
     for (let i = 0; i <= ARC_SEGMENTS; i++) {
-      const t = i / ARC_SEGMENTS;
-      const angle = ARC_START + (ARC_END - ARC_START) * t;
-      const x = WALL_RADIUS * Math.cos(angle);
-      const z = WALL_RADIUS * Math.sin(angle);
+      const angle = -Math.PI + i * SEGMENT_ANGLE;
+      const r = wallRadiusAtAngle(angle);
+      const x = r * Math.cos(angle);
+      const z = r * Math.sin(angle);
       positions.push(x, 0, z); // bottom
       positions.push(x, WALL_HEIGHT, z); // top
     }
@@ -73,20 +81,21 @@ function useWallGeometry() {
 }
 
 // Thin yellow trim strip on top of the wall — the classic "home run
-// boundary" yellow line at the top of an outfield fence.
+// boundary" yellow line at the top of an outfield fence. Continues all
+// the way around the bowl; reads as the cap of the lower-deck wall
+// behind the plate too.
 function useWallTrimGeometry() {
   return useMemo(() => {
     const positions: number[] = [];
     const indices: number[] = [];
-    const trimThickness = 0.6;
     const trimYBottom = WALL_HEIGHT - 0.4;
     const trimYTop = WALL_HEIGHT + 0.2;
-    const trimRadius = WALL_RADIUS - 0.05; // tiny inset so it doesn't z-fight the wall
+    const trimRadialInset = 0.05; // tiny inset so it doesn't z-fight the wall
     for (let i = 0; i <= ARC_SEGMENTS; i++) {
-      const t = i / ARC_SEGMENTS;
-      const angle = ARC_START + (ARC_END - ARC_START) * t;
-      const x = trimRadius * Math.cos(angle);
-      const z = trimRadius * Math.sin(angle);
+      const angle = -Math.PI + i * SEGMENT_ANGLE;
+      const r = wallRadiusAtAngle(angle) - trimRadialInset;
+      const x = r * Math.cos(angle);
+      const z = r * Math.sin(angle);
       positions.push(x, trimYBottom, z);
       positions.push(x, trimYTop, z);
     }
@@ -98,7 +107,6 @@ function useWallTrimGeometry() {
       indices.push(bl, br, tl);
       indices.push(tl, br, tr);
     }
-    void trimThickness; // currently a flat strip, not extruded
     const geom = new THREE.BufferGeometry();
     geom.setAttribute(
       "position",
@@ -110,35 +118,28 @@ function useWallTrimGeometry() {
   }, []);
 }
 
-// Sloped seating ramp: inner edge at (radius=TIER_INNER_RADIUS,
-// y=TIER_BASE_HEIGHT), outer edge at (radius=TIER_OUTER_RADIUS,
-// y=TIER_TOP_HEIGHT). Rises ~22 ft over ~24 ft of depth → ~42° tier
-// slope, similar to upper-deck nosebleeds.
+// Sloped seating ramp: inner edge sits at (wallR + TIER_INNER_OFFSET,
+// y = WALL_HEIGHT), outer edge at (innerR + TIER_DEPTH, y = TIER_TOP).
+// Rises ~22 ft over ~24 ft of depth → ~42° tier slope.
 function useTierGeometry() {
   return useMemo(() => {
     const positions: number[] = [];
     const indices: number[] = [];
     for (let i = 0; i <= ARC_SEGMENTS; i++) {
-      const t = i / ARC_SEGMENTS;
-      const angle = ARC_START + (ARC_END - ARC_START) * t;
+      const angle = -Math.PI + i * SEGMENT_ANGLE;
+      const wallR = wallRadiusAtAngle(angle);
+      const innerR = wallR + TIER_INNER_OFFSET;
+      const outerR = innerR + TIER_DEPTH;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
-      positions.push(
-        TIER_INNER_RADIUS * cos,
-        TIER_BASE_HEIGHT,
-        TIER_INNER_RADIUS * sin,
-      ); // inner edge (bottom-front)
-      positions.push(
-        TIER_OUTER_RADIUS * cos,
-        TIER_TOP_HEIGHT,
-        TIER_OUTER_RADIUS * sin,
-      ); // outer edge (top-back)
+      positions.push(innerR * cos, TIER_BASE_HEIGHT, innerR * sin);
+      positions.push(outerR * cos, TIER_TOP_HEIGHT, outerR * sin);
     }
     for (let i = 0; i < ARC_SEGMENTS; i++) {
-      const bl = i * 2; // inner-bottom of segment i
-      const tl = i * 2 + 1; // outer-top of segment i
-      const br = (i + 1) * 2; // inner-bottom of segment i+1
-      const tr = (i + 1) * 2 + 1; // outer-top of segment i+1
+      const bl = i * 2;
+      const tl = i * 2 + 1;
+      const br = (i + 1) * 2;
+      const tr = (i + 1) * 2 + 1;
       indices.push(bl, br, tl);
       indices.push(tl, br, tr);
     }
@@ -180,9 +181,9 @@ function useWallTrimMaterial() {
 }
 
 // Shader-patched standard material for the seating tier. Paints
-// alternating-color horizontal rows (every ~2 ft of vertical) and dark
-// radial aisles every ~50 ft of arc length so the ramp reads as a
-// section of seats from a distance without modeling per-seat geometry.
+// alternating-color horizontal rows + dark radial aisles by angular
+// position so the aisle lines stay straight (point at home plate)
+// regardless of the seat point's actual height/radius.
 function useSeatsMaterial() {
   return useMemo(() => {
     const mat = new MeshStandardMaterial({
@@ -212,8 +213,7 @@ function useSeatsMaterial() {
         .replace(
           "#include <color_fragment>",
           `#include <color_fragment>
-          // Row stripes: alternate two seat shades every ~2 ft of
-          // vertical rise so the ramp reads as horizontal rows.
+          // Row stripes: alternate two seat shades every ~2 ft of rise.
           float ROW_H = 2.0;
           float row = floor((vStandsWorldPos.y - ${TIER_BASE_HEIGHT.toFixed(1)}) / ROW_H);
           float rowMod = mod(row, 2.0);
@@ -221,26 +221,21 @@ function useSeatsMaterial() {
           vec3 lightSeat = vec3(0.18, 0.24, 0.42);
           vec3 seatColor = mix(darkSeat, lightSeat, rowMod);
 
-          // Thin darker line at each row boundary so individual rows
-          // are visible even at distance — looks like a step shadow.
+          // Step shadow at each row boundary — keeps rows visible at distance.
           float rowFrac = fract((vStandsWorldPos.y - ${TIER_BASE_HEIGHT.toFixed(1)}) / ROW_H);
           if (rowFrac < 0.08) seatColor *= 0.65;
 
-          // Radial aisles: every ~50 ft of arc length AT THE WALL.
-          // Earlier version used the point's own radius for arcLength,
-          // but radius rises with Y across the tier slope (352 at the
-          // bottom, ~376 at the top), so the aisle-modulo value drifted
-          // upward with Y and the aisles rendered as slanted streaks.
-          // Anchoring to the wall radius makes the test depend purely
-          // on angular position, so an aisle is a true radial slice —
-          // every height at the same angle gets the same value, and
-          // the aisles read as vertical lines pointing at home plate.
+          // Radial aisles: angular pattern. ~36 aisles around the bowl
+          // (one every 10°). Using angular position rather than arc
+          // length keeps the aisle as a true radial slice — every
+          // height at the same angle gets the same value, so aisles
+          // render as straight lines pointing at home plate.
           float angle = atan(vStandsWorldPos.z, vStandsWorldPos.x);
-          float AISLE_SPACING = 50.0;
-          float arcAtWall = ${WALL_RADIUS.toFixed(1)} * angle;
-          float aisleFrac = fract(arcAtWall / AISLE_SPACING + 0.5);
-          float aisleDist = abs(aisleFrac - 0.5) * AISLE_SPACING * 2.0;
-          if (aisleDist < 1.5) seatColor = vec3(0.05, 0.07, 0.14);
+          float AISLE_COUNT = 36.0;
+          float angleNorm = (angle + 3.14159265) / (2.0 * 3.14159265);
+          float aisleFrac = fract(angleNorm * AISLE_COUNT);
+          float aisleDist = abs(aisleFrac - 0.5);
+          if (aisleDist > 0.46) seatColor = vec3(0.05, 0.07, 0.14);
 
           diffuseColor.rgb = seatColor;
           `,
@@ -250,7 +245,7 @@ function useSeatsMaterial() {
   }, []);
 }
 
-export function OutfieldStands() {
+export function StadiumBowl() {
   const wallGeom = useWallGeometry();
   const wallTrimGeom = useWallTrimGeometry();
   const tierGeom = useTierGeometry();
