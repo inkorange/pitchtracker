@@ -18,7 +18,7 @@ import { PitcherSearchPopover } from "@/components/chrome/PitcherSearchPopover";
 import { SeasonPicker } from "@/components/filters/SeasonPicker";
 import { HelpButton } from "../stats/HelpButton";
 import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
-import { TopNav } from "@/components/chrome/TopNav";
+import { TOPNAV_BUTTON_CLS, TopNav } from "@/components/chrome/TopNav";
 import { FiltersGate } from "../FiltersGate";
 import { MatchupsPanel } from "../MatchupsPanel";
 import { PitcherCardCollapse } from "../PitcherCardCollapse";
@@ -798,14 +798,13 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       </PitcherOutcomeLegendGate>
 
       <TopNav
-        back={{ href: "/", label: "Home" }}
         title="Pitcher"
         summary={filterSummary}
         rightSlot={
           <div className="flex items-center gap-1">
             <Link
               href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
-              className="px-2.5 py-1 rounded-md bg-white/[0.12] hover:bg-white/[0.2] border border-white/20 text-white text-[10px] uppercase tracking-[0.14em] transition-colors"
+              className={TOPNAV_BUTTON_CLS}
             >
               Compare
             </Link>

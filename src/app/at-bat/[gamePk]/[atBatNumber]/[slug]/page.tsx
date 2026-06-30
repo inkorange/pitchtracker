@@ -637,7 +637,7 @@ function NotCachedState({
 }) {
   return (
     <>
-      <TopNav back={{ href: "/", label: "Home" }} title="At-bat replay" />
+      <TopNav title="At-bat replay" />
       <div className="absolute inset-0 flex items-center justify-center px-6 pointer-events-auto">
         <div className="max-w-2xl space-y-6 text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-white">
