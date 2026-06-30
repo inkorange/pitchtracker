@@ -10,6 +10,7 @@ import {
 } from "@/lib/statsapi/client";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
+import { teamNickname } from "@/lib/teams/nicknames";
 import { absoluteUrl } from "@/lib/url/site";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
@@ -255,12 +256,12 @@ export default async function GameAtBatsPage({ params }: PageProps) {
               {awayTeam?.mlb_id ? (
                 <TeamLogo teamId={awayTeam.mlb_id} size={36} alt={awayTeam.name} />
               ) : null}
-              <span>{awayTeam?.abbreviation ?? "?"}</span>
+              <span>{awayTeam ? teamNickname(awayTeam.mlb_id) : "?"}</span>
               <span className="text-white/45 text-base">@</span>
               {homeTeam?.mlb_id ? (
                 <TeamLogo teamId={homeTeam.mlb_id} size={36} alt={homeTeam.name} />
               ) : null}
-              <span>{homeTeam?.abbreviation ?? "?"}</span>
+              <span>{homeTeam ? teamNickname(homeTeam.mlb_id) : "?"}</span>
             </h1>
             <span className="text-sm text-white/55 tabular-nums">
               {game?.game_date}
@@ -268,13 +269,7 @@ export default async function GameAtBatsPage({ params }: PageProps) {
           </div>
         </div>
 
-        {gameResult ? (
-          <BoxScore
-            result={gameResult}
-            awayAbbr={awayTeam?.abbreviation ?? "?"}
-            homeAbbr={homeTeam?.abbreviation ?? "?"}
-          />
-        ) : null}
+        {gameResult ? <BoxScore result={gameResult} /> : null}
 
         <AtBatGameList
           gamePk={gamePkN}
@@ -290,15 +285,7 @@ export default async function GameAtBatsPage({ params }: PageProps) {
 // Box score — R / H / E per team plus W / L / SV decisions.
 // Sourced from MLB Stats (linescore + decisions hydrate).
 // =====================================================================
-function BoxScore({
-  result,
-  awayAbbr,
-  homeAbbr,
-}: {
-  result: MlbGameResult;
-  awayAbbr: string;
-  homeAbbr: string;
-}) {
+function BoxScore({ result }: { result: MlbGameResult }) {
   const awayScore = result.away.score;
   const homeScore = result.home.score;
   const awayWon =
@@ -318,13 +305,11 @@ function BoxScore({
         <span className="text-[10px] uppercase tracking-[0.16em] text-white/45 text-right">E</span>
         <BoxScoreTeamRow
           teamId={result.away.teamId}
-          abbr={awayAbbr}
           line={result.away}
           won={awayWon}
         />
         <BoxScoreTeamRow
           teamId={result.home.teamId}
-          abbr={homeAbbr}
           line={result.home}
           won={homeWon}
         />
@@ -348,12 +333,10 @@ function BoxScore({
 
 function BoxScoreTeamRow({
   teamId,
-  abbr,
   line,
   won,
 }: {
   teamId: number;
-  abbr: string;
   line: MlbGameResult["home"];
   won: boolean;
 }) {
@@ -363,7 +346,7 @@ function BoxScoreTeamRow({
     <>
       <div className="flex items-center gap-2">
         <TeamLogo teamId={teamId} size={24} />
-        <span className={won ? bold : "text-white/85"}>{abbr}</span>
+        <span className={won ? bold : "text-white/85"}>{teamNickname(teamId)}</span>
       </div>
       <span className={`text-right ${won ? bold : dim}`}>
         {line.score ?? "—"}

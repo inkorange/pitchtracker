@@ -1,25 +1,28 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { MlbGameResult } from "@/lib/statsapi/client";
-import { teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
+import { teamNickname } from "@/lib/teams/nicknames";
+import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 
 // Shared game-result card used by:
 //   - the homepage YesterdayGamesStrip
 //   - the /at-bat date listing
 //
-// Each card links to /at-bat/<gamePk> for the at-bat browser, shows
-// final scores with the winning team bolded, an optional status chip
-// for non-Final states (In Progress / Postponed / etc.), and W / L /
-// SV decisions on a single wrap-friendly line below.
+// The team rows are a click target that opens the at-bat browser
+// (/at-bat/<gamePk>). Each W / L / SV pitcher name in the decisions
+// row below is its own link to that pitcher's page — clicking the
+// pitcher name does NOT bounce through the matchup. Anchor tags
+// can't nest in valid HTML, so the outer wrapper is a plain styled
+// container with two independent click targets inside.
+//
+// Team identity reads as the canonical nickname ("Tigers", "Yankees",
+// "Red Sox") via the teamNickname helper.
 
 interface GameCardProps {
   game: MlbGameResult;
-  awayAbbr: string;
-  homeAbbr: string;
 }
 
-export function GameCard({ game, awayAbbr, homeAbbr }: GameCardProps) {
+export function GameCard({ game }: GameCardProps) {
   const awayScore = game.away.score ?? 0;
   const homeScore = game.home.score ?? 0;
   const hasScores = game.away.score != null && game.home.score != null;
@@ -31,65 +34,75 @@ export function GameCard({ game, awayAbbr, homeAbbr }: GameCardProps) {
     game.decisions.winner || game.decisions.loser || game.decisions.save;
 
   return (
-    <Link
-      href={`/at-bat/${game.gamePk}`}
-      className="block rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 transition-colors px-3 py-2.5 space-y-1.5"
-    >
-      <div className="space-y-0.5">
+    <div className="rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 transition-colors px-3.5 py-3 space-y-2.5">
+      {/* Team rows are the game-link click target. space-y-2 keeps
+          the two 28px team-logo rows from stacking edge-to-edge. */}
+      <Link href={`/at-bat/${game.gamePk}`} className="block space-y-2">
         <TeamScoreRow
           teamId={game.away.teamId}
-          abbr={awayAbbr}
           score={hasScores ? awayScore : null}
           won={awayWon}
           statusChip={showStatusNote ? game.status.detailedState : null}
         />
         <TeamScoreRow
           teamId={game.home.teamId}
-          abbr={homeAbbr}
           score={hasScores ? homeScore : null}
           won={homeWon}
         />
-      </div>
+      </Link>
       {hasDecisions ? (
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10.5px] tabular-nums pt-1.5 border-t border-white/[0.06]">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] tabular-nums pt-2.5 border-t border-white/[0.06]">
           {game.decisions.winner ? (
-            <DecisionInline color="text-emerald-300/90" tag="W" name={game.decisions.winner.fullName} />
+            <DecisionLink
+              color="text-emerald-300/90"
+              tag="W"
+              id={game.decisions.winner.id}
+              name={game.decisions.winner.fullName}
+            />
           ) : null}
           {game.decisions.loser ? (
-            <DecisionInline color="text-red-300/90" tag="L" name={game.decisions.loser.fullName} />
+            <DecisionLink
+              color="text-red-300/90"
+              tag="L"
+              id={game.decisions.loser.id}
+              name={game.decisions.loser.fullName}
+            />
           ) : null}
           {game.decisions.save ? (
-            <DecisionInline color="text-amber-300/90" tag="SV" name={game.decisions.save.fullName} />
+            <DecisionLink
+              color="text-amber-300/90"
+              tag="SV"
+              id={game.decisions.save.id}
+              name={game.decisions.save.fullName}
+            />
           ) : null}
         </div>
       ) : null}
-    </Link>
+    </div>
   );
 }
 
 function TeamScoreRow({
   teamId,
-  abbr,
   score,
   won,
   statusChip,
 }: {
   teamId: number;
-  abbr: string;
   score: number | null;
   won: boolean;
   statusChip?: string | null;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <TeamLogo teamId={teamId} size={20} />
+    <div className="flex items-center gap-2.5">
+      <TeamLogo teamId={teamId} size={28} />
       <span
         className={
-          "text-[13px] flex-1 " +
-          (won ? "text-white font-semibold" : "text-white/70")
+          "text-[14px] flex-1 truncate " +
+          (won ? "text-white font-semibold" : "text-white/75")
         }
       >
-        {abbr}
+        {teamNickname(teamId)}
       </span>
       {statusChip ? (
         <span className="text-[9px] uppercase tracking-[0.12em] text-white/40">
@@ -98,7 +111,7 @@ function TeamScoreRow({
       ) : null}
       <span
         className={
-          "text-[13px] tabular-nums w-5 text-right " +
+          "text-[16px] tabular-nums w-6 text-right " +
           (won ? "text-white font-semibold" : "text-white/55")
         }
       >
@@ -108,22 +121,29 @@ function TeamScoreRow({
   );
 }
 
-function DecisionInline({
+function DecisionLink({
   color,
   tag,
+  id,
   name,
 }: {
   color: string;
   tag: string;
+  id: number;
   name: string;
 }) {
   return (
-    <span className="inline-flex items-baseline gap-1">
+    <Link
+      href={pitcherPagePath(id, name)}
+      className="inline-flex items-baseline gap-1 hover:underline underline-offset-2 decoration-white/30"
+    >
       <span className={`${color} font-semibold uppercase tracking-[0.08em]`}>
         {tag}
       </span>
-      <span className="text-white/85">{shortenName(name)}</span>
-    </span>
+      <span className="text-white/85 hover:text-white transition-colors">
+        {shortenName(name)}
+      </span>
+    </Link>
   );
 }
 
