@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { MlbGameResult } from "@/lib/statsapi/client";
 import { teamLogoUrl } from "@/lib/viz/headshot";
+import { TeamLogo } from "@/components/team/TeamLogo";
 
 // Shared game-result card used by:
 //   - the homepage YesterdayGamesStrip
@@ -81,16 +82,7 @@ function TeamScoreRow({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="relative w-5 h-5 flex-shrink-0">
-        <Image
-          src={teamLogoUrl(teamId)}
-          alt=""
-          fill
-          sizes="20px"
-          className="object-contain"
-          unoptimized
-        />
-      </div>
+      <TeamLogo teamId={teamId} size={20} />
       <span
         className={
           "text-[13px] flex-1 " +

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { TeamLogo } from "@/components/team/TeamLogo";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { absoluteUrl } from "@/lib/url/site";
 import { TopNav } from "@/components/chrome/TopNav";
@@ -139,16 +140,7 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
       <div className="max-w-4xl mx-auto space-y-10">
         <header className="space-y-3">
           <div className="flex items-center gap-4">
-            <div className="relative w-14 h-14 flex-shrink-0">
-              <Image
-                src={teamLogoUrl(team.mlb_id)}
-                alt={team.name}
-                fill
-                sizes="56px"
-                className="object-contain"
-                unoptimized
-              />
-            </div>
+            <TeamLogo teamId={team.mlb_id} size={56} alt={team.name} />
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">{team.name}</h1>
               <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">

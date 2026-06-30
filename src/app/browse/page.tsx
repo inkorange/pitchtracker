@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl } from "@/lib/viz/headshot";
+import { TeamLogo } from "@/components/team/TeamLogo";
 import { TopNav } from "@/components/chrome/TopNav";
 
 const DIVISION_ORDER = [
@@ -53,16 +54,7 @@ export default async function BrowsePage() {
                       href={`/browse/${t.mlb_id}`}
                       className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] hover:border-white/15 transition-colors"
                     >
-                      <div className="relative w-9 h-9 flex-shrink-0">
-                        <Image
-                          src={teamLogoUrl(t.mlb_id)}
-                          alt={t.name}
-                          fill
-                          sizes="36px"
-                          className="object-contain"
-                          unoptimized
-                        />
-                      </div>
+                      <TeamLogo teamId={t.mlb_id} size={36} alt={t.name} />
                       <div className="min-w-0">
                         <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
                           {t.abbreviation}

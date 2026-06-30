@@ -7,6 +7,7 @@ import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
 import { absoluteUrl } from "@/lib/url/site";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
+import { TeamLogo } from "@/components/team/TeamLogo";
 import {
   categorizeDescription,
   getPitchLabel,
@@ -871,16 +872,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                   </div>
                 </div>
                 {team ? (
-                  <div className="hidden sm:block relative w-14 h-14 flex-shrink-0">
-                    <Image
-                      src={teamLogoUrl(team.mlb_id)}
-                      alt={team.name}
-                      fill
-                      sizes="56px"
-                      className="object-contain"
-                      unoptimized
-                    />
-                  </div>
+                  <TeamLogo
+                    teamId={team.mlb_id}
+                    size={56}
+                    alt={team.name}
+                    className="hidden sm:block"
+                  />
                 ) : null}
               </div>
 
