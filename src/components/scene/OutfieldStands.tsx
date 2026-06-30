@@ -226,16 +226,20 @@ function useSeatsMaterial() {
           float rowFrac = fract((vStandsWorldPos.y - ${TIER_BASE_HEIGHT.toFixed(1)}) / ROW_H);
           if (rowFrac < 0.08) seatColor *= 0.65;
 
-          // Radial aisles: dark strips every ~50 ft of arc length.
-          // arcLength = radius * angle; use the seat point's actual
-          // radius so the aisle width stays roughly constant in real
-          // feet across the slope.
+          // Radial aisles: every ~50 ft of arc length AT THE WALL.
+          // Earlier version used the point's own radius for arcLength,
+          // but radius rises with Y across the tier slope (352 at the
+          // bottom, ~376 at the top), so the aisle-modulo value drifted
+          // upward with Y and the aisles rendered as slanted streaks.
+          // Anchoring to the wall radius makes the test depend purely
+          // on angular position, so an aisle is a true radial slice —
+          // every height at the same angle gets the same value, and
+          // the aisles read as vertical lines pointing at home plate.
           float angle = atan(vStandsWorldPos.z, vStandsWorldPos.x);
-          float radius = length(vStandsWorldPos.xz);
-          float arcLength = radius * angle;
           float AISLE_SPACING = 50.0;
-          float aisleFrac = fract(arcLength / AISLE_SPACING + 0.5);
-          float aisleDist = abs(aisleFrac - 0.5) * AISLE_SPACING * 2.0; // 0 at aisle center
+          float arcAtWall = ${WALL_RADIUS.toFixed(1)} * angle;
+          float aisleFrac = fract(arcAtWall / AISLE_SPACING + 0.5);
+          float aisleDist = abs(aisleFrac - 0.5) * AISLE_SPACING * 2.0;
           if (aisleDist < 1.5) seatColor = vec3(0.05, 0.07, 0.14);
 
           diffuseColor.rgb = seatColor;
