@@ -108,12 +108,7 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {games.map((g) => (
-                <GameCard
-                  key={g.gamePk}
-                  game={g}
-                  awayAbbr={teamById.get(g.away.teamId)?.abbreviation ?? "?"}
-                  homeAbbr={teamById.get(g.home.teamId)?.abbreviation ?? "?"}
-                />
+                <GameCard key={g.gamePk} game={g} />
               ))}
             </div>
           )}

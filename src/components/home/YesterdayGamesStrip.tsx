@@ -1,4 +1,3 @@
-import { createClient } from "@/lib/supabase/server";
 import { fetchGameResults, type MlbGameResult } from "@/lib/statsapi/client";
 import { GameCard } from "@/components/games/GameCard";
 
@@ -9,6 +8,11 @@ import { GameCard } from "@/components/games/GameCard";
 //
 // Renders nothing if the Stats API call fails or yesterday had no
 // final regular-season games (e.g. off-day, preseason).
+//
+// GameCard derives its own team-nickname labels from teamId via the
+// teamNickname helper, so this strip no longer needs to pre-fetch
+// abbreviations from pitch_teams — one fewer Supabase round-trip on
+// the homepage critical path.
 
 export async function YesterdayGamesStrip() {
   // "Yesterday" in America/New_York — the canonical baseball day
@@ -38,20 +42,6 @@ export async function YesterdayGamesStrip() {
   );
   if (finals.length === 0) return null;
 
-  // Pull team abbreviations from supabase so the card has 2-3 letter
-  // codes that match the rest of the site's chrome.
-  const supabase = await createClient();
-  const teamIds = Array.from(
-    new Set(finals.flatMap((g) => [g.home.teamId, g.away.teamId])),
-  );
-  const { data: teamRows } = await supabase
-    .from("pitch_teams")
-    .select("mlb_id, abbreviation")
-    .in("mlb_id", teamIds);
-  const abbrById = new Map<number, string>(
-    (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
-  );
-
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between">
@@ -64,12 +54,7 @@ export async function YesterdayGamesStrip() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {finals.map((g) => (
-          <GameCard
-            key={g.gamePk}
-            game={g}
-            awayAbbr={abbrById.get(g.away.teamId) ?? "?"}
-            homeAbbr={abbrById.get(g.home.teamId) ?? "?"}
-          />
+          <GameCard key={g.gamePk} game={g} />
         ))}
       </div>
     </section>

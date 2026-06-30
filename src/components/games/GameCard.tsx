@@ -1,8 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { MlbGameResult } from "@/lib/statsapi/client";
-import { teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
+import { teamNickname } from "@/lib/teams/nicknames";
 
 // Shared game-result card used by:
 //   - the homepage YesterdayGamesStrip
@@ -12,14 +11,19 @@ import { TeamLogo } from "@/components/team/TeamLogo";
 // final scores with the winning team bolded, an optional status chip
 // for non-Final states (In Progress / Postponed / etc.), and W / L /
 // SV decisions on a single wrap-friendly line below.
+//
+// Team identity reads as the canonical nickname ("Tigers", "Yankees",
+// "Red Sox") via the teamNickname helper. Earlier passes had the
+// 2-3 letter abbreviation here (DET, NYY), which read as a chrome
+// element more than a team — the full nickname makes the card more
+// scannable and gives away/home rows the visual weight they should
+// carry on the homepage strip.
 
 interface GameCardProps {
   game: MlbGameResult;
-  awayAbbr: string;
-  homeAbbr: string;
 }
 
-export function GameCard({ game, awayAbbr, homeAbbr }: GameCardProps) {
+export function GameCard({ game }: GameCardProps) {
   const awayScore = game.away.score ?? 0;
   const homeScore = game.home.score ?? 0;
   const hasScores = game.away.score != null && game.home.score != null;
@@ -33,25 +37,26 @@ export function GameCard({ game, awayAbbr, homeAbbr }: GameCardProps) {
   return (
     <Link
       href={`/at-bat/${game.gamePk}`}
-      className="block rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 transition-colors px-3 py-2.5 space-y-1.5"
+      className="block rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 transition-colors px-3.5 py-3 space-y-2"
     >
-      <div className="space-y-0.5">
+      {/* Each team row uses gap-2.5 (logo→name) + space-y-2 between
+          rows so the larger 28px logos breathe rather than stacking
+          edge-to-edge. */}
+      <div className="space-y-2">
         <TeamScoreRow
           teamId={game.away.teamId}
-          abbr={awayAbbr}
           score={hasScores ? awayScore : null}
           won={awayWon}
           statusChip={showStatusNote ? game.status.detailedState : null}
         />
         <TeamScoreRow
           teamId={game.home.teamId}
-          abbr={homeAbbr}
           score={hasScores ? homeScore : null}
           won={homeWon}
         />
       </div>
       {hasDecisions ? (
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10.5px] tabular-nums pt-1.5 border-t border-white/[0.06]">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10.5px] tabular-nums pt-2 border-t border-white/[0.06]">
           {game.decisions.winner ? (
             <DecisionInline color="text-emerald-300/90" tag="W" name={game.decisions.winner.fullName} />
           ) : null}
@@ -69,27 +74,25 @@ export function GameCard({ game, awayAbbr, homeAbbr }: GameCardProps) {
 
 function TeamScoreRow({
   teamId,
-  abbr,
   score,
   won,
   statusChip,
 }: {
   teamId: number;
-  abbr: string;
   score: number | null;
   won: boolean;
   statusChip?: string | null;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <TeamLogo teamId={teamId} size={20} />
+    <div className="flex items-center gap-2.5">
+      <TeamLogo teamId={teamId} size={28} />
       <span
         className={
-          "text-[13px] flex-1 " +
-          (won ? "text-white font-semibold" : "text-white/70")
+          "text-[14px] flex-1 truncate " +
+          (won ? "text-white font-semibold" : "text-white/75")
         }
       >
-        {abbr}
+        {teamNickname(teamId)}
       </span>
       {statusChip ? (
         <span className="text-[9px] uppercase tracking-[0.12em] text-white/40">
@@ -98,7 +101,7 @@ function TeamScoreRow({
       ) : null}
       <span
         className={
-          "text-[13px] tabular-nums w-5 text-right " +
+          "text-[16px] tabular-nums w-6 text-right " +
           (won ? "text-white font-semibold" : "text-white/55")
         }
       >
