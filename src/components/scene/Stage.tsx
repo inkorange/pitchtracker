@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Line } from "@react-three/drei";
 import { MeshStandardMaterial, Path, Shape } from "three";
+import { OutfieldStands } from "./OutfieldStands";
 
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
@@ -286,6 +287,7 @@ export function Stage() {
       <HomePlate />
       <Mound />
       <StrikeZone />
+      <OutfieldStands />
     </group>
   );
 }
@@ -498,7 +500,10 @@ function Base({ position }: { position: [number, number, number] }) {
 }
 
 function FoulLines() {
-  const extent = 320;
+  // Extends to the outfield-wall radius (350 ft) so the lines visually
+  // terminate at the foul poles where the wall arc meets, instead of
+  // dangling ~30 ft short with a visible gap.
+  const extent = 350;
   const firstLine: Array<[number, number, number]> = [
     [0, Y_LINE, 0],
     [extent / Math.SQRT2, Y_LINE, -extent / Math.SQRT2],
