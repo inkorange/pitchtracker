@@ -63,16 +63,19 @@ export function HidablePanel({
   return (
     <div className={`${positionClass} pointer-events-auto`} {...extraAttrs}>
       {children}
-      {/* Hide button sits at the top-right of the wrapper. The panel's
-          first child (the dark-navy section) starts at the wrapper's
-          top:0, so the button visually lands at the section's top-
-          right corner — exactly where the user asked. */}
+      {/* Hide button sticks OUT of the panel's top-right corner —
+          slightly above + slightly right of the section so it can't
+          collide with header content (team logos, headshots, etc.)
+          that anchor that corner on desktop. Mobile uses a smaller
+          offset so the button stays on-screen when the panel hugs
+          the screen's right edge. Styled like the restore button
+          (same navy chip + border + shadow) for visual symmetry. */}
       <button
         type="button"
         onClick={() => setHidden(true)}
         title={`Hide ${panelName}`}
         aria-label={`Hide ${panelName}`}
-        className="absolute top-2.5 right-2.5 z-30 w-7 h-7 rounded-md bg-white/[0.04] hover:bg-white/[0.14] text-white/55 hover:text-white/95 flex items-center justify-center transition-colors"
+        className="absolute -top-1.5 -right-1.5 sm:-top-3 sm:-right-3 z-30 w-7 h-7 rounded-full bg-[#081a32]/85 backdrop-blur-md border border-white/15 hover:border-white/30 text-white/80 hover:text-white shadow-md flex items-center justify-center transition-all"
       >
         <EyeIcon />
       </button>
