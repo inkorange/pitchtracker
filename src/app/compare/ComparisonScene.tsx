@@ -1,12 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Html } from "@react-three/drei";
+import { Html, Sphere } from "@react-three/drei";
+import { parseAsString, useQueryState } from "nuqs";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { TransportBar } from "@/components/controls/TransportBar";
+import { HeatGridPlane } from "@/components/scene/HeatGridPlane";
+import {
+  buildHeatGrid,
+  parseHeatMetric,
+  HEAT_METRIC_LABELS,
+  type HeatMetric,
+} from "@/lib/pitch/heatGrid";
 import {
   averagePitchesByType,
   pitchFromRow,
@@ -20,7 +28,6 @@ import { TunnelMarker } from "./TunnelMarker";
 import { OutcomeMarkers } from "./OutcomeMarkers";
 import { useCompareHover, useOpacityForSide } from "./CompareHoverContext";
 import { getPitchColorForSide, type CompareSide } from "@/lib/viz/colors";
-import { Sphere } from "@react-three/drei";
 
 interface PitchWithOutcome extends CachedPitchSubset {
   description?: string | null;
@@ -118,6 +125,26 @@ export function ComparisonScene({
   // ribbons are the primary read; the dots are a power-user "show me
   // every actual outcome" toggle.
   const [showOutcomes, setShowOutcomes] = useState(false);
+
+  // Heat-grid overlay — mirrors the pitcher arsenal page's ?heat
+  // query state. Combines BOTH pitchers' pitches into one grid (the
+  // compare view is overlaid in shared 3D space, so a single combined
+  // grid reads as "where ALL these pitches land" with the same
+  // metric the pitcher page uses).
+  const [heatParam, setHeatParam] = useQueryState(
+    "heat",
+    parseAsString.withDefault(""),
+  );
+  const heatMetric = parseHeatMetric(heatParam);
+  const heatGrid = useMemo(() => {
+    if (!heatMetric) return null;
+    const combined = [...aPitches, ...bPitches].map((p) => ({
+      plate_x: p.plate_x,
+      plate_z: p.plate_z,
+      description: p.description ?? null,
+    }));
+    return buildHeatGrid(combined, heatMetric);
+  }, [heatMetric, aPitches, bPitches]);
 
   const { aRibbons, bRibbons, tunnels, flightDuration, releaseOffset } = useMemo(() => {
     const aByType = averagePitchesByType(aPitches);
@@ -426,6 +453,7 @@ export function ComparisonScene({
             pitchType={t.pitchType}
           />
         ))}
+        {heatGrid ? <HeatGridPlane grid={heatGrid} /> : null}
       </Scene>
       <CameraPad current={preset} onChange={handlePresetChange} />
       {showTracers && (
@@ -463,6 +491,16 @@ export function ComparisonScene({
         />
         Outcomes
       </button>
+      {/* Heat-grid overlay toggle. Mirrors the pitcher arsenal page —
+          ?heat=whiff|chase|called|csw on/off + metric chip picker. The
+          grid here combines BOTH pitchers' pitches because the compare
+          view overlays the arsenals; the combined grid reads as
+          "where do all these pitches end up" with the same metric the
+          single-pitcher page surfaces. */}
+      <HeatToggle
+        metric={heatMetric}
+        onSelect={(m) => setHeatParam(m)}
+      />
     </>
   );
 }
@@ -642,6 +680,69 @@ function tunnelMarkerPosition(
     (pa[1] + pb[1] + bOffset[1]) / 2,
     (pa[2] + pb[2] + bOffset[2]) / 2,
   ];
+}
+
+// Heat-grid overlay toggle. Mirrors the look of the pitcher arsenal
+// page's HeatToggle so the two views share visual language. Trimmed
+// version — no help modal here; the metric's behavior is the same as
+// the pitcher page so the explainer over there covers both.
+const HEAT_METRIC_OPTIONS: HeatMetric[] = ["whiff", "chase", "called", "csw"];
+
+function HeatToggle({
+  metric,
+  onSelect,
+}: {
+  metric: HeatMetric | null;
+  onSelect: (next: HeatMetric | null) => void;
+}) {
+  const active = metric !== null;
+  const label = active
+    ? `Heat: ${HEAT_METRIC_LABELS[metric].replace(" %", "")}`
+    : "Heat";
+  return (
+    <div className="absolute bottom-32 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
+      <button
+        type="button"
+        onClick={() => onSelect(active ? null : "whiff")}
+        title="Show a per-zone heat grid across both pitchers' pitches"
+        className={`px-3 py-1.5 rounded-md backdrop-blur-md border text-[11px] uppercase tracking-[0.14em] transition-colors ${
+          active
+            ? "bg-[#5fc7d8]/30 border-[#5fc7d8]/55 text-white"
+            : "bg-[#081a32]/45 border-white/10 text-white/65 hover:text-white hover:bg-[#0e2a4d]/70 hover:border-white/20"
+        }`}
+      >
+        {label}
+      </button>
+      {active ? (
+        <div
+          className="flex items-center gap-1 mt-0.5"
+          role="radiogroup"
+          aria-label="Heat metric"
+        >
+          {HEAT_METRIC_OPTIONS.map((m) => {
+            const isActive = m === metric;
+            return (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                onClick={() => onSelect(m)}
+                title={HEAT_METRIC_LABELS[m]}
+                className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] backdrop-blur-md border transition-colors ${
+                  isActive
+                    ? "bg-[#5fc7d8]/30 border-[#5fc7d8]/55 text-white"
+                    : "bg-[#081a32]/45 border-white/10 text-white/55 hover:text-white hover:bg-[#0e2a4d]/70 hover:border-white/20"
+                }`}
+              >
+                {HEAT_METRIC_LABELS[m].replace(" %", "")}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function MetricsPanel({
