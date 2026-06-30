@@ -32,6 +32,33 @@ interface ShapeMetrics {
   pfxXIn: number | null; // horizontal break, inches
   pfxZIn: number | null; // induced vertical break, inches
   extensionFt: number | null;
+  // Sample size that produced the averages. Surfaced as "avg of N
+  // pitches" in the hover panel so the viewer knows the ribbon is a
+  // composite, not a single pitch's actual flight.
+  count: number;
+}
+
+// Long names for the common pitch_type abbreviations. The hover panel
+// surfaces "FF · 4-seam fastball" so a viewer who doesn't know the
+// codes can still read what they're seeing.
+const PITCH_TYPE_LONG_NAMES: Record<string, string> = {
+  FF: "4-seam fastball",
+  SI: "sinker",
+  FC: "cutter",
+  SL: "slider",
+  ST: "sweeper",
+  CU: "curveball",
+  KC: "knuckle curve",
+  SV: "slurve",
+  CS: "slow curve",
+  CH: "changeup",
+  FS: "splitter",
+  FO: "forkball",
+  EP: "eephus",
+  KN: "knuckleball",
+};
+function pitchTypeLongName(code: string): string | null {
+  return PITCH_TYPE_LONG_NAMES[code] ?? null;
 }
 
 interface ComparisonSceneProps {
@@ -77,6 +104,20 @@ export function ComparisonScene({
 
   const [progress, setProgress] = useState(0);
   const [selected, setSelected] = useState<Selection | null>(null);
+  // Hover state — drives the floating metrics panel without requiring
+  // a click. When the user hovers an averaged ribbon, we surface its
+  // pitch type + count + avg metrics. A click-selection still wins:
+  // if `selected` is set, the panel follows the selection and hover
+  // is ignored until the selection is cleared.
+  const [hoveredAverage, setHoveredAverage] = useState<{
+    side: CompareSide;
+    pitchType: string;
+  } | null>(null);
+  // Show the per-pitch outcome dots (one sphere per individual pitch
+  // at its actual plate-end location)? Default OFF so the averaged
+  // ribbons are the primary read; the dots are a power-user "show me
+  // every actual outcome" toggle.
+  const [showOutcomes, setShowOutcomes] = useState(false);
 
   const { aRibbons, bRibbons, tunnels, flightDuration, releaseOffset } = useMemo(() => {
     const aByType = averagePitchesByType(aPitches);
@@ -142,20 +183,34 @@ export function ComparisonScene({
     return { aRibbons: aRaw, bRibbons, tunnels, flightDuration, releaseOffset };
   }, [aPitches, bPitches, normalizeRelease]);
 
-  // Build the selected ribbon's path + label. Two kinds:
+  // Build the panel ribbon (path + label + metrics) from either the
+  // sticky selection or the transient hover. Selection wins when both
+  // are set; hover is shorthand for "show me the metrics for this
+  // ribbon while my pointer is on it".
+  //
+  // Two kinds:
   //   "pitch":   one specific cached pitch — build its path from kinematics
   //   "average": one averaged-by-type ribbon — reuse its already-built path
   // Side B paths in both cases inherit the release-point offset that the
   // averaged B ribbons received, so the selection lines up with its
   // averaged ribbon when normalizeRelease is on.
   const selectedRibbon = useMemo(() => {
-    if (!selected) return null;
-    const sideRibbons = selected.side === "a" ? aRibbons : bRibbons;
-    const label = selected.side === "a" ? aLabel : bLabel;
+    const effective: Selection | null =
+      selected ??
+      (hoveredAverage
+        ? {
+            kind: "average",
+            side: hoveredAverage.side,
+            pitchType: hoveredAverage.pitchType,
+          }
+        : null);
+    if (!effective) return null;
+    const sideRibbons = effective.side === "a" ? aRibbons : bRibbons;
+    const label = effective.side === "a" ? aLabel : bLabel;
 
-    if (selected.kind === "pitch") {
-      const list = selected.side === "a" ? aPitches : bPitches;
-      const row = list[selected.index];
+    if (effective.kind === "pitch") {
+      const list = effective.side === "a" ? aPitches : bPitches;
+      const row = list[effective.index];
       if (!row) return null;
       const pitch = pitchFromRow(row);
       if (!pitch) return null;
@@ -165,7 +220,7 @@ export function ComparisonScene({
       } catch {
         return null;
       }
-      if (selected.side === "b") {
+      if (effective.side === "b") {
         path = path.map(
           (p) =>
             [
@@ -178,11 +233,14 @@ export function ComparisonScene({
       return {
         pitchType: row.pitch_type ?? "",
         path,
-        side: selected.side,
+        side: effective.side,
         labelPosition: statcastToThree(path[path.length - 1]),
         label,
         velocity: row.release_speed,
         metrics: {
+          // A pitch selection is one real pitch — count surfaces as 1
+          // so the MetricsPanel can suppress the "avg of N" framing.
+          count: 1,
           spinRpm: row.release_spin_rate ?? null,
           spinAxis: row.spin_axis ?? null,
           pfxXIn: row.pfx_x != null ? row.pfx_x * 12 : null,
@@ -195,20 +253,30 @@ export function ComparisonScene({
     // kind === "average"
     // Side B's averaged ribbon already has releaseOffset baked in, so
     // path comes through correctly without additional translation.
-    const r = sideRibbons.find((x) => x.pitchType === selected.pitchType);
+    const r = sideRibbons.find((x) => x.pitchType === effective.pitchType);
     if (!r) return null;
-    const sourcePitches = selected.side === "a" ? aPitches : bPitches;
-    const metrics = averageMetrics(sourcePitches, selected.pitchType);
+    const sourcePitches = effective.side === "a" ? aPitches : bPitches;
+    const metrics = averageMetrics(sourcePitches, effective.pitchType);
     return {
       pitchType: r.pitchType,
       path: r.path,
-      side: selected.side,
+      side: effective.side,
       labelPosition: statcastToThree(r.path[r.path.length - 1]),
       label,
       velocity: r.releaseSpeed,
       metrics,
     };
-  }, [selected, aPitches, bPitches, aRibbons, bRibbons, releaseOffset, aLabel, bLabel]);
+  }, [
+    selected,
+    hoveredAverage,
+    aPitches,
+    bPitches,
+    aRibbons,
+    bRibbons,
+    releaseOffset,
+    aLabel,
+    bLabel,
+  ]);
 
   const showTracers = aRibbons.length + bRibbons.length > 0;
   const hasSelection = selected !== null;
@@ -270,15 +338,22 @@ export function ComparisonScene({
           pitches={aPitches}
           progress={progress}
           showTracers={showTracers}
+          showOutcomes={showOutcomes}
           selectedPitchIndex={
             selected?.kind === "pitch" && selected.side === "a" ? selected.index : null
           }
           selectedAveragePitchType={
             selected?.kind === "average" && selected.side === "a" ? selected.pitchType : null
           }
+          hoveredAveragePitchType={
+            hoveredAverage?.side === "a" ? hoveredAverage.pitchType : null
+          }
           hasSelection={hasSelection}
           onSelectPitch={(idx) => selectPitch("a", idx)}
           onSelectAverage={(pt) => selectAverage("a", pt)}
+          onHoverAverage={(pt) =>
+            setHoveredAverage(pt ? { side: "a", pitchType: pt } : null)
+          }
         />
         <SideLayer
           side="b"
@@ -286,15 +361,22 @@ export function ComparisonScene({
           pitches={bPitches}
           progress={progress}
           showTracers={showTracers}
+          showOutcomes={showOutcomes}
           selectedPitchIndex={
             selected?.kind === "pitch" && selected.side === "b" ? selected.index : null
           }
           selectedAveragePitchType={
             selected?.kind === "average" && selected.side === "b" ? selected.pitchType : null
           }
+          hoveredAveragePitchType={
+            hoveredAverage?.side === "b" ? hoveredAverage.pitchType : null
+          }
           hasSelection={hasSelection}
           onSelectPitch={(idx) => selectPitch("b", idx)}
           onSelectAverage={(pt) => selectAverage("b", pt)}
+          onHoverAverage={(pt) =>
+            setHoveredAverage(pt ? { side: "b", pitchType: pt } : null)
+          }
         />
         {selectedRibbon && (
           <>
@@ -329,7 +411,10 @@ export function ComparisonScene({
                     </span>
                   )}
                 </div>
-                <MetricsPanel metrics={selectedRibbon.metrics} />
+                <MetricsPanel
+                  metrics={selectedRibbon.metrics}
+                  pitchType={selectedRibbon.pitchType}
+                />
               </div>
             </Html>
           </>
@@ -355,6 +440,29 @@ export function ComparisonScene({
           Clear selection
         </button>
       )}
+      {/* Outcome-dot toggle. Default OFF — the per-pitch ending dots
+          at the plate were the main visual noise when comparing two
+          arsenals overlaid, so the averaged ribbons are now the
+          primary read. Toggle on if you want to see every actual
+          ending location alongside the averages. */}
+      <button
+        type="button"
+        onClick={() => setShowOutcomes((v) => !v)}
+        title={
+          showOutcomes
+            ? "Hide individual pitch ending locations at the plate"
+            : "Show one dot per individual pitch at its plate-end location"
+        }
+        className="absolute top-4 right-4 px-2.5 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] backdrop-blur-md border border-white/15 text-[10px] uppercase tracking-[0.16em] text-white/80 hover:text-white pointer-events-auto inline-flex items-center gap-1.5"
+      >
+        <span
+          aria-hidden
+          className={`inline-block w-1.5 h-1.5 rounded-full ${
+            showOutcomes ? "bg-emerald-400" : "bg-white/30"
+          }`}
+        />
+        Outcomes
+      </button>
     </>
   );
 }
@@ -365,11 +473,14 @@ interface SideLayerProps {
   pitches: PitchWithOutcome[];
   progress: number;
   showTracers: boolean;
+  showOutcomes: boolean;
   selectedPitchIndex: number | null;
   selectedAveragePitchType: string | null;
+  hoveredAveragePitchType: string | null;
   hasSelection: boolean;
   onSelectPitch: (index: number) => void;
   onSelectAverage: (pitchType: string) => void;
+  onHoverAverage: (pitchType: string | null) => void;
 }
 
 function SideLayer({
@@ -378,11 +489,14 @@ function SideLayer({
   pitches,
   progress,
   showTracers,
+  showOutcomes,
   selectedPitchIndex,
   selectedAveragePitchType,
+  hoveredAveragePitchType,
   hasSelection,
   onSelectPitch,
   onSelectAverage,
+  onHoverAverage,
 }: SideLayerProps) {
   const hoverOpacity = useOpacityForSide(side);
   const { setHoveredSide } = useCompareHover();
@@ -397,39 +511,52 @@ function SideLayer({
     <>
       {ribbons.map((r) => {
         const isSelectedAverage = selectedAveragePitchType === r.pitchType;
-        // When something is selected, non-selected averaged ribbons fade
-        // out so the focused pitch reads clearly. The selected average
-        // (if any) stays full strength and gets a thicker tube.
+        const isHoveredAverage = hoveredAveragePitchType === r.pitchType;
+        // Highlight whatever is currently focused — either the sticky
+        // selection or the transient hover — by drawing it at the
+        // thicker radius. Both fade other ribbons down to 18% opacity
+        // so the focused pitch reads clearly. When nothing is focused
+        // and nothing selected, all ribbons render at full strength.
+        const focused = isSelectedAverage || isHoveredAverage;
+        const focusActive = hasSelection || hoveredAveragePitchType != null;
         const ribbonOpacity =
-          hoverOpacity * (hasSelection && !isSelectedAverage ? 0.18 : 1);
+          hoverOpacity * (focusActive && !focused ? 0.18 : 1);
         const endPos = statcastToThree(r.path[r.path.length - 1]);
         const ballColor = getPitchColorForSide(r.pitchType, side);
+        const handleHoverEnter = () => {
+          onOver();
+          onHoverAverage(r.pitchType);
+        };
+        const handleHoverLeave = () => {
+          onOut();
+          onHoverAverage(null);
+        };
         return (
           <group key={`${side}-${r.pitchType}`}>
             <Ribbon
               path={r.path}
               pitchType={r.pitchType}
-              radius={isSelectedAverage ? 0.13 : 0.1}
+              radius={focused ? 0.13 : 0.1}
               side={side}
               opacity={ribbonOpacity}
-              onPointerOver={onOver}
-              onPointerOut={onOut}
+              onPointerOver={handleHoverEnter}
+              onPointerOut={handleHoverLeave}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectAverage(r.pitchType);
               }}
             />
             <Sphere
-              args={[isSelectedAverage ? 0.16 : 0.12, 18, 18]}
+              args={[focused ? 0.16 : 0.12, 18, 18]}
               position={endPos}
               onPointerOver={(e) => {
                 e.stopPropagation();
                 document.body.style.cursor = "pointer";
-                onOver();
+                handleHoverEnter();
               }}
               onPointerOut={() => {
                 document.body.style.cursor = "";
-                onOut();
+                handleHoverLeave();
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -442,22 +569,24 @@ function SideLayer({
                 metalness={0.05}
                 transparent
                 opacity={ribbonOpacity}
-                emissive={isSelectedAverage ? ballColor : "#000000"}
-                emissiveIntensity={isSelectedAverage ? 0.6 : 0}
+                emissive={focused ? ballColor : "#000000"}
+                emissiveIntensity={focused ? 0.6 : 0}
               />
             </Sphere>
           </group>
         );
       })}
-      <OutcomeMarkers
-        pitches={pitches}
-        opacity={hoverOpacity}
-        selectedIndex={selectedPitchIndex}
-        hasSelection={hasSelection}
-        onSelect={onSelectPitch}
-        onPointerOver={onOver}
-        onPointerOut={onOut}
-      />
+      {showOutcomes && (
+        <OutcomeMarkers
+          pitches={pitches}
+          opacity={hoverOpacity}
+          selectedIndex={selectedPitchIndex}
+          hasSelection={hasSelection}
+          onSelect={onSelectPitch}
+          onPointerOver={onOver}
+          onPointerOut={onOut}
+        />
+      )}
       {showTracers &&
         !hasSelection &&
         ribbons.map((r) => (
@@ -515,7 +644,13 @@ function tunnelMarkerPosition(
   ];
 }
 
-function MetricsPanel({ metrics }: { metrics: ShapeMetrics }) {
+function MetricsPanel({
+  metrics,
+  pitchType,
+}: {
+  metrics: ShapeMetrics;
+  pitchType: string;
+}) {
   const rows: Array<{ label: string; value: string }> = [];
   if (metrics.spinRpm != null) {
     rows.push({ label: "Spin", value: `${Math.round(metrics.spinRpm)} rpm` });
@@ -532,13 +667,33 @@ function MetricsPanel({ metrics }: { metrics: ShapeMetrics }) {
   if (metrics.extensionFt != null) {
     rows.push({ label: "Ext", value: `${metrics.extensionFt.toFixed(1)} ft` });
   }
-  if (rows.length === 0) return null;
+  const longName = pitchTypeLongName(pitchType);
+  // count > 1 ⇒ averaged ribbon (the common case in the compare view);
+  // count === 1 ⇒ a single-pitch selection. Suppress the "avg of" line
+  // in the single-pitch case so the panel doesn't lie.
+  const showAvgHeader = metrics.count > 1;
+  if (rows.length === 0 && !longName && !showAvgHeader) return null;
 
   return (
     <div
-      className="absolute whitespace-nowrap px-2 py-1.5 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg"
+      className="absolute whitespace-nowrap px-2.5 py-1.5 rounded bg-black/75 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg"
       style={{ right: 0, top: 0, transform: "translate(-12px, -50%)" }}
     >
+      {(longName || showAvgHeader) && (
+        <div className="flex flex-col gap-0.5 pb-1 mb-1 border-b border-white/10 normal-nums">
+          {longName && (
+            <div className="text-white/90">
+              <span className="text-white/55 mr-1">{pitchType}</span>
+              {longName}
+            </div>
+          )}
+          {showAvgHeader && (
+            <div className="text-[10px] text-white/45">
+              avg of {metrics.count} pitches
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex flex-col gap-0.5">
         {rows.map((r) => (
           <div key={r.label} className="flex justify-between gap-3">
@@ -593,7 +748,12 @@ function averageMetrics(
       extN += 1;
     }
   }
+  // The count we surface in the UI is the number of pitches of this
+  // type, not the per-metric sample size. Even when a few rows lack
+  // spin/extension, the trajectory itself is still based on n total.
+  const matched = pitches.filter((p) => p.pitch_type === pitchType).length;
   return {
+    count: matched,
     spinRpm: spinN > 0 ? spinSum / spinN : null,
     spinAxis: axisN > 0 ? axisSum / axisN : null,
     pfxXIn: pxN > 0 ? (pxSum / pxN) * 12 : null,
