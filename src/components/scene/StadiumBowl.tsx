@@ -32,27 +32,37 @@ const OUTFIELD_BEARING = -Math.PI / 2;
 const WALL_HEIGHT = 8;
 
 // Lower deck (closest to the field): begins 2 ft behind the wall, 24
-// ft deep, rises 22 ft. ~42° slope.
+// ft deep, rises 22 ft. ~42° overall slope, but the surface is built
+// as N stepped rows so the geometry physically looks like stadium
+// stairs (visible treads + risers) rather than a smooth ramp.
 const LOWER_INNER_OFFSET = 2;
 const LOWER_DEPTH = 24;
 const LOWER_RISE = 22;
 const LOWER_BASE_HEIGHT = WALL_HEIGHT;
 const LOWER_TOP_HEIGHT = LOWER_BASE_HEIGHT + LOWER_RISE;
+const LOWER_ROWS = 12; // → 2.0 ft tread, 1.83 ft rise per row
 
-// Concourse gap between the lower and upper decks. A small radial +
-// vertical step separates the two tiers so they read as distinct
-// decks instead of one continuous ramp.
-const CONCOURSE_RADIAL_GAP = 4;
-const CONCOURSE_VERTICAL_STEP = 2;
+// Cantilever: the upper deck overhangs forward over the back of the
+// lower deck. CONCOURSE_RADIAL_OVERLAP ft of the upper-deck inner
+// edge sits inside the lower deck's outer-edge radial position, so
+// the rearmost rows of the lower bowl are physically under the
+// upper-deck overhang — classic two-deck stadium look. The vertical
+// CLEARANCE is the under-deck height between the lower deck's top
+// and the upper deck's underside; that's where the concourse /
+// standing area lives in a real ballpark.
+const CONCOURSE_RADIAL_OVERLAP = 6;
+const CONCOURSE_VERTICAL_CLEARANCE = 4;
 
-// Upper deck (cheap seats / nosebleeds): sits behind + above the
-// lower deck, slightly deeper and steeper to match a typical
-// stadium upper bowl.
-const UPPER_INNER_OFFSET = LOWER_INNER_OFFSET + LOWER_DEPTH + CONCOURSE_RADIAL_GAP;
-const UPPER_DEPTH = 28;
-const UPPER_RISE = 26;
-const UPPER_BASE_HEIGHT = LOWER_TOP_HEIGHT + CONCOURSE_VERTICAL_STEP;
+// Upper deck (cheap seats / nosebleeds): cantilevered forward over
+// the lower deck back rows, sitting taller and deeper to dominate
+// the bowl silhouette.
+const UPPER_INNER_OFFSET =
+  LOWER_INNER_OFFSET + LOWER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
+const UPPER_DEPTH = 32;
+const UPPER_RISE = 38;
+const UPPER_BASE_HEIGHT = LOWER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
 const UPPER_TOP_HEIGHT = UPPER_BASE_HEIGHT + UPPER_RISE;
+const UPPER_ROWS = 20; // → 1.6 ft tread, 1.9 ft rise per row
 
 const ARC_SEGMENTS = 256;
 const SEGMENT_ANGLE = (2 * Math.PI) / ARC_SEGMENTS;
@@ -136,36 +146,95 @@ function useWallTrimGeometry() {
   }, []);
 }
 
-// Sloped seating ramp factory. Builds a curved tier between two
-// (radial offset, height) edges — inner-bottom and outer-top — that
-// follow the wall's variable radius all the way around the bowl.
-// Used for both decks.
-function buildTierGeometry(
+// Stepped seating tier factory. Builds the tier as N rows of physical
+// stairs — each row contributes a horizontal "tread" (the floor of
+// that row of seats) plus a vertical "riser" (the front face of the
+// row above). The strips follow the wall's variable radius all the
+// way around the bowl.
+//
+// Why stepped and not a smooth slope: from a low field-level camera,
+// a smooth slope reads as a flat panel of color. Stepped geometry
+// gives the front faces (risers) of each row real horizontal-band
+// presence — the same visual cue the reference cross-section
+// diagrams show. The stairs visibly lean back up away from the field.
+//
+// Tread/riser dimensions:
+//   rowDepth = totalDepth / numRows  → horizontal width of one row
+//   rowRise  = totalRise / numRows   → vertical height between rows
+//
+// Returns one geometry that contains all 2N−1 strips (N treads + N−1
+// risers between them). Top of the topmost tread is left open — a
+// roof / facade is a separate concern.
+function buildSteppedTierGeometry(
   innerOffset: number,
-  depth: number,
+  totalDepth: number,
   baseHeight: number,
-  topHeight: number,
+  totalRise: number,
+  numRows: number,
 ): THREE.BufferGeometry {
+  const rowDepth = totalDepth / numRows;
+  const rowRise = totalRise / numRows;
   const positions: number[] = [];
   const indices: number[] = [];
-  for (let i = 0; i <= ARC_SEGMENTS; i++) {
-    const angle = -Math.PI + i * SEGMENT_ANGLE;
-    const wallR = wallRadiusAtAngle(angle);
-    const innerR = wallR + innerOffset;
-    const outerR = innerR + depth;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    positions.push(innerR * cos, baseHeight, innerR * sin); // inner-bottom (front)
-    positions.push(outerR * cos, topHeight, outerR * sin); // outer-top (back)
+
+  for (let row = 0; row < numRows; row++) {
+    const treadY = baseHeight + row * rowRise;
+    const innerOff = innerOffset + row * rowDepth;
+    const outerOff = innerOff + rowDepth;
+
+    // === TREAD: horizontal strip at treadY, inner→outer in radius ===
+    const treadStart = positions.length / 3;
+    for (let i = 0; i <= ARC_SEGMENTS; i++) {
+      const angle = -Math.PI + i * SEGMENT_ANGLE;
+      const wallR = wallRadiusAtAngle(angle);
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      positions.push((wallR + innerOff) * cos, treadY, (wallR + innerOff) * sin);
+      positions.push((wallR + outerOff) * cos, treadY, (wallR + outerOff) * sin);
+    }
+    for (let i = 0; i < ARC_SEGMENTS; i++) {
+      const bl = treadStart + i * 2;
+      const tl = treadStart + i * 2 + 1;
+      const br = treadStart + (i + 1) * 2;
+      const tr = treadStart + (i + 1) * 2 + 1;
+      // Winding gives upward (+Y) normals — tread faces up toward sky.
+      indices.push(bl, br, tl);
+      indices.push(tl, br, tr);
+    }
+
+    // === RISER: vertical strip at outerOff, treadY → nextTreadY ===
+    if (row < numRows - 1) {
+      const nextTreadY = treadY + rowRise;
+      const riserStart = positions.length / 3;
+      for (let i = 0; i <= ARC_SEGMENTS; i++) {
+        const angle = -Math.PI + i * SEGMENT_ANGLE;
+        const wallR = wallRadiusAtAngle(angle);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        positions.push(
+          (wallR + outerOff) * cos,
+          treadY,
+          (wallR + outerOff) * sin,
+        );
+        positions.push(
+          (wallR + outerOff) * cos,
+          nextTreadY,
+          (wallR + outerOff) * sin,
+        );
+      }
+      for (let i = 0; i < ARC_SEGMENTS; i++) {
+        const bl = riserStart + i * 2;
+        const tl = riserStart + i * 2 + 1;
+        const br = riserStart + (i + 1) * 2;
+        const tr = riserStart + (i + 1) * 2 + 1;
+        // Winding gives inward normals — riser faces toward home plate
+        // (the field side, where the camera lives).
+        indices.push(bl, br, tl);
+        indices.push(tl, br, tr);
+      }
+    }
   }
-  for (let i = 0; i < ARC_SEGMENTS; i++) {
-    const bl = i * 2;
-    const tl = i * 2 + 1;
-    const br = (i + 1) * 2;
-    const tr = (i + 1) * 2 + 1;
-    indices.push(bl, br, tl);
-    indices.push(tl, br, tr);
-  }
+
   const geom = new THREE.BufferGeometry();
   geom.setAttribute(
     "position",
@@ -179,11 +248,12 @@ function buildTierGeometry(
 function useLowerTierGeometry() {
   return useMemo(
     () =>
-      buildTierGeometry(
+      buildSteppedTierGeometry(
         LOWER_INNER_OFFSET,
         LOWER_DEPTH,
         LOWER_BASE_HEIGHT,
-        LOWER_TOP_HEIGHT,
+        LOWER_RISE,
+        LOWER_ROWS,
       ),
     [],
   );
@@ -192,11 +262,12 @@ function useLowerTierGeometry() {
 function useUpperTierGeometry() {
   return useMemo(
     () =>
-      buildTierGeometry(
+      buildSteppedTierGeometry(
         UPPER_INNER_OFFSET,
         UPPER_DEPTH,
         UPPER_BASE_HEIGHT,
-        UPPER_TOP_HEIGHT,
+        UPPER_RISE,
+        UPPER_ROWS,
       ),
     [],
   );
@@ -246,6 +317,7 @@ interface SeatPalette {
 
 function buildSeatsMaterial(
   baseY: number,
+  rowRise: number,
   palette: SeatPalette,
 ): MeshStandardMaterial {
   const mat = new MeshStandardMaterial({
@@ -275,17 +347,19 @@ function buildSeatsMaterial(
       .replace(
         "#include <color_fragment>",
         `#include <color_fragment>
-        // Row stripes: alternate two seat shades every ~2 ft of rise.
-        float ROW_H = 2.0;
+        // Row stripes alternate two shades every rowRise of vertical
+        // rise. With stepped geometry every point on a tread shares one
+        // Y, so each tread is uniformly colored and adjacent treads
+        // alternate light/dark — the rows read clearly from any
+        // viewing angle. Risers span (rowY → rowY + rowRise) so they
+        // show as a transition between two adjacent row colors, which
+        // emphasizes the stepped look at distance.
+        float ROW_H = ${rowRise.toFixed(3)};
         float row = floor((vStandsWorldPos.y - ${baseY.toFixed(1)}) / ROW_H);
         float rowMod = mod(row, 2.0);
         vec3 darkSeat = vec3(${palette.darkRow});
         vec3 lightSeat = vec3(${palette.lightRow});
         vec3 seatColor = mix(darkSeat, lightSeat, rowMod);
-
-        // Step shadow at each row boundary — keeps rows visible at distance.
-        float rowFrac = fract((vStandsWorldPos.y - ${baseY.toFixed(1)}) / ROW_H);
-        if (rowFrac < 0.08) seatColor *= 0.65;
 
         // Radial aisles: angular pattern. ~36 aisles around the bowl
         // (one every 10°). Using angular position rather than arc
@@ -325,14 +399,24 @@ const UPPER_PALETTE: SeatPalette = {
 
 function useLowerSeatsMaterial() {
   return useMemo(
-    () => buildSeatsMaterial(LOWER_BASE_HEIGHT, LOWER_PALETTE),
+    () =>
+      buildSeatsMaterial(
+        LOWER_BASE_HEIGHT,
+        LOWER_RISE / LOWER_ROWS,
+        LOWER_PALETTE,
+      ),
     [],
   );
 }
 
 function useUpperSeatsMaterial() {
   return useMemo(
-    () => buildSeatsMaterial(UPPER_BASE_HEIGHT, UPPER_PALETTE),
+    () =>
+      buildSeatsMaterial(
+        UPPER_BASE_HEIGHT,
+        UPPER_RISE / UPPER_ROWS,
+        UPPER_PALETTE,
+      ),
     [],
   );
 }
