@@ -98,9 +98,18 @@ export async function DailyPickStrip() {
               <div className="text-sm text-white/95 font-medium truncate">
                 {resolveName(f.pitcher_id)}
               </div>
-              <div className="text-[11px] text-white/55 truncate">
-                {f.reason ?? "vs " + resolveName(f.batter_id)}
-              </div>
+              {f.reason ? (
+                <div className="text-[11px] text-white/55 truncate">
+                  {f.reason}
+                </div>
+              ) : null}
+              {/* Batter line as a separate row — adds matchup
+                  narrative without crowding the pitch description. */}
+              {f.batter_id ? (
+                <div className="text-[11px] text-white/40 truncate">
+                  vs {resolveName(f.batter_id)}
+                </div>
+              ) : null}
             </div>
             <span className="text-[10px] uppercase tracking-[0.14em] text-white/35">
               Watch →
