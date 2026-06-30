@@ -5,8 +5,15 @@ import type { ReactNode } from "react";
 // Shared top nav for every product surface. Anchored at the top of
 // the viewport with a 75% black backdrop so it reads cleanly over
 // either a 3D canvas (compare / at-bat / pitcher) or a static page
-// (browse / daily / etc.). No pill backgrounds on individual links —
-// the bar itself is the affordance.
+// (browse / daily / etc.).
+//
+// Back button and any rightSlot action buttons share the pill style
+// below — `TOPNAV_BUTTON_CLS` is re-exported so per-page action
+// buttons (Compare on /pitcher, etc.) can stay visually consistent
+// without each page guessing at the styling tokens.
+
+export const TOPNAV_BUTTON_CLS =
+  "inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white/[0.08] hover:bg-white/[0.18] border border-white/15 text-white/85 hover:text-white text-[10px] uppercase tracking-[0.14em] transition-colors";
 
 interface TopNavProps {
   // Back affordance: e.g., { href: "/at-bat/12345", label: "Game" }.
@@ -31,9 +38,10 @@ export function TopNav({ back, title, summary, rightSlot }: TopNavProps) {
         {back ? (
           <Link
             href={back.href}
-            className="text-[11px] uppercase tracking-[0.14em] text-white/70 hover:text-white transition-colors flex-shrink-0"
+            className={`${TOPNAV_BUTTON_CLS} flex-shrink-0`}
           >
-            ← {back.label}
+            <span aria-hidden>←</span>
+            {back.label}
           </Link>
         ) : null}
         <Link
@@ -46,7 +54,7 @@ export function TopNav({ back, title, summary, rightSlot }: TopNavProps) {
             alt="pitchtracker"
             width={65}
             height={20}
-            className="h-5 w-auto"
+            className="h-5 w-auto mt-1"
           />
         </Link>
       </div>

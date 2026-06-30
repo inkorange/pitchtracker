@@ -14,8 +14,10 @@ import type { OutcomeCategory } from "@/lib/viz/colors";
 export interface AtBatEventChip {
   /** URL value. Kept short + readable. */
   key: string;
-  /** UI label rendered on the chip. */
+  /** UI label rendered on the chip on desktop. */
   label: string;
+  /** Compact label rendered on the chip below the `sm` breakpoint. */
+  shortLabel: string;
   /** MLB event values this chip resolves to. */
   events: readonly string[];
 }
@@ -24,6 +26,7 @@ export const AT_BAT_EVENT_CHIPS: readonly AtBatEventChip[] = [
   {
     key: "strikeout",
     label: "Strikeout",
+    shortLabel: "K",
     // K_DP is a strikeout where another runner is also retired —
     // viewers asking for "strikeouts" expect both.
     events: ["strikeout", "strikeout_double_play"],
@@ -31,21 +34,25 @@ export const AT_BAT_EVENT_CHIPS: readonly AtBatEventChip[] = [
   {
     key: "walk",
     label: "Walk",
+    shortLabel: "BB",
     events: ["walk", "intent_walk"],
   },
   {
     key: "hit",
     label: "Hit",
+    shortLabel: "H",
     events: ["single", "double", "triple", "home_run"],
   },
   {
     key: "home_run",
     label: "Home run",
+    shortLabel: "HR",
     events: ["home_run"],
   },
   {
     key: "out",
     label: "Out",
+    shortLabel: "Out",
     events: [
       "field_out",
       "force_out",
@@ -61,6 +68,7 @@ export const AT_BAT_EVENT_CHIPS: readonly AtBatEventChip[] = [
   {
     key: "hit_by_pitch",
     label: "HBP",
+    shortLabel: "HBP",
     events: ["hit_by_pitch"],
   },
 ];

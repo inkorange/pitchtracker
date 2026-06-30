@@ -79,7 +79,7 @@ export default async function AtBatIndex({ searchParams }: PageProps) {
 
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
-      <TopNav back={{ href: "/", label: "Home" }} title="At-bat replays" />
+      <TopNav title="At-bat replays" />
       <div className="max-w-3xl mx-auto space-y-10">
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">At-bat replays</h1>

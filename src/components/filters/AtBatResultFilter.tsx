@@ -66,7 +66,8 @@ export function AtBatResultFilter({
                     : "bg-white/[0.06] text-white/85 border border-white/10 hover:bg-white/[0.1]"
               }`}
             >
-              {opt.label}
+              <span className="sm:hidden">{opt.shortLabel}</span>
+              <span className="hidden sm:inline">{opt.label}</span>
             </button>
           );
         })}

@@ -9,6 +9,14 @@ import {
   type CameraPosition,
   type CameraPreset,
 } from "@/lib/viz/camera-presets";
+import { BACKSTOP_RADIUS } from "./StadiumBowl";
+
+// Buffer between the camera's allowed z-cap and the actual backstop
+// wall. The wall lives at z = +BACKSTOP_RADIUS (≈85 ft behind home
+// plate); leaving 10 ft of slack means the camera can lean back far
+// enough to feel "behind the catcher" without ever passing through or
+// poking into the stands behind the plate.
+const BACKSTOP_CAMERA_BUFFER = 10;
 
 type OrbitControlsImpl = ComponentRef<typeof OrbitControls>;
 
@@ -90,6 +98,16 @@ export function CameraRig({ preset, presetTick = 0, presetOverride }: CameraRigP
     // at long distances.
     if (camera.position.y < 0.3) {
       camera.position.setY(0.3);
+    }
+
+    // Hard cap on camera z so the user can't orbit past the backstop
+    // wall and end up looking at the field from inside the stands
+    // behind home plate. Backstop wall sits at z ≈ +BACKSTOP_RADIUS;
+    // leave BACKSTOP_CAMERA_BUFFER of slack so the camera can lean
+    // back to feel "behind the catcher" without ever crossing through.
+    const maxCamZ = BACKSTOP_RADIUS - BACKSTOP_CAMERA_BUFFER;
+    if (camera.position.z > maxCamZ) {
+      camera.position.setZ(maxCamZ);
     }
   });
 

@@ -148,11 +148,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
           normalizeRelease={syncRelease}
         />
 
-        <TopNav
-          back={{ href: "/", label: "Home" }}
-          title="Compare"
-          rightSlot={<CompareLinkActions />}
-        />
+        <TopNav title="Compare" rightSlot={<CompareLinkActions />} />
 
         <OutcomeLegend />
 
