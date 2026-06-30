@@ -2,22 +2,21 @@ import Link from "next/link";
 import type { MlbGameResult } from "@/lib/statsapi/client";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import { teamNickname } from "@/lib/teams/nicknames";
+import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 
 // Shared game-result card used by:
 //   - the homepage YesterdayGamesStrip
 //   - the /at-bat date listing
 //
-// Each card links to /at-bat/<gamePk> for the at-bat browser, shows
-// final scores with the winning team bolded, an optional status chip
-// for non-Final states (In Progress / Postponed / etc.), and W / L /
-// SV decisions on a single wrap-friendly line below.
+// The team rows are a click target that opens the at-bat browser
+// (/at-bat/<gamePk>). Each W / L / SV pitcher name in the decisions
+// row below is its own link to that pitcher's page — clicking the
+// pitcher name does NOT bounce through the matchup. Anchor tags
+// can't nest in valid HTML, so the outer wrapper is a plain styled
+// container with two independent click targets inside.
 //
 // Team identity reads as the canonical nickname ("Tigers", "Yankees",
-// "Red Sox") via the teamNickname helper. Earlier passes had the
-// 2-3 letter abbreviation here (DET, NYY), which read as a chrome
-// element more than a team — the full nickname makes the card more
-// scannable and gives away/home rows the visual weight they should
-// carry on the homepage strip.
+// "Red Sox") via the teamNickname helper.
 
 interface GameCardProps {
   game: MlbGameResult;
@@ -35,14 +34,10 @@ export function GameCard({ game }: GameCardProps) {
     game.decisions.winner || game.decisions.loser || game.decisions.save;
 
   return (
-    <Link
-      href={`/at-bat/${game.gamePk}`}
-      className="block rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 transition-colors px-3.5 py-3 space-y-2"
-    >
-      {/* Each team row uses gap-2.5 (logo→name) + space-y-2 between
-          rows so the larger 28px logos breathe rather than stacking
-          edge-to-edge. */}
-      <div className="space-y-2">
+    <div className="rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 transition-colors px-3.5 py-3 space-y-2.5">
+      {/* Team rows are the game-link click target. space-y-2 keeps
+          the two 28px team-logo rows from stacking edge-to-edge. */}
+      <Link href={`/at-bat/${game.gamePk}`} className="block space-y-2">
         <TeamScoreRow
           teamId={game.away.teamId}
           score={hasScores ? awayScore : null}
@@ -54,21 +49,36 @@ export function GameCard({ game }: GameCardProps) {
           score={hasScores ? homeScore : null}
           won={homeWon}
         />
-      </div>
+      </Link>
       {hasDecisions ? (
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10.5px] tabular-nums pt-2 border-t border-white/[0.06]">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] tabular-nums pt-2.5 border-t border-white/[0.06]">
           {game.decisions.winner ? (
-            <DecisionInline color="text-emerald-300/90" tag="W" name={game.decisions.winner.fullName} />
+            <DecisionLink
+              color="text-emerald-300/90"
+              tag="W"
+              id={game.decisions.winner.id}
+              name={game.decisions.winner.fullName}
+            />
           ) : null}
           {game.decisions.loser ? (
-            <DecisionInline color="text-red-300/90" tag="L" name={game.decisions.loser.fullName} />
+            <DecisionLink
+              color="text-red-300/90"
+              tag="L"
+              id={game.decisions.loser.id}
+              name={game.decisions.loser.fullName}
+            />
           ) : null}
           {game.decisions.save ? (
-            <DecisionInline color="text-amber-300/90" tag="SV" name={game.decisions.save.fullName} />
+            <DecisionLink
+              color="text-amber-300/90"
+              tag="SV"
+              id={game.decisions.save.id}
+              name={game.decisions.save.fullName}
+            />
           ) : null}
         </div>
       ) : null}
-    </Link>
+    </div>
   );
 }
 
@@ -111,22 +121,29 @@ function TeamScoreRow({
   );
 }
 
-function DecisionInline({
+function DecisionLink({
   color,
   tag,
+  id,
   name,
 }: {
   color: string;
   tag: string;
+  id: number;
   name: string;
 }) {
   return (
-    <span className="inline-flex items-baseline gap-1">
+    <Link
+      href={pitcherPagePath(id, name)}
+      className="inline-flex items-baseline gap-1 hover:underline underline-offset-2 decoration-white/30"
+    >
       <span className={`${color} font-semibold uppercase tracking-[0.08em]`}>
         {tag}
       </span>
-      <span className="text-white/85">{shortenName(name)}</span>
-    </span>
+      <span className="text-white/85 hover:text-white transition-colors">
+        {shortenName(name)}
+      </span>
+    </Link>
   );
 }
 
