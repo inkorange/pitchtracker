@@ -71,7 +71,7 @@ export default function ExplorePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetJsonLd) }}
       />
-      <TopNav back={{ href: "/", label: "Home" }} title="Explore" />
+      <TopNav title="Explore" />
       <Suspense fallback={<div className="px-6 py-8 text-white/55">Loading…</div>}>
         <ExploreClient />
       </Suspense>

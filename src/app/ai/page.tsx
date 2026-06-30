@@ -133,7 +133,7 @@ export default function AiLandingPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
-      <TopNav back={{ href: "/", label: "Home" }} title="AI assistant" />
+      <TopNav title="AI assistant" />
 
       <article className="max-w-3xl mx-auto space-y-12">
         <header className="space-y-4">

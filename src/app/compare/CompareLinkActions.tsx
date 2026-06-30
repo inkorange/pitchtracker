@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TOPNAV_BUTTON_CLS } from "@/components/chrome/TopNav";
 
 export function CompareLinkActions() {
   const [copied, setCopied] = useState(false);
@@ -20,7 +21,7 @@ export function CompareLinkActions() {
     <button
       type="button"
       onClick={handleCopy}
-      className="text-[10px] uppercase tracking-[0.14em] text-white/70 hover:text-white transition-colors"
+      className={TOPNAV_BUTTON_CLS}
     >
       {copied ? "Copied!" : "Copy link"}
     </button>

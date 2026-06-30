@@ -30,7 +30,7 @@ export default async function BrowsePage() {
 
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
-      <TopNav back={{ href: "/", label: "Home" }} title="Browse" />
+      <TopNav title="Browse" />
       <div className="max-w-5xl mx-auto space-y-10">
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Browse by team</h1>
