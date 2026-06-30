@@ -6,6 +6,118 @@ import type { TablesInsert } from "@/lib/supabase/types";
 
 export const maxDuration = 60;
 
+// Display names for the pitch_type abbreviations Statcast uses. The
+// reason string surfaced on the homepage Daily Pick Strip uses the
+// long names so a casual reader doesn't have to know what "ST" means.
+const PITCH_TYPE_NAMES: Record<string, string> = {
+  FF: "fastball",
+  SI: "sinker",
+  FC: "cutter",
+  SL: "slider",
+  ST: "sweeper",
+  CU: "curveball",
+  KC: "knuckle curve",
+  SV: "slurve",
+  CS: "slow curve",
+  CH: "changeup",
+  FS: "splitter",
+};
+
+// Two scoring pools compete for POTD/WoW. The category with the higher
+// score wins, so a 104mph FF still beats a meh slider, and a nasty 22"
+// curveball buried for K3 still beats a 100mph FF — variety without
+// abandoning velo as the obvious-good fallback.
+const HEAT_TYPES = new Set(["FF", "SI"]);
+const BREAKER_TYPES = new Set(["SL", "ST", "CU", "KC", "SV", "CS"]);
+
+interface ScoredPitch {
+  score: number;
+  reason: string;
+}
+
+interface PitchForScoring {
+  pitch_type: string | null;
+  description: string | null;
+  release_speed: number | null;
+  release_spin_rate: number | null;
+  strikes: number | null;
+  plate_x: number | null;
+  plate_z: number | null;
+  pfx_x: number | null;
+  pfx_z: number | null;
+}
+
+// Returns null when the pitch isn't a swinging strike on a heat or
+// breaker pitch type. Calibration aims for ~3-out-of-5 breakers winning
+// the daily slot vs heat — see preview SQL in the PR description.
+function scoreCandidate(p: PitchForScoring): ScoredPitch | null {
+  if (categorizeDescription(p.description) !== "whiff") return null;
+  if (p.release_speed == null || !p.pitch_type) return null;
+
+  const velo = Number(p.release_speed);
+  // strikes is the count BEFORE this pitch. strikes=2 + swinging strike
+  // means this pitch was strike 3 (the K-ending pitch). Statcast's
+  // `events` field is only populated on the AB-ending pitch and may be
+  // empty on intermediate ones, so counting strikes is more reliable.
+  const isK3 = p.strikes === 2;
+  const pitchName = PITCH_TYPE_NAMES[p.pitch_type] ?? p.pitch_type.toLowerCase();
+
+  if (HEAT_TYPES.has(p.pitch_type)) {
+    // 90mph baseline so 100 = 10, 102 = 12, 104 = 14. Calibrated so
+    // 104mph still wins against a typical buried K3 slider but loses
+    // to a truly spectacular curveball.
+    const score = Math.max(0, velo - 90);
+    const result = isK3 ? "strike 3 swinging" : "swing & miss";
+    return {
+      score,
+      reason: `${velo.toFixed(1)} mph ${pitchName}, ${result}`,
+    };
+  }
+
+  if (BREAKER_TYPES.has(p.pitch_type)) {
+    // pfx_x / pfx_z are stored in FEET (Statcast convention). Convert
+    // to inches for the human-readable break number and so the bonus
+    // threshold reads naturally ("over 12 inches of break").
+    const pfxX = p.pfx_x != null ? Number(p.pfx_x) : 0;
+    const pfxZ = p.pfx_z != null ? Number(p.pfx_z) : 0;
+    const breakIn = 12 * Math.sqrt(pfxX * pfxX + pfxZ * pfxZ);
+    const breakBonus = Math.max(0, (breakIn - 12) / 1.5);
+
+    // plate_x / plate_z are also in feet, measured at the front of the
+    // plate. Zone bottom ≈ 1.5 ft, zone half-width ≈ 0.83 ft. "Buried
+    // low" = below 1.0 ft (well under the zone). "Off edge" = outside
+    // 1.0 ft horizontally (clearly off the plate, not just nibbling).
+    const plateX = p.plate_x != null ? Number(p.plate_x) : 0;
+    const plateZ = p.plate_z != null ? Number(p.plate_z) : 2.5;
+    const buriedLow = plateZ < 1.0;
+    const offEdge = Math.abs(plateX) > 1.0;
+    const buriedBonus = (buriedLow ? 2 : 0) + (offEdge ? 1.5 : 0);
+
+    const k3Bonus = isK3 ? 2 : 0;
+    const spin = p.release_spin_rate != null ? Number(p.release_spin_rate) : 0;
+    const spinBonus = spin >= 2800 ? 1 : 0;
+
+    const score = breakBonus + buriedBonus + k3Bonus + spinBonus;
+    if (score <= 0) return null;
+
+    // Build the reason from the most distinctive signals so the card
+    // tells a story: pitch + velo + break + buried/off-edge + result.
+    const breakRound = Math.round(breakIn);
+    const buriedLabel = buriedLow
+      ? "buried for "
+      : offEdge
+        ? "chased off the plate for "
+        : "";
+    const resultLabel = isK3 ? "strike 3 swinging" : "swing & miss";
+    return {
+      score,
+      reason: `${Math.round(velo)} mph ${pitchName}, ${breakRound}″ break, ${buriedLabel}${resultLabel}`,
+    };
+  }
+
+  return null;
+}
+
 // Score every at-bat in the last N days (default 7) and persist the
 // composite score to pitch_notable_at_bats. Then pick one Pitch of the
 // Day (from the last 24h) and one Whiff of the Week (rolling 7-day) and
@@ -133,7 +245,7 @@ export async function GET(request: Request) {
     const { data: pitchesRaw } = await supabase
       .from("pitch_game_pitches")
       .select(
-        "at_bat_number, pitch_number, pitcher_id, batter_id, description, events, delta_run_exp, release_speed",
+        "at_bat_number, pitch_number, pitcher_id, batter_id, description, events, delta_run_exp, release_speed, pitch_type, strikes, plate_x, plate_z, pfx_x, pfx_z, release_spin_rate",
       )
       .eq("game_pk", g.game_pk)
       .range(0, 1499);
@@ -172,48 +284,46 @@ export async function GET(request: Request) {
       const dre = p.delta_run_exp != null ? Math.abs(Number(p.delta_run_exp)) : 0;
       if (dre > ab.max_abs_delta_run_exp) ab.max_abs_delta_run_exp = dre;
 
-      // Pitch-of-day candidate: best-velocity whiff from yesterday's
-      // games specifically. Strict date filter means each day's pool
-      // is non-overlapping with the previous day's, so the same pitch
-      // can't be picked twice across consecutive runs.
-      if (
-        cat === "whiff" &&
-        g.game_date === yesterdayET &&
-        p.release_speed != null
-      ) {
-        const score = Number(p.release_speed);
-        if (!pitchOfDay || score > pitchOfDay.score) {
+      // Pitch-of-day candidate: highest-scoring swing-and-miss from
+      // yesterday's games, scored across two pools (heat vs breaker)
+      // — see scoreCandidate() above for the calibration. Strict date
+      // filter means each day's pool is non-overlapping with the
+      // previous day's, so the same pitch can't be picked twice across
+      // consecutive runs.
+      if (g.game_date === yesterdayET) {
+        const candidate = scoreCandidate(p);
+        if (candidate && (!pitchOfDay || candidate.score > pitchOfDay.score)) {
           pitchOfDay = {
             game_pk: g.game_pk,
             at_bat_number: p.at_bat_number,
             pitch_number: p.pitch_number,
             pitcher_id: p.pitcher_id,
             batter_id: p.batter_id,
-            score,
-            reason: `${score.toFixed(1)} mph swinging strike`,
+            score: candidate.score,
+            reason: candidate.reason,
             feature_date: todayIso,
           };
         }
       }
 
-      // Whiff-of-week candidate: highest-velocity whiff in the 7-day
-      // lookback. Only computed when this cron run is the weekly
-      // refresh (Mondays) — daily WoW updates produce noisy week-over-
-      // week jitter where a single high-velo pitch reshuffles the
-      // headline every morning. On non-Monday runs we leave the
-      // existing WoW row in place via the `if (whiffOfWeek)` guard
-      // around the upsert below.
-      if (isMondayET && cat === "whiff" && p.release_speed != null) {
-        const score = Number(p.release_speed);
-        if (!whiffOfWeek || score > whiffOfWeek.score) {
+      // Whiff-of-week candidate: highest-scoring swing-and-miss in the
+      // 7-day lookback, using the same dual-pool scoring as POTD. Only
+      // computed when this cron run is the weekly refresh (Mondays) —
+      // daily WoW updates produce noisy week-over-week jitter where a
+      // single high-scoring pitch reshuffles the headline every morn-
+      // ing. On non-Monday runs the existing WoW row stays in place
+      // (whiffOfWeek stays null → no upsert).
+      if (isMondayET) {
+        const candidate = scoreCandidate(p);
+        if (candidate && (!whiffOfWeek || candidate.score > whiffOfWeek.score)) {
           whiffOfWeek = {
             game_pk: g.game_pk,
             at_bat_number: p.at_bat_number,
             pitch_number: p.pitch_number,
             pitcher_id: p.pitcher_id,
             batter_id: p.batter_id,
-            score,
-            reason: `${score.toFixed(1)} mph whiff (${gameDateByPk.get(g.game_pk) ?? ""})`,
+            score: candidate.score,
+            reason: candidate.reason,
             feature_date: todayIso,
           };
         }
