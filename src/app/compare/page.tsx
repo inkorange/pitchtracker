@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
+import { TeamLogo } from "@/components/team/TeamLogo";
 import {
   categorizeDescription,
   getPitchColorForSide,
@@ -514,16 +515,12 @@ function PitcherCard({
             </div>
           </div>
           {team ? (
-            <div className="hidden sm:block relative w-9 h-9 flex-shrink-0">
-              <Image
-                src={teamLogoUrl(team.mlb_id)}
-                alt={team.name}
-                fill
-                sizes="36px"
-                className="object-contain"
-                unoptimized
-              />
-            </div>
+            <TeamLogo
+              teamId={team.mlb_id}
+              size={36}
+              alt={team.name}
+              className="hidden sm:block"
+            />
           ) : null}
         </div>
       }

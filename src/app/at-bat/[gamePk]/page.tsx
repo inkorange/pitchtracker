@@ -9,6 +9,7 @@ import {
   type MlbGameResult,
 } from "@/lib/statsapi/client";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { TeamLogo } from "@/components/team/TeamLogo";
 import { absoluteUrl } from "@/lib/url/site";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
@@ -252,30 +253,12 @@ export default async function GameAtBatsPage({ params }: PageProps) {
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-3">
               {awayTeam?.mlb_id ? (
-                <div className="relative w-9 h-9">
-                  <Image
-                    src={teamLogoUrl(awayTeam.mlb_id)}
-                    alt={awayTeam.name}
-                    fill
-                    sizes="36px"
-                    className="object-contain"
-                    unoptimized
-                  />
-                </div>
+                <TeamLogo teamId={awayTeam.mlb_id} size={36} alt={awayTeam.name} />
               ) : null}
               <span>{awayTeam?.abbreviation ?? "?"}</span>
               <span className="text-white/45 text-base">@</span>
               {homeTeam?.mlb_id ? (
-                <div className="relative w-9 h-9">
-                  <Image
-                    src={teamLogoUrl(homeTeam.mlb_id)}
-                    alt={homeTeam.name}
-                    fill
-                    sizes="36px"
-                    className="object-contain"
-                    unoptimized
-                  />
-                </div>
+                <TeamLogo teamId={homeTeam.mlb_id} size={36} alt={homeTeam.name} />
               ) : null}
               <span>{homeTeam?.abbreviation ?? "?"}</span>
             </h1>
@@ -379,16 +362,7 @@ function BoxScoreTeamRow({
   return (
     <>
       <div className="flex items-center gap-2">
-        <div className="relative w-6 h-6 flex-shrink-0">
-          <Image
-            src={teamLogoUrl(teamId)}
-            alt=""
-            fill
-            sizes="24px"
-            className="object-contain"
-            unoptimized
-          />
-        </div>
+        <TeamLogo teamId={teamId} size={24} />
         <span className={won ? bold : "text-white/85"}>{abbr}</span>
       </div>
       <span className={`text-right ${won ? bold : dim}`}>

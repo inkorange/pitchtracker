@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
+import { TeamLogo } from "@/components/team/TeamLogo";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 
 // Two-track blend so the strip mixes stable elite names with a
@@ -131,16 +132,7 @@ export async function FeaturedStrip() {
                 </div>
               </div>
               {p.current_team_id ? (
-                <div className="relative w-7 h-7 flex-shrink-0">
-                  <Image
-                    src={teamLogoUrl(p.current_team_id)}
-                    alt=""
-                    fill
-                    sizes="28px"
-                    className="object-contain opacity-80"
-                    unoptimized
-                  />
-                </div>
+                <TeamLogo teamId={p.current_team_id} size={28} />
               ) : null}
             </Link>
           </li>
