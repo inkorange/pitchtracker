@@ -52,7 +52,7 @@ export default function Home() {
         </header>
       </section>
 
-      <div className="max-w-3xl mx-auto px-6 pt-8 pb-16 space-y-10">
+      <div className="max-w-4xl mx-auto px-6 pt-8 pb-16 space-y-10">
         {/* Sticky so the search stays reachable as the user scrolls
             through the daily pick + featured strips. -mx-6 px-6
             extends the backdrop to the container edges so scrolled
@@ -72,12 +72,24 @@ export default function Home() {
                 Pitchers · rosters
               </span>
             </div>
-            <span
+            {/* 2×2 grid affordance: hints at the team grid the link
+                opens. Same circular-button pattern as the daily-pick
+                cards so the action layer reads as one consistent
+                system across the homepage. */}
+            <div
               aria-hidden
-              className="text-white/55 group-hover:text-white group-hover:translate-x-0.5 transition-all"
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-white/[0.08] border border-white/15 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-white/[0.18] group-hover:border-white/30"
             >
-              →
-            </span>
+              <svg
+                viewBox="0 0 24 24"
+                className="w-[18px] h-[18px] fill-white/85 transition-colors group-hover:fill-white"
+              >
+                <rect x="4" y="4" width="7" height="7" rx="1.5" />
+                <rect x="13" y="4" width="7" height="7" rx="1.5" />
+                <rect x="4" y="13" width="7" height="7" rx="1.5" />
+                <rect x="13" y="13" width="7" height="7" rx="1.5" />
+              </svg>
+            </div>
           </Link>
           <Link
             href="/at-bat"
@@ -89,12 +101,19 @@ export default function Home() {
                 Pitch-by-pitch
               </span>
             </div>
-            <span
+            {/* Play triangle — matches the play button on the daily
+                pick cards since both destinations are pitch replays. */}
+            <div
               aria-hidden
-              className="text-white/55 group-hover:text-white group-hover:translate-x-0.5 transition-all"
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-white/[0.08] border border-white/15 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-white/[0.18] group-hover:border-white/30"
             >
-              →
-            </span>
+              <svg
+                viewBox="0 0 24 24"
+                className="w-4 h-4 fill-white/85 ml-[2px] transition-colors group-hover:fill-white"
+              >
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
           </Link>
           <Link
             href="/explore"
@@ -106,12 +125,22 @@ export default function Home() {
                 Filters · stats
               </span>
             </div>
-            <span
+            {/* Sliders icon: two horizontal tracks + filled knobs.
+                Reads as "adjust filters" — matches the subtitle. */}
+            <div
               aria-hidden
-              className="text-white/55 group-hover:text-white group-hover:translate-x-0.5 transition-all"
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-white/[0.08] border border-white/15 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-white/[0.18] group-hover:border-white/30"
             >
-              →
-            </span>
+              <svg
+                viewBox="0 0 24 24"
+                className="w-[18px] h-[18px] fill-white/85 transition-colors group-hover:fill-white"
+              >
+                <rect x="3" y="6" width="11" height="2" rx="1" />
+                <circle cx="17" cy="7" r="2.5" />
+                <rect x="3" y="16" width="7" height="2" rx="1" />
+                <circle cx="13" cy="17" r="2.5" />
+              </svg>
+            </div>
           </Link>
         </div>
 
