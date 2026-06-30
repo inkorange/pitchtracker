@@ -54,7 +54,7 @@ export function TopNav({ back, title, summary, rightSlot }: TopNavProps) {
             alt="pitchtracker"
             width={65}
             height={20}
-            className="h-5 w-auto"
+            className="h-5 w-auto mt-1"
           />
         </Link>
       </div>
