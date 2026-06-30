@@ -22,6 +22,7 @@ import { TOPNAV_BUTTON_CLS, TopNav } from "@/components/chrome/TopNav";
 import { FiltersGate } from "../FiltersGate";
 import { MatchupsPanel } from "../MatchupsPanel";
 import { PitcherCardCollapse } from "../PitcherCardCollapse";
+import { HidablePanel } from "@/components/chrome/HidablePanel";
 import { AtBatHeader } from "../AtBatHeader";
 import { PitcherBody } from "../PitcherBody";
 import { StatsModeToggle } from "../StatsModeToggle";
@@ -821,9 +822,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           can anchor below the WHOLE column (card + summary), not just
           the card section — otherwise the summary banner overlaps the
           stat cards on mobile in stats mode. */}
-      <div
-        data-pitcher-card-column
-        className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] pointer-events-auto flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
+      <HidablePanel
+        positionClass="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
+        hiddenPositionClass="absolute top-16 left-3 sm:left-6 z-30"
+        panelName="pitcher panel"
+        dataAttribute="data-pitcher-card-column"
       >
       <section
         data-pitcher-card
@@ -1006,7 +1009,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           {filterSummary}
         </div>
       ) : null}
-      </div>
+      </HidablePanel>
 
       {/* Stats analytics view — sibling of the pitcher card, NOT
           inside it. Renders nothing in arsenal mode. The

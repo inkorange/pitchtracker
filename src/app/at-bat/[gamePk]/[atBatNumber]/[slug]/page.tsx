@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { HidablePanel } from "@/components/chrome/HidablePanel";
 import { notFound, permanentRedirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPerson, fetchPersonsCached } from "@/lib/statsapi/client";
@@ -333,7 +334,12 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
         title="At-bat replay"
       />
 
-      <section className="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 pointer-events-auto max-h-[55vh] sm:max-h-[calc(100vh-17rem)] overflow-hidden flex flex-col">
+      <HidablePanel
+        positionClass="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px]"
+        hiddenPositionClass="absolute top-16 left-3 sm:left-6 z-30"
+        panelName="matchup panel"
+      >
+      <section className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3 sm:p-4 max-h-[55vh] sm:max-h-[calc(100vh-17rem)] overflow-hidden flex flex-col">
         {/* Top portion stays pinned via flex-shrink-0 — only the
             matchups list below absorbs flex-1 and scrolls. */}
         <div className="flex-shrink-0 space-y-2 sm:space-y-4">
@@ -560,6 +566,7 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
           allPitcherAbs={pitcherAbDisplay}
         />
       </section>
+      </HidablePanel>
 
       <AtBatOutcomeLegend />
     </>
