@@ -22,7 +22,10 @@ import { TOPNAV_BUTTON_CLS, TopNav } from "@/components/chrome/TopNav";
 import { FiltersGate } from "../FiltersGate";
 import { MatchupsPanel } from "../MatchupsPanel";
 import { PitcherCardCollapse } from "../PitcherCardCollapse";
-import { HidablePanel } from "@/components/chrome/HidablePanel";
+import {
+  HidablePanel,
+  HiddenWhenCollapsed,
+} from "@/components/chrome/HidablePanel";
 import { AtBatHeader } from "../AtBatHeader";
 import { PitcherBody } from "../PitcherBody";
 import { StatsModeToggle } from "../StatsModeToggle";
@@ -824,7 +827,6 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           stat cards on mobile in stats mode. */}
       <HidablePanel
         positionClass="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
-        hiddenPositionClass="absolute top-16 left-3 sm:left-6 z-30"
         panelName="pitcher panel"
         dataAttribute="data-pitcher-card-column"
       >
@@ -893,11 +895,17 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                   FiltersGate — the view toggle is not a per-side
                   filter and must stay reachable in at-bat playback so
                   the user can flip over to the batter-scoped stats
-                  view without losing the AB context. */}
-              <StatsModeToggle />
+                  view without losing the AB context. Wrapped in
+                  HiddenWhenCollapsed so the panel's compact summary
+                  view (pitcher row + season picker only) doesn't
+                  carry the mode toggle. */}
+              <HiddenWhenCollapsed>
+                <StatsModeToggle />
+              </HiddenWhenCollapsed>
             </>
           }
           body={
+            <HiddenWhenCollapsed>
             <PitcherBody
               arsenal={
                 <div>
@@ -990,25 +998,31 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
                 </div>
               }
             />
+            </HiddenWhenCollapsed>
           }
         />
 
         {/* At-bat info card: lives outside the collapsing body so it
             stays on screen on mobile after the auto-collapse. Shows
             the active matchup's batter, outcome, and game context.
-            Renders nothing when not in at-bat mode. */}
-        <AtBatHeader season={season} />
+            Renders nothing when not in at-bat mode. Also collapses
+            with the summary view. */}
+        <HiddenWhenCollapsed>
+          <AtBatHeader season={season} />
+        </HiddenWhenCollapsed>
       </section>
 
       {/* Mobile-only filter-summary banner. Lives in the top nav on
           desktop. Anchored just below the card via the flex-col
           wrapper so it tracks the card's bottom edge whether the body
           is collapsed or expanded. */}
-      {filterSummary ? (
-        <div className="sm:hidden flex-shrink-0 text-[12px] leading-snug text-white/85 italic bg-[#081a32]/70 backdrop-blur-md border border-white/10 rounded-md px-3 py-1.5 shadow-lg">
-          {filterSummary}
-        </div>
-      ) : null}
+      <HiddenWhenCollapsed>
+        {filterSummary ? (
+          <div className="sm:hidden flex-shrink-0 text-[12px] leading-snug text-white/85 italic bg-[#081a32]/70 backdrop-blur-md border border-white/10 rounded-md px-3 py-1.5 shadow-lg">
+            {filterSummary}
+          </div>
+        ) : null}
+      </HiddenWhenCollapsed>
       </HidablePanel>
 
       {/* Stats analytics view — sibling of the pitcher card, NOT

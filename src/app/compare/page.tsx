@@ -17,7 +17,10 @@ import { CompareSideFilters } from "./CompareSideFilters";
 import { CompareSharedFilters } from "./CompareSharedFilters";
 import { CompareLinkActions } from "./CompareLinkActions";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
-import { HidablePanel } from "@/components/chrome/HidablePanel";
+import {
+  HidablePanel,
+  HiddenWhenCollapsed,
+} from "@/components/chrome/HidablePanel";
 import { CompareSlotSearch } from "./CompareSlotSearch";
 import { TunnelingPanel } from "./TunnelingPanel";
 import {
@@ -156,7 +159,6 @@ export default async function ComparePage({ searchParams }: PageProps) {
 
         <HidablePanel
           positionClass="absolute top-20 -translate-y-5 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[400px]"
-          hiddenPositionClass="absolute top-20 -translate-y-5 left-3 sm:left-6 z-30"
           panelName="pitcher comparison panel"
         >
         <section className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-4 max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-7rem)] overflow-y-auto">
@@ -184,22 +186,27 @@ export default async function ComparePage({ searchParams }: PageProps) {
             />
           </HoverableSide>
 
-          <div className="border-t border-white/[0.08]" />
-          <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
+          {/* Bulky tunneling stats + shared filters + render count
+              collapse out of the way when the panel is in its summary
+              state — only the two pitcher cards stay visible. */}
+          <HiddenWhenCollapsed>
+            <div className="border-t border-white/[0.08]" />
+            <TunnelingPanel aPitches={aCtx.pitches} bPitches={bCtx.pitches} />
 
-          <CompareSharedFilters />
+            <CompareSharedFilters />
 
-          <div className="text-[11px] tabular-nums text-white/45 pt-2 border-t border-white/[0.05] flex items-center justify-between">
-            <span>
-              {aCtx.pitches.length + bCtx.pitches.length} pitches rendered
-            </span>
-            <Link
-              href={`/compare?${buildToggleQS(sp, "syncRelease", syncRelease ? null : "1")}`}
-              className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white transition-colors"
-            >
-              {syncRelease ? "True release" : "Sync release"}
-            </Link>
-          </div>
+            <div className="text-[11px] tabular-nums text-white/45 pt-2 border-t border-white/[0.05] flex items-center justify-between">
+              <span>
+                {aCtx.pitches.length + bCtx.pitches.length} pitches rendered
+              </span>
+              <Link
+                href={`/compare?${buildToggleQS(sp, "syncRelease", syncRelease ? null : "1")}`}
+                className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white transition-colors"
+              >
+                {syncRelease ? "True release" : "Sync release"}
+              </Link>
+            </div>
+          </HiddenWhenCollapsed>
         </section>
         </HidablePanel>
       </main>
@@ -537,7 +544,11 @@ function PitcherCard({
         </div>
       }
       body={
-        <>
+        // When the comparison panel is collapsed to its summary view,
+        // each PitcherCard reduces to just the headshot + name + team
+        // row. The switch / arsenal / filters block disappears with
+        // the rest of the bulky content so the summary stays tight.
+        <HiddenWhenCollapsed>
           <SwitchPitcherButton side={side} />
           {aggregates.length === 0 ? (
             <div className="text-xs text-white/55">No arsenal data for {season}.</div>
@@ -576,7 +587,7 @@ function PitcherCard({
             }))}
             games={games}
           />
-        </>
+        </HiddenWhenCollapsed>
       }
     />
   );
