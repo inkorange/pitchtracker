@@ -33,7 +33,7 @@ export function TeamLogo({ teamId, size, alt = "", className = "" }: Props) {
   // styling rather than an opaque blob.
   return (
     <div
-      className={`relative rounded-full bg-white/75 shadow-sm ring-1 ring-white/40 flex-shrink-0 ${className}`}
+      className={`relative rounded-full bg-white shadow-sm ring-1 ring-white/40 flex-shrink-0 ${className}`}
       style={{ width: size, height: size }}
     >
       <Image
