@@ -273,6 +273,59 @@ function useUpperTierGeometry() {
   );
 }
 
+// Leading face that closes the sky gap between the lower deck and the
+// upper deck. Without it, the vertical air between the top of the
+// back-most lower-deck tread and the cantilevered upper-deck base
+// height reads as raw sky from any field-level camera angle — the
+// two tiers look like they float apart instead of stacking. The face
+// is a vertical curved strip at the upper deck's inner radial offset,
+// painted with the same wall color as the rest of the bowl structure
+// so it reads as a continuation of the wall facade rather than a
+// separate element.
+function useUpperDeckLeadingFaceGeometry() {
+  return useMemo(() => {
+    const lowerRowDepth = LOWER_DEPTH / LOWER_ROWS;
+    const lowerRowRise = LOWER_RISE / LOWER_ROWS;
+    // Which lower-deck row's front edge lines up with the upper deck's
+    // inner radial offset — the face starts at that row's tread Y, so
+    // it sits flush against the back of one of the lower-deck rows
+    // rather than starting above or below it.
+    const rowIdx = Math.floor(
+      (UPPER_INNER_OFFSET - LOWER_INNER_OFFSET) / lowerRowDepth,
+    );
+    const faceBottomY = LOWER_BASE_HEIGHT + rowIdx * lowerRowRise;
+
+    const positions: number[] = [];
+    const indices: number[] = [];
+    for (let i = 0; i <= ARC_SEGMENTS; i++) {
+      const angle = -Math.PI + i * SEGMENT_ANGLE;
+      const wallR = wallRadiusAtAngle(angle);
+      const r = wallR + UPPER_INNER_OFFSET;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      positions.push(r * cos, faceBottomY, r * sin);
+      positions.push(r * cos, UPPER_BASE_HEIGHT, r * sin);
+    }
+    for (let i = 0; i < ARC_SEGMENTS; i++) {
+      const bl = i * 2;
+      const tl = i * 2 + 1;
+      const br = (i + 1) * 2;
+      const tr = (i + 1) * 2 + 1;
+      // Inward-facing normals (same winding as the wall).
+      indices.push(bl, br, tl);
+      indices.push(tl, br, tr);
+    }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(positions, 3),
+    );
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+    return geom;
+  }, []);
+}
+
 function useWallMaterial() {
   return useMemo(
     () =>
@@ -425,6 +478,7 @@ export function StadiumBowl() {
   const wallGeom = useWallGeometry();
   const wallTrimGeom = useWallTrimGeometry();
   const lowerTierGeom = useLowerTierGeometry();
+  const leadingFaceGeom = useUpperDeckLeadingFaceGeometry();
   const upperTierGeom = useUpperTierGeometry();
   const wallMat = useWallMaterial();
   const trimMat = useWallTrimMaterial();
@@ -435,6 +489,10 @@ export function StadiumBowl() {
       <mesh geometry={wallGeom} material={wallMat} />
       <mesh geometry={wallTrimGeom} material={trimMat} />
       <mesh geometry={lowerTierGeom} material={lowerSeatsMat} />
+      {/* Closes the sky between the lower deck top and the upper
+          deck's cantilevered leading edge. Reuses the wall material
+          so it reads as part of the bowl's structural facade. */}
+      <mesh geometry={leadingFaceGeom} material={wallMat} />
       <mesh geometry={upperTierGeom} material={upperSeatsMat} />
     </group>
   );
