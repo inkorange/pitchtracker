@@ -30,11 +30,29 @@ const R_AMP = (OUTFIELD_RADIUS - BACKSTOP_RADIUS) / 2;
 const OUTFIELD_BEARING = -Math.PI / 2;
 
 const WALL_HEIGHT = 8;
-const TIER_INNER_OFFSET = 2;
-const TIER_DEPTH = 24;
-const TIER_RISE = 22;
-const TIER_BASE_HEIGHT = WALL_HEIGHT;
-const TIER_TOP_HEIGHT = TIER_BASE_HEIGHT + TIER_RISE;
+
+// Lower deck (closest to the field): begins 2 ft behind the wall, 24
+// ft deep, rises 22 ft. ~42° slope.
+const LOWER_INNER_OFFSET = 2;
+const LOWER_DEPTH = 24;
+const LOWER_RISE = 22;
+const LOWER_BASE_HEIGHT = WALL_HEIGHT;
+const LOWER_TOP_HEIGHT = LOWER_BASE_HEIGHT + LOWER_RISE;
+
+// Concourse gap between the lower and upper decks. A small radial +
+// vertical step separates the two tiers so they read as distinct
+// decks instead of one continuous ramp.
+const CONCOURSE_RADIAL_GAP = 4;
+const CONCOURSE_VERTICAL_STEP = 2;
+
+// Upper deck (cheap seats / nosebleeds): sits behind + above the
+// lower deck, slightly deeper and steeper to match a typical
+// stadium upper bowl.
+const UPPER_INNER_OFFSET = LOWER_INNER_OFFSET + LOWER_DEPTH + CONCOURSE_RADIAL_GAP;
+const UPPER_DEPTH = 28;
+const UPPER_RISE = 26;
+const UPPER_BASE_HEIGHT = LOWER_TOP_HEIGHT + CONCOURSE_VERTICAL_STEP;
+const UPPER_TOP_HEIGHT = UPPER_BASE_HEIGHT + UPPER_RISE;
 
 const ARC_SEGMENTS = 256;
 const SEGMENT_ANGLE = (2 * Math.PI) / ARC_SEGMENTS;
@@ -118,40 +136,70 @@ function useWallTrimGeometry() {
   }, []);
 }
 
-// Sloped seating ramp: inner edge sits at (wallR + TIER_INNER_OFFSET,
-// y = WALL_HEIGHT), outer edge at (innerR + TIER_DEPTH, y = TIER_TOP).
-// Rises ~22 ft over ~24 ft of depth → ~42° tier slope.
-function useTierGeometry() {
-  return useMemo(() => {
-    const positions: number[] = [];
-    const indices: number[] = [];
-    for (let i = 0; i <= ARC_SEGMENTS; i++) {
-      const angle = -Math.PI + i * SEGMENT_ANGLE;
-      const wallR = wallRadiusAtAngle(angle);
-      const innerR = wallR + TIER_INNER_OFFSET;
-      const outerR = innerR + TIER_DEPTH;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      positions.push(innerR * cos, TIER_BASE_HEIGHT, innerR * sin);
-      positions.push(outerR * cos, TIER_TOP_HEIGHT, outerR * sin);
-    }
-    for (let i = 0; i < ARC_SEGMENTS; i++) {
-      const bl = i * 2;
-      const tl = i * 2 + 1;
-      const br = (i + 1) * 2;
-      const tr = (i + 1) * 2 + 1;
-      indices.push(bl, br, tl);
-      indices.push(tl, br, tr);
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(positions, 3),
-    );
-    geom.setIndex(indices);
-    geom.computeVertexNormals();
-    return geom;
-  }, []);
+// Sloped seating ramp factory. Builds a curved tier between two
+// (radial offset, height) edges — inner-bottom and outer-top — that
+// follow the wall's variable radius all the way around the bowl.
+// Used for both decks.
+function buildTierGeometry(
+  innerOffset: number,
+  depth: number,
+  baseHeight: number,
+  topHeight: number,
+): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= ARC_SEGMENTS; i++) {
+    const angle = -Math.PI + i * SEGMENT_ANGLE;
+    const wallR = wallRadiusAtAngle(angle);
+    const innerR = wallR + innerOffset;
+    const outerR = innerR + depth;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    positions.push(innerR * cos, baseHeight, innerR * sin); // inner-bottom (front)
+    positions.push(outerR * cos, topHeight, outerR * sin); // outer-top (back)
+  }
+  for (let i = 0; i < ARC_SEGMENTS; i++) {
+    const bl = i * 2;
+    const tl = i * 2 + 1;
+    const br = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    indices.push(bl, br, tl);
+    indices.push(tl, br, tr);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function useLowerTierGeometry() {
+  return useMemo(
+    () =>
+      buildTierGeometry(
+        LOWER_INNER_OFFSET,
+        LOWER_DEPTH,
+        LOWER_BASE_HEIGHT,
+        LOWER_TOP_HEIGHT,
+      ),
+    [],
+  );
+}
+
+function useUpperTierGeometry() {
+  return useMemo(
+    () =>
+      buildTierGeometry(
+        UPPER_INNER_OFFSET,
+        UPPER_DEPTH,
+        UPPER_BASE_HEIGHT,
+        UPPER_TOP_HEIGHT,
+      ),
+    [],
+  );
 }
 
 function useWallMaterial() {
@@ -180,83 +228,130 @@ function useWallTrimMaterial() {
   );
 }
 
-// Shader-patched standard material for the seating tier. Paints
+// Shader-patched standard material for a seating tier. Paints
 // alternating-color horizontal rows + dark radial aisles by angular
 // position so the aisle lines stay straight (point at home plate)
 // regardless of the seat point's actual height/radius.
-function useSeatsMaterial() {
-  return useMemo(() => {
-    const mat = new MeshStandardMaterial({
-      color: "#2c3a55",
-      roughness: 0.7,
-      metalness: 0,
-      side: THREE.FrontSide,
-    });
-    mat.onBeforeCompile = (shader) => {
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          "#include <common>",
-          `#include <common>\nvarying vec3 vStandsWorldPos;`,
-        )
-        .replace(
-          "#include <begin_vertex>",
-          `#include <begin_vertex>\nvStandsWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
-        );
+//
+// Parameterized so the lower and upper decks can share one builder
+// but render with their own row baseline and seat tint — the upper
+// deck reads as a slightly darker, recessed band so the lower deck
+// remains the visual focal point.
+interface SeatPalette {
+  base: string;
+  darkRow: string; // glsl vec3 components: "0.12, 0.16, 0.30"
+  lightRow: string;
+  aisle: string;
+}
 
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          "#include <common>",
-          `#include <common>
-          varying vec3 vStandsWorldPos;
-          `,
-        )
-        .replace(
-          "#include <color_fragment>",
-          `#include <color_fragment>
-          // Row stripes: alternate two seat shades every ~2 ft of rise.
-          float ROW_H = 2.0;
-          float row = floor((vStandsWorldPos.y - ${TIER_BASE_HEIGHT.toFixed(1)}) / ROW_H);
-          float rowMod = mod(row, 2.0);
-          vec3 darkSeat = vec3(0.12, 0.16, 0.30);
-          vec3 lightSeat = vec3(0.18, 0.24, 0.42);
-          vec3 seatColor = mix(darkSeat, lightSeat, rowMod);
+function buildSeatsMaterial(
+  baseY: number,
+  palette: SeatPalette,
+): MeshStandardMaterial {
+  const mat = new MeshStandardMaterial({
+    color: palette.base,
+    roughness: 0.7,
+    metalness: 0,
+    side: THREE.FrontSide,
+  });
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>\nvarying vec3 vStandsWorldPos;`,
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>\nvStandsWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+      );
 
-          // Step shadow at each row boundary — keeps rows visible at distance.
-          float rowFrac = fract((vStandsWorldPos.y - ${TIER_BASE_HEIGHT.toFixed(1)}) / ROW_H);
-          if (rowFrac < 0.08) seatColor *= 0.65;
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+        varying vec3 vStandsWorldPos;
+        `,
+      )
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+        // Row stripes: alternate two seat shades every ~2 ft of rise.
+        float ROW_H = 2.0;
+        float row = floor((vStandsWorldPos.y - ${baseY.toFixed(1)}) / ROW_H);
+        float rowMod = mod(row, 2.0);
+        vec3 darkSeat = vec3(${palette.darkRow});
+        vec3 lightSeat = vec3(${palette.lightRow});
+        vec3 seatColor = mix(darkSeat, lightSeat, rowMod);
 
-          // Radial aisles: angular pattern. ~36 aisles around the bowl
-          // (one every 10°). Using angular position rather than arc
-          // length keeps the aisle as a true radial slice — every
-          // height at the same angle gets the same value, so aisles
-          // render as straight lines pointing at home plate.
-          float angle = atan(vStandsWorldPos.z, vStandsWorldPos.x);
-          float AISLE_COUNT = 36.0;
-          float angleNorm = (angle + 3.14159265) / (2.0 * 3.14159265);
-          float aisleFrac = fract(angleNorm * AISLE_COUNT);
-          float aisleDist = abs(aisleFrac - 0.5);
-          if (aisleDist > 0.46) seatColor = vec3(0.05, 0.07, 0.14);
+        // Step shadow at each row boundary — keeps rows visible at distance.
+        float rowFrac = fract((vStandsWorldPos.y - ${baseY.toFixed(1)}) / ROW_H);
+        if (rowFrac < 0.08) seatColor *= 0.65;
 
-          diffuseColor.rgb = seatColor;
-          `,
-        );
-    };
-    return mat;
-  }, []);
+        // Radial aisles: angular pattern. ~36 aisles around the bowl
+        // (one every 10°). Using angular position rather than arc
+        // length keeps the aisle as a true radial slice — every
+        // height at the same angle gets the same value, so aisles
+        // render as straight lines pointing at home plate.
+        float angle = atan(vStandsWorldPos.z, vStandsWorldPos.x);
+        float AISLE_COUNT = 36.0;
+        float angleNorm = (angle + 3.14159265) / (2.0 * 3.14159265);
+        float aisleFrac = fract(angleNorm * AISLE_COUNT);
+        float aisleDist = abs(aisleFrac - 0.5);
+        if (aisleDist > 0.46) seatColor = vec3(${palette.aisle});
+
+        diffuseColor.rgb = seatColor;
+        `,
+      );
+  };
+  return mat;
+}
+
+const LOWER_PALETTE: SeatPalette = {
+  base: "#2c3a55",
+  darkRow: "0.12, 0.16, 0.30",
+  lightRow: "0.18, 0.24, 0.42",
+  aisle: "0.05, 0.07, 0.14",
+};
+
+// Upper deck: slightly darker + more muted than the lower deck so the
+// two decks read as distinct horizontal bands and the lower deck
+// stays the eye's focal point.
+const UPPER_PALETTE: SeatPalette = {
+  base: "#1f2940",
+  darkRow: "0.09, 0.12, 0.23",
+  lightRow: "0.14, 0.18, 0.33",
+  aisle: "0.04, 0.05, 0.10",
+};
+
+function useLowerSeatsMaterial() {
+  return useMemo(
+    () => buildSeatsMaterial(LOWER_BASE_HEIGHT, LOWER_PALETTE),
+    [],
+  );
+}
+
+function useUpperSeatsMaterial() {
+  return useMemo(
+    () => buildSeatsMaterial(UPPER_BASE_HEIGHT, UPPER_PALETTE),
+    [],
+  );
 }
 
 export function StadiumBowl() {
   const wallGeom = useWallGeometry();
   const wallTrimGeom = useWallTrimGeometry();
-  const tierGeom = useTierGeometry();
+  const lowerTierGeom = useLowerTierGeometry();
+  const upperTierGeom = useUpperTierGeometry();
   const wallMat = useWallMaterial();
   const trimMat = useWallTrimMaterial();
-  const seatsMat = useSeatsMaterial();
+  const lowerSeatsMat = useLowerSeatsMaterial();
+  const upperSeatsMat = useUpperSeatsMaterial();
   return (
     <group>
       <mesh geometry={wallGeom} material={wallMat} />
       <mesh geometry={wallTrimGeom} material={trimMat} />
-      <mesh geometry={tierGeom} material={seatsMat} />
+      <mesh geometry={lowerTierGeom} material={lowerSeatsMat} />
+      <mesh geometry={upperTierGeom} material={upperSeatsMat} />
     </group>
   );
 }
