@@ -24,6 +24,7 @@ export async function generateMetadata({
     title: "Explore · pitchtracker",
     description:
       "Mine the Statcast pitch dataset by handedness, count, outcome, pitch type, season, and more.",
+    alternates: { canonical: "/explore" },
     openGraph: {
       title: "Explore the Statcast pitch dataset",
       description:

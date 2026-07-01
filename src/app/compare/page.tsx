@@ -63,6 +63,16 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   const ogUrl = `/api/og/compare?${og.toString()}`;
   return {
     title: "Compare pitchers · pitchtracker",
+    alternates: { canonical: "/compare" },
+    // Every combination of ?a=X&b=Y is a distinct URL to Google —
+    // hundreds of thousands of theoretical permutations. Users don't
+    // organically search for specific pairs, and even if they did, the
+    // homepage + pitcher pages already carry the "compare pitchers"
+    // signal. Noindex keeps this out of Google's crawl queue and
+    // concentrates authority on the pages that actually rank.
+    // `follow` stays on so links inside the compare view (pitcher
+    // names → arsenal pages) still pass authority.
+    robots: { index: false, follow: true },
     openGraph: {
       title: "Compare pitchers in 3D",
       description: "Two pitchers' arsenals overlaid in shared 3D space.",

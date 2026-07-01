@@ -11,6 +11,7 @@ import { TopNav } from "@/components/chrome/TopNav";
 export const metadata: Metadata = {
   title: "Daily picks · pitchtracker",
   description: "Pitch of the Day and Whiff of the Week, automatically curated.",
+  alternates: { canonical: "/daily" },
 };
 
 interface DailyFeatureRow {

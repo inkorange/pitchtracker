@@ -22,7 +22,10 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { gamePk } = await params;
-  return { title: `Game ${gamePk} · pitchtracker` };
+  return {
+    title: `Game ${gamePk} · pitchtracker`,
+    alternates: { canonical: `/at-bat/${gamePk}` },
+  };
 }
 
 interface PitchSummaryRow {
@@ -185,6 +188,12 @@ export default async function GameAtBatsPage({ params }: PageProps) {
     pitcher_name: ab.pitcher_id
       ? pitcherById.get(ab.pitcher_id)?.lastName ?? `Pitcher #${ab.pitcher_id}`
       : "—",
+    // Full name kept separately for URL construction — AtBatGameList
+    // passes this to atBatPath() so the emitted link matches the
+    // canonical slug the [slug] route computes from full_name.
+    pitcher_full_name: ab.pitcher_id
+      ? pitcherById.get(ab.pitcher_id)?.fullName ?? null
+      : null,
     batter_name: ab.batter_id
       ? batterMap.get(ab.batter_id)?.fullName ?? `Batter #${ab.batter_id}`
       : "—",

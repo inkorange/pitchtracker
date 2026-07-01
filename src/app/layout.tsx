@@ -50,6 +50,12 @@ export const metadata: Metadata = {
     template: "%s · pitchtracker",
   },
   description: HOMEPAGE_DESCRIPTION,
+  // Default canonical points at the homepage. Every page that renders
+  // its own metadata (generateMetadata) should override with its own
+  // canonical; this default keeps `?utm_source=…` and similar tracking
+  // params from splitting authority on any page that hasn't been
+  // audited yet.
+  alternates: { canonical: "/" },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

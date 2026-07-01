@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import { TopNav } from "@/components/chrome/TopNav";
+
+export const metadata: Metadata = {
+  title: "Browse pitchers by team · pitchtracker",
+  description:
+    "All 30 MLB teams and their pitching staffs — jump to any pitcher's 3D arsenal in one click.",
+  alternates: { canonical: "/browse" },
+};
 
 const DIVISION_ORDER = [
   "AL East",
