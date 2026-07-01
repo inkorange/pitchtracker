@@ -25,8 +25,16 @@ export interface AtBatDisplay {
   inning_topbot: "Top" | "Bot";
   pitcher_id: number | null;
   batter_id: number | null;
+  // Display name (last name only — keeps the list compact on mobile).
   pitcher_name: string;
   batter_name: string;
+  // Full name for URL slug construction. Kept separate from
+  // pitcher_name because passing the last-name-only form to atBatPath()
+  // produces a non-canonical slug (`cecconi-vs-…` instead of
+  // `slade-cecconi-vs-…`), which triggers a 308 on click and gives
+  // Google two URLs for the same at-bat to reconcile — one of the
+  // main duplicate-URL sources tanking indexing.
+  pitcher_full_name: string | null;
   outs_when_up: number;
   final_balls: number;
   final_strikes: number;
@@ -154,10 +162,14 @@ function AtBatRow({
   const cat = categorizeDescription(ab.last_description);
   const dotColor = OUTCOME_COLORS[cat];
   const outcome = formatEvent(ab.events) ?? "In progress";
+  // URL uses the FULL pitcher name so the slug matches the canonical
+  // one that [slug]/page.tsx computes from full_name. Falls back to
+  // the display name (last-name only) if full_name isn't available —
+  // in that case the [slug] route's 308 will still normalize on click.
   const basePath = atBatPath(
     gamePk,
     ab.at_bat_number,
-    ab.pitcher_name,
+    ab.pitcher_full_name ?? ab.pitcher_name,
     ab.batter_name,
   );
   const href = eventParam
