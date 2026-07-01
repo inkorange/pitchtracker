@@ -402,9 +402,11 @@ export function AtBatReplayScene({
       <PitchStepper
         prepared={prepared}
         currentIdx={currentIdx}
+        selectedDetailIdx={selectedDetailIdx}
         playing={playing}
         phase={phase}
         onJumpTo={jumpTo}
+        onSelectPitch={handleSelectPitch}
         onTogglePlay={handleTogglePlay}
         activePitch={activePitch}
       />
@@ -740,13 +742,21 @@ function formatBreakInches(inches: number): string {
 interface PitchStepperProps {
   prepared: PreparedPitch[];
   currentIdx: number;
+  selectedDetailIdx: number | null;
   playing: boolean;
   // Whether the active pitch is mid-flight or already landed/done.
   // Drives the active dot color: white while flying, outcome-colored
   // once it lands (so the final pitch ends up in its outcome color
   // instead of stuck on white forever).
   phase: "flying" | "settled" | "done";
+  // prev/next arrows use onJumpTo (rewinds/advances currentIdx).
   onJumpTo: (idx: number, autoPlay?: boolean) => void;
+  // Per-pitch DOTS use onSelectPitch — same handler ribbon-clicks in
+  // the 3D scene fire — so clicking a dot pins the metrics overlay
+  // and pauses playback WITHOUT rewinding currentIdx (which would
+  // hide any later pitches from view). Matches the "click a ribbon
+  // in the scene" affordance exactly.
+  onSelectPitch: (idx: number) => void;
   onTogglePlay: () => void;
   activePitch: PreparedPitch | undefined;
 }
@@ -754,9 +764,11 @@ interface PitchStepperProps {
 function PitchStepper({
   prepared,
   currentIdx,
+  selectedDetailIdx,
   playing,
   phase,
   onJumpTo,
+  onSelectPitch,
   onTogglePlay,
   activePitch,
 }: PitchStepperProps) {
@@ -829,6 +841,7 @@ function PitchStepper({
           const landed =
             i < currentIdx || (i === currentIdx && phase !== "flying");
           const isActiveFlying = i === currentIdx && !landed;
+          const isSelected = selectedDetailIdx === i;
           const cls = landed
             ? dotColorForOutcome(p.raw.description)
             : isActiveFlying
@@ -839,9 +852,14 @@ function PitchStepper({
             <button
               key={`dot-${i}`}
               type="button"
-              onClick={() => onJumpTo(i, false)}
-              className={`w-5 h-5 rounded-full overflow-hidden transition-colors flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls}`}
-              aria-label={`Jump to pitch ${i + 1}`}
+              onClick={() => onSelectPitch(i)}
+              className={`w-5 h-5 rounded-full overflow-hidden transition-all flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls} ${
+                isSelected
+                  ? "ring-2 ring-white/90 ring-offset-1 ring-offset-[#081a32] scale-110"
+                  : ""
+              }`}
+              aria-label={`Show details for pitch ${i + 1}`}
+              aria-pressed={isSelected}
             >
               {isActiveFlying ? (
                 <BaseballGlyph spinning />
