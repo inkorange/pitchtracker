@@ -13,6 +13,8 @@ import {
   Color,
   DoubleSide,
   Mesh,
+  MeshDepthMaterial,
+  RGBADepthPacking,
   ShaderMaterial,
   SRGBColorSpace,
   Vector3,
@@ -136,7 +138,7 @@ const BATTER_GROUND_LIFT_FT = 0.25;
 // to restyle. Emissive tint at low intensity gives the glowing
 // "scout-mode" feel without washing out the figure.
 const BATTER_HOLOGRAM_COLOR = "#5fc7d8";
-const BATTER_HOLOGRAM_OPACITY = 0.38;
+const BATTER_HOLOGRAM_OPACITY = 0.5;
 const BATTER_HOLOGRAM_EMISSIVE_INTENSITY = 0.35;
 // Y rotation per stance — RHB stands on the third-base side facing
 // the pitcher; LHB mirrors via scale.x = -1 on the outer group.
@@ -173,17 +175,44 @@ function BatterModel({ stand }: { stand: "L" | "R" }) {
   // hologram. Mutates in place so two BatterModel instances sharing
   // a clone (rare but possible) don't fight; the props we touch are
   // safe to mutate per call. DoubleSide also forced here for the
-  // LHB mirror.
+  // LHB mirror. Also opts each mesh into castShadow so the batter
+  // silhouette projects onto the ground; alphaTest is set on each
+  // material so the shadow-map depth pass reads the model as opaque
+  // (with plain transparency the shadow would be extremely faint).
   useMemo(() => {
     const tint = new Color(BATTER_HOLOGRAM_COLOR);
+    // Dedicated depth material for the shadow-map pass. The visible
+    // material is transparent (opacity 0.5) with alphaTest set, which
+    // three.js's auto-generated shadow depth material handles unevenly
+    // — the resulting shadow is either extremely faint or missing
+    // entirely. Assigning our own opaque MeshDepthMaterial forces the
+    // shadow pass to render the model as a fully solid silhouette so
+    // the ground shadow is crisp regardless of the hologram alpha.
+    // RGBADepthPacking is required because three.js's WebGL shadow
+    // maps pack depth into RGBA channels; using the wrong packing
+    // produces garbled shadows.
+    const shadowDepth = new MeshDepthMaterial({
+      depthPacking: RGBADepthPacking,
+    });
     clone.traverse((obj) => {
       if (!(obj instanceof Mesh) || !obj.material) return;
+      obj.castShadow = true;
+      obj.receiveShadow = false;
+      obj.customDepthMaterial = shadowDepth;
       const restyle = (mat: typeof obj.material) => {
         if (Array.isArray(mat)) return;
         mat.side = DoubleSide;
         mat.transparent = true;
         mat.opacity = BATTER_HOLOGRAM_OPACITY;
-        mat.depthWrite = false;
+        // depthWrite: true so front-facing polygons occlude BACK-facing
+        // polygons of the same mesh. Without this, transparent
+        // fragments blend through each other and you see the head
+        // through the arm, hips through the bat, etc. With depthWrite
+        // on, each face of the model appears solid; the OVERALL object
+        // still fades against the background (transparent + opacity),
+        // matching the user's ask ("entire surface opaque, but entire
+        // object has an opacity").
+        mat.depthWrite = true;
         // The default GLTF materials are MeshStandardMaterial-like
         // with color + emissive props. Set both to the hologram tint
         // so the figure reads as a glowing wireframe ghost rather
@@ -202,6 +231,12 @@ function BatterModel({ stand }: { stand: "L" | "R" }) {
         }
         if (anyMat.metalness !== undefined) anyMat.metalness = 0.1;
         if (anyMat.roughness !== undefined) anyMat.roughness = 0.4;
+        // alphaTest > 0 forces the shadow depth pass to accept
+        // fragments as either fully opaque or fully absent, so the
+        // hologram's opacity=0.3 no longer produces a nearly-invisible
+        // shadow. Low value keeps the visible fringe smooth.
+        const alphaMat = mat as unknown as { alphaTest?: number };
+        alphaMat.alphaTest = 0.01;
       };
       if (Array.isArray(obj.material)) {
         for (const mat of obj.material) restyle(mat);

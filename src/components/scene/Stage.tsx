@@ -1,9 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { Line } from "@react-three/drei";
-import { MeshStandardMaterial, Path, Shape } from "three";
+import { Line, useTexture } from "@react-three/drei";
+import {
+  MeshStandardMaterial,
+  Path,
+  RepeatWrapping,
+  Shape,
+  SRGBColorSpace,
+} from "three";
 import { StadiumBowl, wallRadiusAtAngle } from "./StadiumBowl";
+import { useEnvToggles } from "@/lib/env-toggles-store";
 
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
@@ -157,21 +164,25 @@ function useMowGrassMaterial() {
   }, []);
 }
 
-// Procedural dirt material — bump-map style. Instead of painting
-// color variation into the dirt, we perturb the surface normal from
-// a value-noise field so the directional lighting (lib/scene
-// Lighting.tsx) creates the highlights / shadows of a bumpy clay
-// surface. Color stays close to the base DIRT tone with only a
-// faint tint variation, so the relief comes from light interaction
-// with the displaced normals — not from baked color contrast.
-//
-// Shared by every dirt mesh (infield fan, base cutouts, home circle,
-// mound, basepaths) so the bump pattern is continuous across the
-// surface boundaries.
+// Dirt material — samples /soil.jpg at world XZ so the tiling is
+// continuous across every dirt mesh (infield fan, base cutouts, home
+// circle, mound, basepaths) regardless of each mesh's own UVs. Then
+// perturbs the normal from the same value-noise field the previous
+// procedural version used, so the texture still picks up light-side
+// / shadow-side highlights from directional lighting instead of
+// reading as a flat painted image.
 function useDirtMaterial() {
+  const soilTexture = useTexture("/soil.jpg");
   return useMemo(() => {
+    soilTexture.wrapS = RepeatWrapping;
+    soilTexture.wrapT = RepeatWrapping;
+    soilTexture.colorSpace = SRGBColorSpace;
+    // Base color is the original DIRT tone; the texture blends over
+    // it at 50% (see the map_fragment patch below) so the soil detail
+    // reads as subtle grain rather than fully replacing the color.
     const mat = new MeshStandardMaterial({
       color: DIRT,
+      map: soilTexture,
       roughness: 0.95,
       metalness: 0,
     });
@@ -238,20 +249,53 @@ function useDirtMaterial() {
           }
           `,
         )
+        // Replace the default map sampling (which uses per-mesh UVs)
+        // with a world-space sample so the texture tiles at a constant
+        // scale across every dirt mesh regardless of its individual
+        // size / UVs. 0.25 in world units = one texture repeat per
+        // ~4 ft — reads as clay grain (individual pebbles + clay
+        // clumps at scale) rather than a giant painted image.
+        //
+        // Overlay the sample as a CENTERED modulator around 1.0
+        // rather than a straight multiply. If the sampled pixel is
+        // 0.5 the modulator lands on 1.0 (no change to base color);
+        // brighter pixels push slightly above 1.0, darker pixels
+        // slightly below. STRENGTH controls how much variation. This
+        // preserves the base DIRT tone (previous straight-multiply
+        // darkened the whole surface because soil.jpg averages < 1)
+        // while still surfacing the texture's grain and mottling.
+        .replace(
+          "#include <map_fragment>",
+          `
+          vec2 soilUV = vDirtWorldPos.xz * 0.25;
+          vec3 sampled = texture2D(map, soilUV).rgb;
+          // STRENGTH sets how far the modulator swings around 1.0.
+          // CENTER is the sampled-value that maps to no-change; if
+          // it's 0.5 but soil.jpg's average brightness is closer to
+          // 0.4, the modulator averages below 1.0 and darkens the
+          // base color. Setting CENTER = 0.4 matches the texture's
+          // actual mid-tone so the average modulator lands at 1.0 —
+          // the base DIRT tone survives and the texture just adds
+          // grain on top.
+          float STRENGTH = 1.5;
+          float CENTER = 0.4;
+          vec3 modulator = 1.0 + (sampled - vec3(CENTER)) * STRENGTH;
+          diffuseColor.rgb *= modulator;
+          `,
+        )
         .replace(
           "#include <color_fragment>",
           `#include <color_fragment>
-          // Tiny tint variation only — the bump map carries the
-          // lighting-driven detail. Without this slight wash the dirt
-          // reads as a uniform brown plane.
+          // Subtle noise wash on top of the sampled texture so the
+          // repeat isn't perfectly uniform across the field. Narrow
+          // range because the texture already carries color detail.
           float tintN = dirtNoise(vDirtWorldPos.xz * 0.25);
-          vec3 base = diffuseColor.rgb * mix(0.88, 1.06, tintN);
-          diffuseColor.rgb = base;
+          diffuseColor.rgb *= mix(0.92, 1.05, tintN);
           `,
         );
     };
     return mat;
-  }, []);
+  }, [soilTexture]);
 }
 
 // Compute where the 95-ft-from-rubber arc intersects each foul line.
@@ -268,27 +312,73 @@ const FOUL_HIT = (() => {
 export function Stage() {
   const mowMaterial = useMowGrassMaterial();
   const dirtMaterial = useDirtMaterial();
+  const { stadium, field } = useEnvToggles();
   return (
     <group>
-      <OutfieldGrass material={mowMaterial} />
-      <InfieldDirtFan material={dirtMaterial} />
-      <InfieldGrassDiamond material={mowMaterial} />
-      <FoulLineBasepath side="first" material={dirtMaterial} />
-      <FoulLineBasepath side="third" material={dirtMaterial} />
-      <BaseCutout position={FIRST_BASE} material={dirtMaterial} />
-      <BaseCutout position={SECOND_BASE} material={dirtMaterial} />
-      <BaseCutout position={THIRD_BASE} material={dirtMaterial} />
-      <HomePlateArea material={dirtMaterial} />
-      <MoundDirt material={dirtMaterial} />
-      <FoulLines />
-      <Base position={FIRST_BASE} />
-      <Base position={SECOND_BASE} />
-      <Base position={THIRD_BASE} />
+      {/* Field group — everything gets stripped when the field toggle
+          is off, INCLUDING the mound (bump + dirt) and the batter's
+          circle (HomePlateArea dirt). Only the pentagon HOME PLATE
+          and the StrikeZone stay behind. Per user: "if we remove the
+          field, I want the mound and batter's circle to be removed,
+          but leave the plate." */}
+      {field ? (
+        <>
+          <OutfieldGrass material={mowMaterial} />
+          <InfieldDirtFan material={dirtMaterial} />
+          <InfieldGrassDiamond material={mowMaterial} />
+          <FoulLineBasepath side="first" material={dirtMaterial} />
+          <FoulLineBasepath side="third" material={dirtMaterial} />
+          <BaseCutout position={FIRST_BASE} material={dirtMaterial} />
+          <BaseCutout position={SECOND_BASE} material={dirtMaterial} />
+          <BaseCutout position={THIRD_BASE} material={dirtMaterial} />
+          <HomePlateArea material={dirtMaterial} />
+          <MoundDirt material={dirtMaterial} />
+          <FoulLines />
+          <Base position={FIRST_BASE} />
+          <Base position={SECOND_BASE} />
+          <Base position={THIRD_BASE} />
+          <Mound />
+        </>
+      ) : null}
+      {/* Always-on core: home plate + strike zone so pitch playback
+          still reads even with the surrounding field stripped. */}
       <HomePlate />
-      <Mound />
       <StrikeZone />
-      <StadiumBowl />
+      {/* Fallback ground plane when the field is off — a flat light
+          grey plane at grass-Y so the eye still gets a "ground here"
+          reference. Without this, home plate + strike zone appear to
+          float on the sky-blue clear color and it's hard to gauge
+          scene depth. */}
+      {!field ? <PlaceholderGround /> : null}
+      {stadium ? <StadiumBowl /> : null}
     </group>
+  );
+}
+
+// =====================================================================
+// Placeholder ground: rendered ONLY when the field toggle is off.
+// A flat, matte light-grey plane at grass-Y giving the eye a ground
+// reference so the plate + strike zone don't appear to float on the
+// sky. Sized to match the outfield grass plane so from any camera
+// angle you still see "the field goes out this far" even without
+// grass detail. Slightly BELOW Y_GRASS_BASE so it doesn't z-fight
+// the plate or dirt patches if the toggle ever flips mid-frame.
+// =====================================================================
+function PlaceholderGround() {
+  return (
+    <mesh
+      position={[0, Y_GRASS_BASE - 0.02, -200]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={-1}
+      receiveShadow
+    >
+      <planeGeometry args={[1400, 1400]} />
+      <meshStandardMaterial
+        color="#c8ccd0"
+        roughness={0.95}
+        metalness={0}
+      />
+    </mesh>
   );
 }
 
@@ -310,6 +400,7 @@ function OutfieldGrass({ material }: { material: MeshStandardMaterial }) {
       // angles the grass ends up sorted AFTER pitch ribbons, masking
       // them. Drawing grass first removes that ambiguity entirely.
       renderOrder={-1}
+      receiveShadow
     >
       <planeGeometry args={[1400, 1400]} />
     </mesh>
@@ -337,6 +428,7 @@ function InfieldDirtFan({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_DIRT_FAN, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      receiveShadow
     >
       <shapeGeometry args={[shape]} />
     </mesh>
@@ -470,6 +562,7 @@ function HomePlateArea({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_DIRT_FEATURE, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      receiveShadow
     >
       <circleGeometry args={[HOME_AREA_R, 48]} />
     </mesh>
@@ -482,6 +575,7 @@ function MoundDirt({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_DIRT_FEATURE, -PLATE_TO_MOUND]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      receiveShadow
     >
       <circleGeometry args={[MOUND_R, 32]} />
     </mesh>

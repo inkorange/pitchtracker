@@ -11,6 +11,8 @@ import { BallTracer } from "@/components/ribbon/BallTracer";
 import { Batter, frontPresetForStand } from "@/components/scene/BatterSilhouette";
 import { BaseballGlyph } from "@/components/icons/BaseballGlyph";
 import { CameraPad } from "@/components/controls/CameraPad";
+import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
+import { useEnvToggles } from "@/lib/env-toggles-store";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
@@ -94,6 +96,7 @@ export function AtBatReplayScene({
 
   const [preset, setPreset] = useState<CameraPreset>(initialCamera);
   const [presetTick, setPresetTick] = useState(0);
+  const { batter: batterVisible } = useEnvToggles();
 
   // Update URL params without forcing a scroll or history entry. The
   // page is fully driven by these params on first load, so keeping
@@ -304,11 +307,31 @@ export function AtBatReplayScene({
   const detailLanded =
     detailIdx < currentIdx || (detailIdx === currentIdx && phase !== "flying");
 
-  // Pin the metrics overlay to the clicked pitch and pause. We don't
-  // call jumpTo here — that would rewind currentIdx and hide every
-  // pitch after the click target, which is not what users expect when
-  // browsing a finished at-bat.
+  // Pin the metrics overlay to the clicked pitch and pause.
+  //
+  // If the click target is a PAST pitch (idx <= currentIdx): leave
+  // currentIdx alone so later pitches stay drawn. We don't rewind
+  // like jumpTo() does — hiding future pitches on a click-to-inspect
+  // is not the behavior users expect on a finished at-bat.
+  //
+  // If the click target is a FUTURE pitch (idx > currentIdx) while
+  // playback is still in progress: fast-forward currentIdx to that
+  // pitch so its ribbon is actually drawn (the render map filters
+  // out `i > currentIdx`), and land it (intraProgress=1, phase=
+  // settled) so it appears as a fully-flown pitch instead of a
+  // half-flying one. Without this, clicking a future dot would just
+  // highlight it with no visible ribbon and stop playback in an
+  // opaque state.
   const handleSelectPitch = useCallback((idx: number) => {
+    setCurrentIdx((prev) => {
+      if (idx > prev) {
+        setIntraProgress(1);
+        setPhase("settled");
+        settledTimerRef.current = 0;
+        return idx;
+      }
+      return prev;
+    });
     setSelectedDetailIdx(idx);
     setPlaying(false);
   }, []);
@@ -350,7 +373,7 @@ export function AtBatReplayScene({
           progress={intraProgress}
           phase={phase}
         />
-        {batterStand ? <Batter stand={batterStand} /> : null}
+        {batterStand && batterVisible ? <Batter stand={batterStand} /> : null}
         {/* Outcome chip on every pitch that has already landed (idx <
             currentIdx, plus the active pitch once it's settled). */}
         {prepared.map((p, i) => {
@@ -383,7 +406,11 @@ export function AtBatReplayScene({
         ) : null}
       </Scene>
 
-      <CameraPad current={preset} onChange={handlePresetChange} />
+      <CameraPad
+        current={preset}
+        onChange={handlePresetChange}
+        leftSlot={<EnvToggleGear />}
+      />
 
       <button
         type="button"

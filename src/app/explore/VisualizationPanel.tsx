@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { CameraPad } from "@/components/controls/CameraPad";
+import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import type { SavantPitchRow } from "@/lib/savant/client";
 import type { CameraPreset } from "@/lib/viz/camera-presets";
@@ -266,7 +267,11 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
             : ""}
         </div>
 
-        <CameraPad current={preset} onChange={handlePresetChange} />
+        <CameraPad
+          current={preset}
+          onChange={handlePresetChange}
+          leftSlot={<EnvToggleGear />}
+        />
       </div>
     </div>
   );

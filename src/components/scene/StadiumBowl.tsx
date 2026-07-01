@@ -31,38 +31,65 @@ const OUTFIELD_BEARING = -Math.PI / 2;
 
 const WALL_HEIGHT = 8;
 
-// Lower deck (closest to the field): begins 2 ft behind the wall, 24
-// ft deep, rises 22 ft. ~42° overall slope, but the surface is built
-// as N stepped rows so the geometry physically looks like stadium
-// stairs (visible treads + risers) rather than a smooth ramp.
+// Deck slopes: ~30° across all three decks — each row steps back
+// noticeably further than it steps up (tread > rise), so the deck
+// visibly LEANS BACK away from the field. Steeper slopes (45°, 58°)
+// read as vertical walls of seats from field-level cameras; the ~30°
+// silhouette matches the user's sketch of diagonal deck lines
+// pitched shallowly upward-and-back.
+
+// Lower deck (closest to the field): begins 2 ft behind the wall,
+// 30 ft deep, rises 18 ft → atan(18/30) ≈ 31°. Shallow enough that
+// treads (2.5 ft) are visibly wider than risers (1.5 ft), so the
+// deck leans back through each row instead of stepping up sharply.
 const LOWER_INNER_OFFSET = 2;
-const LOWER_DEPTH = 24;
-const LOWER_RISE = 22;
+const LOWER_DEPTH = 30;
+const LOWER_RISE = 18;
 const LOWER_BASE_HEIGHT = WALL_HEIGHT;
 const LOWER_TOP_HEIGHT = LOWER_BASE_HEIGHT + LOWER_RISE;
-const LOWER_ROWS = 12; // → 2.0 ft tread, 1.83 ft rise per row
+const LOWER_ROWS = 12; // → 2.5 ft tread, 1.5 ft rise per row
 
-// Cantilever: the upper deck overhangs forward over the back of the
-// lower deck. CONCOURSE_RADIAL_OVERLAP ft of the upper-deck inner
-// edge sits inside the lower deck's outer-edge radial position, so
-// the rearmost rows of the lower bowl are physically under the
-// upper-deck overhang — classic two-deck stadium look. The vertical
-// CLEARANCE is the under-deck height between the lower deck's top
-// and the upper deck's underside; that's where the concourse /
-// standing area lives in a real ballpark.
-const CONCOURSE_RADIAL_OVERLAP = 6;
-const CONCOURSE_VERTICAL_CLEARANCE = 4;
+// Cantilever: the deck above overhangs forward over the back rows of
+// the deck below. CONCOURSE_RADIAL_OVERLAP ft of the upper-deck inner
+// edge sits inside the lower deck's outer-edge radial position — the
+// bigger this value, the more the stadium reads as STACKED (decks
+// piled forward) rather than SPLAYED (decks fanning out backward).
+// CONCOURSE_VERTICAL_CLEARANCE is the vertical gap between one deck's
+// top-row height and the next deck's underside — this becomes the
+// visible "leading face" band between decks, so keep it thin.
+const CONCOURSE_RADIAL_OVERLAP = 14;
+// Number of rows of the DECK BELOW that the deck above interlocks
+// with. Instead of stacking with a positive vertical clearance
+// between deck top and next deck base, the deck above's base sits
+// this many rows BELOW the deck below's top — so from the field the
+// two decks read as INTERLOCKED (the front rows of the upper deck
+// slide down behind the top rows of the lower deck), matching the
+// user's sketch: each next-level line starts LOWER than the previous
+// line's top, not higher.
+const CONCOURSE_ROW_OVERLAP = 3;
 
-// Upper deck (cheap seats / nosebleeds): cantilevered forward over
-// the lower deck back rows, sitting taller and deeper to dominate
-// the bowl silhouette.
+// Upper deck (mid-tier / club level): 36 ft deep, 22 ft rise →
+// atan(22/36) ≈ 31°. Same shallow lean as the lower deck so the
+// whole stack reads consistently tilted back.
 const UPPER_INNER_OFFSET =
   LOWER_INNER_OFFSET + LOWER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
-const UPPER_DEPTH = 32;
-const UPPER_RISE = 38;
-const UPPER_BASE_HEIGHT = LOWER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
+const UPPER_DEPTH = 36;
+const UPPER_RISE = 22;
+const UPPER_BASE_HEIGHT =
+  LOWER_TOP_HEIGHT - CONCOURSE_ROW_OVERLAP * (LOWER_RISE / LOWER_ROWS);
 const UPPER_TOP_HEIGHT = UPPER_BASE_HEIGHT + UPPER_RISE;
-const UPPER_ROWS = 20; // → 1.6 ft tread, 1.9 ft rise per row
+const UPPER_ROWS = 18; // → 2.0 ft tread, 1.22 ft rise per row
+
+// Top deck (cheap seats / nosebleeds): 32 ft deep, 20 ft rise →
+// atan(20/32) ≈ 32°. Same shallow lean as the other decks.
+const TOP_INNER_OFFSET =
+  UPPER_INNER_OFFSET + UPPER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
+const TOP_DEPTH = 32;
+const TOP_RISE = 20;
+const TOP_BASE_HEIGHT =
+  UPPER_TOP_HEIGHT - CONCOURSE_ROW_OVERLAP * (UPPER_RISE / UPPER_ROWS);
+const TOP_TOP_HEIGHT = TOP_BASE_HEIGHT + TOP_RISE;
+const TOP_ROWS = 16; // → 2.0 ft tread, 1.25 ft rise per row
 
 const ARC_SEGMENTS = 256;
 const SEGMENT_ANGLE = (2 * Math.PI) / ARC_SEGMENTS;
@@ -273,56 +300,99 @@ function useUpperTierGeometry() {
   );
 }
 
-// Leading face that closes the sky gap between the lower deck and the
-// upper deck. Without it, the vertical air between the top of the
-// back-most lower-deck tread and the cantilevered upper-deck base
-// height reads as raw sky from any field-level camera angle — the
-// two tiers look like they float apart instead of stacking. The face
-// is a vertical curved strip at the upper deck's inner radial offset,
-// painted with the same wall color as the rest of the bowl structure
-// so it reads as a continuation of the wall facade rather than a
-// separate element.
+function useTopTierGeometry() {
+  return useMemo(
+    () =>
+      buildSteppedTierGeometry(
+        TOP_INNER_OFFSET,
+        TOP_DEPTH,
+        TOP_BASE_HEIGHT,
+        TOP_RISE,
+        TOP_ROWS,
+      ),
+    [],
+  );
+}
+
+// Curved vertical leading-face strip at the given radial offset,
+// spanning from `faceBottomY` up to `faceTopY`. Used between decks
+// to close the sky gap between a lower deck's back-most tread and
+// the cantilevered upper deck's leading edge — without this, the
+// vertical air between them reads as raw sky from any field-level
+// camera angle. Painted with the wall material downstream so each
+// leading face reads as part of the bowl's structural facade.
+function buildLeadingFaceGeometry(
+  innerOffset: number,
+  innerY: number,
+  outerOffset: number,
+  outerY: number,
+): THREE.BufferGeometry {
+  // Cantilever underside: a slanted panel bridging the FRONT-INNER
+  // edge of the deck above (near-plate side, at height innerY, radial
+  // offset innerOffset from wall) to the BACK-OUTER edge of the deck
+  // below (further from plate, at height outerY, radial offset
+  // outerOffset). Since the deck above cantilevers OVER the deck
+  // below, innerOffset < outerOffset — the panel slopes from the
+  // upper deck's front (near-plate, higher) down-and-out to the
+  // lower deck's back edge, matching how real cantilevered stadium
+  // decks look from the field. Previous design was a vertical WALL
+  // at innerOffset, which read as a big grey slab in the wrong
+  // orientation ("in the wrong direction" per user).
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= ARC_SEGMENTS; i++) {
+    const angle = -Math.PI + i * SEGMENT_ANGLE;
+    const wallR = wallRadiusAtAngle(angle);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const rInner = wallR + innerOffset;
+    const rOuter = wallR + outerOffset;
+    positions.push(rInner * cos, innerY, rInner * sin); // 0: inner
+    positions.push(rOuter * cos, outerY, rOuter * sin); // 1: outer
+  }
+  for (let i = 0; i < ARC_SEGMENTS; i++) {
+    const il = i * 2;
+    const ol = i * 2 + 1;
+    const ir = (i + 1) * 2;
+    const or_ = (i + 1) * 2 + 1;
+    // Winding chosen so the normal points DOWN and slightly IN
+    // (toward the plate) — this is the underside a field-level
+    // camera sees.
+    indices.push(il, ir, ol);
+    indices.push(ol, ir, or_);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
 function useUpperDeckLeadingFaceGeometry() {
   return useMemo(() => {
-    const lowerRowDepth = LOWER_DEPTH / LOWER_ROWS;
-    const lowerRowRise = LOWER_RISE / LOWER_ROWS;
-    // Which lower-deck row's front edge lines up with the upper deck's
-    // inner radial offset — the face starts at that row's tread Y, so
-    // it sits flush against the back of one of the lower-deck rows
-    // rather than starting above or below it.
-    const rowIdx = Math.floor(
-      (UPPER_INNER_OFFSET - LOWER_INNER_OFFSET) / lowerRowDepth,
+    // Inner edge: front-inner corner of the UPPER deck (near-plate).
+    // Outer edge: back-outer corner of the LOWER deck (further out,
+    // top of the lower tier at LOWER_TOP_HEIGHT).
+    return buildLeadingFaceGeometry(
+      UPPER_INNER_OFFSET,
+      UPPER_BASE_HEIGHT,
+      LOWER_INNER_OFFSET + LOWER_DEPTH,
+      LOWER_TOP_HEIGHT,
     );
-    const faceBottomY = LOWER_BASE_HEIGHT + rowIdx * lowerRowRise;
+  }, []);
+}
 
-    const positions: number[] = [];
-    const indices: number[] = [];
-    for (let i = 0; i <= ARC_SEGMENTS; i++) {
-      const angle = -Math.PI + i * SEGMENT_ANGLE;
-      const wallR = wallRadiusAtAngle(angle);
-      const r = wallR + UPPER_INNER_OFFSET;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      positions.push(r * cos, faceBottomY, r * sin);
-      positions.push(r * cos, UPPER_BASE_HEIGHT, r * sin);
-    }
-    for (let i = 0; i < ARC_SEGMENTS; i++) {
-      const bl = i * 2;
-      const tl = i * 2 + 1;
-      const br = (i + 1) * 2;
-      const tr = (i + 1) * 2 + 1;
-      // Inward-facing normals (same winding as the wall).
-      indices.push(bl, br, tl);
-      indices.push(tl, br, tr);
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(positions, 3),
+function useTopDeckLeadingFaceGeometry() {
+  return useMemo(() => {
+    return buildLeadingFaceGeometry(
+      TOP_INNER_OFFSET,
+      TOP_BASE_HEIGHT,
+      UPPER_INNER_OFFSET + UPPER_DEPTH,
+      UPPER_TOP_HEIGHT,
     );
-    geom.setIndex(indices);
-    geom.computeVertexNormals();
-    return geom;
   }, []);
 }
 
@@ -426,6 +496,32 @@ function buildSeatsMaterial(
         float aisleDist = abs(aisleFrac - 0.5);
         if (aisleDist > 0.46) seatColor = vec3(${palette.aisle});
 
+        // Crowd speckle: procedural per-cell coloring layered on top of
+        // the row/aisle pattern so the tiers read as PEOPLE sitting in
+        // seats, not solid painted sections. Sample world XZ at ~0.6 ft
+        // per cell (one 'person'), hash to pseudo-random 0–1, remap to
+        // a small palette of typical crowd colors (reds, blues, tans,
+        // whites, grays, warm skin tones). A second hash gates the
+        // 'presence' of each cell — some stay closer to seat base
+        // color (empty seat), others fully take on the crowd tint.
+        // Aisles keep their dark color regardless so aisle lines stay
+        // visible through the speckle.
+        if (aisleDist <= 0.46) {
+          vec2 crowdCell = floor(vStandsWorldPos.xz * 1.6);
+          float h1 = fract(sin(dot(crowdCell, vec2(12.9898, 78.233))) * 43758.5453);
+          float h2 = fract(sin(dot(crowdCell + 1.7, vec2(39.34, 91.7))) * 43758.5453);
+          vec3 crowd;
+          if      (h1 < 0.18) crowd = vec3(0.72, 0.20, 0.20); // red jersey
+          else if (h1 < 0.34) crowd = vec3(0.20, 0.35, 0.68); // blue jersey
+          else if (h1 < 0.48) crowd = vec3(0.82, 0.75, 0.60); // tan / hat brim
+          else if (h1 < 0.62) crowd = vec3(0.90, 0.90, 0.86); // white shirt
+          else if (h1 < 0.76) crowd = vec3(0.28, 0.28, 0.30); // gray / dark
+          else if (h1 < 0.88) crowd = vec3(0.85, 0.60, 0.45); // skin tone
+          else                crowd = vec3(0.75, 0.55, 0.20); // gold / mustard
+          float presence = smoothstep(0.15, 0.85, h2);
+          seatColor = mix(seatColor, crowd, presence * 0.62);
+        }
+
         diffuseColor.rgb = seatColor;
         `,
       );
@@ -448,6 +544,16 @@ const UPPER_PALETTE: SeatPalette = {
   darkRow: "0.09, 0.12, 0.23",
   lightRow: "0.14, 0.18, 0.33",
   aisle: "0.04, 0.05, 0.10",
+};
+
+// Top deck (nosebleeds): darkest band. The crowd speckle carries most
+// of the visual interest at this distance from the field — the seat
+// tint recedes behind the per-cell "people" colors.
+const TOP_PALETTE: SeatPalette = {
+  base: "#161e30",
+  darkRow: "0.07, 0.09, 0.18",
+  lightRow: "0.11, 0.14, 0.26",
+  aisle: "0.03, 0.04, 0.08",
 };
 
 function useLowerSeatsMaterial() {
@@ -474,16 +580,618 @@ function useUpperSeatsMaterial() {
   );
 }
 
+function useTopSeatsMaterial() {
+  return useMemo(
+    () =>
+      buildSeatsMaterial(
+        TOP_BASE_HEIGHT,
+        TOP_RISE / TOP_ROWS,
+        TOP_PALETTE,
+      ),
+    [],
+  );
+}
+
+// Sideline stands — straight grandstands running parallel to each
+// foul line, 40 ft off the line in foul territory. Real ballparks have
+// dedicated 1B-line and 3B-line seating that sits close to the field
+// and PARALLEL to the foul line, not curved back along the main bowl.
+// Without this, the sides of the smooth ellipse bowl sit ~220 ft off
+// the plate at 0°/180° bearings, leaving the baselines feeling
+// exposed. This drops in a rectangular stand along each foul line so
+// the viewer sees stands hugging the sidelines from a
+// behind-the-plate camera.
+//
+// Coord layout: build the stand centered on the foul-line direction
+// (1B → +x/-z axis at 45°) with local Z along the line and local X
+// perpendicular (out into foul territory), then rotate into place.
+// Local origin sits at the near-plate end of the sideline stand.
+// Box seats along the baselines: LOW to the ground — 3 rows tall,
+// short. Real premium box seats sit maybe 4–8 ft above the field level
+// so fans get a low-angle vantage. Not full grandstands. Slope still
+// matches the main bowl's 40° so the row proportions read consistent
+// (rise 5 / depth 6 → atan(5/6) ≈ 40°). No structural wall — the
+// dugout-side railing gets absorbed by the first riser.
+const SIDELINE_OFFSET = 25;   // perpendicular distance from foul line
+const SIDELINE_NEAR = 30;     // start along the foul line (ft from plate)
+const SIDELINE_LENGTH = 240;  // total length along the foul line
+const SIDELINE_DEPTH = 6;
+// One flat platform, tucked BEHIND the wall — the field view sees the
+// wall + one row of crowd heads peeking over. No stepped tiers (the
+// stepped tier read as "stands out on the field", which was wrong).
+// TREAD_BELOW_WALL: how far below the wall's crest the platform sits.
+// Small positive value → the crowd texture on the platform top pokes
+// just above the wall's line, matching real box seats behind a
+// dugout-height wall.
+//
+// SIDELINE_HEIGHT stays NONZERO on purpose. It's not used to size a
+// stepped tier (SIDELINE_ROWS=1 means no risers), but the crowd
+// shader in buildSeatsMaterial divides by rowRise (=SIDELINE_HEIGHT/
+// SIDELINE_ROWS) to compute a row index. Rowrise=0 → division by zero
+// → NaN color → the box-seat platform AND back-fill panel render as
+// invisible pixels, and the field grass shows through the gap between
+// box-seat top and bowl-wall top. Setting it to 2 keeps the shader
+// numerically safe (row index is still constant across the flat
+// platform, so the crowd speckle overlays it as one uniform color).
+const SIDELINE_HEIGHT = 2;
+const SIDELINE_ROWS = 1;
+const SIDELINE_TREAD_BELOW_WALL = 0.3;
+// Wall along the field-side of the box seats. A REAL wall (chest-high,
+// ~4 ft) — not a decorative lip. From a low field-level camera this
+// hides the stepped rows behind it so the box seats read as "premium
+// seating behind a wall", not as stands rising up out of the fair
+// grass. Referenced against real MLB sideline walls, which run 3–4 ft
+// where the netting takes over above.
+const SIDELINE_WALL_HEIGHT = 4;
+
+// Builds one sideline grandstand IN WORLD COORDS from three basis
+// vectors describing where the stand lives:
+//
+//   origin  — world position of the front-plate corner (the vertex
+//             where the wall's near-plate end sits on the ground)
+//   lineDir — unit vector along the foul line, pointing away from
+//             home plate (defines the "length" direction of the stand)
+//   perpDir — unit vector perpendicular to the foul line, pointing
+//             AWAY from the field into foul territory (defines the
+//             "depth" direction — treads step outward this way)
+//
+// Every vertex = origin + s·lineDir + d·perpDir + h·(0,1,0) where s
+// runs 0..SIDELINE_LENGTH along the line, d runs 0..SIDELINE_DEPTH
+// perpendicular, and h is the vertex height. Building directly in
+// world coords sidesteps the rotation ambiguity that had the stands
+// pointing the wrong way (front wall not facing the field).
+function buildSidelineGeometry(
+  origin: [number, number, number],
+  lineDir: [number, number, number],
+  perpDir: [number, number, number],
+): { wall: THREE.BufferGeometry; tier: THREE.BufferGeometry } {
+  const rowDepth = SIDELINE_DEPTH / SIDELINE_ROWS;
+  const rowRise = SIDELINE_HEIGHT / SIDELINE_ROWS;
+  const LENGTH_SEGMENTS = 32; // low-poly along the length
+
+  const [ox, oy, oz] = origin;
+  const [lx, ly, lz] = lineDir;
+  const [px, py, pz] = perpDir;
+
+  // Vertex helper: given s along line, d perpendicular, h up →
+  // returns world (x,y,z).
+  const worldXYZ = (
+    s: number,
+    d: number,
+    h: number,
+  ): [number, number, number] => [
+    ox + s * lx + d * px,
+    oy + s * ly + d * py + h,
+    oz + s * lz + d * pz,
+  ];
+
+  // WALL — vertical strip along the near-field edge (d=0) running the
+  // full length. Inward-facing normal points toward the field
+  // (opposite of perpDir).
+  const wallPos: number[] = [];
+  const wallIdx: number[] = [];
+  for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+    const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+    wallPos.push(...worldXYZ(s, 0, 0)); // bottom
+    wallPos.push(...worldXYZ(s, 0, SIDELINE_WALL_HEIGHT)); // top
+  }
+  for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+    const bl = i * 2;
+    const tl = i * 2 + 1;
+    const br = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    // Winding: as `s` increases we advance along +lineDir; +tl is
+    // upward. For the field-facing normal (−perpDir), triangles
+    // wound bl → br → tl / tl → br → tr give the cross product a
+    // −perpDir component.
+    wallIdx.push(bl, br, tl);
+    wallIdx.push(tl, br, tr);
+  }
+  const wallGeom = new THREE.BufferGeometry();
+  wallGeom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(wallPos, 3),
+  );
+  wallGeom.setIndex(wallIdx);
+  wallGeom.computeVertexNormals();
+
+  // TIER — stepped rows. Each row: horizontal tread at treadY spanning
+  // (innerD → outerD) along perpDir, then a vertical riser to next
+  // row's tread. Same winding convention as the main bowl tiers.
+  const tierPos: number[] = [];
+  const tierIdx: number[] = [];
+  for (let row = 0; row < SIDELINE_ROWS; row++) {
+    // Box seats sit BEHIND the wall, top just under the wall's crest.
+    // With SIDELINE_ROWS=1 the tier is a single flat platform tucked
+    // in behind — from the field you see the wall + a thin band of
+    // crowd heads peeking over (real MLB box-seat look). Front row of
+    // the old 3-row stepped tier was reading as "stands rising in
+    // fair territory" — collapsing to 1 row hides that behind the wall.
+    const treadY =
+      SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL + row * rowRise;
+    const innerD = row * rowDepth;
+    const outerD = innerD + rowDepth;
+
+    // Tread — horizontal, normal +Y.
+    {
+      const start = tierPos.length / 3;
+      for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+        const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+        tierPos.push(...worldXYZ(s, innerD, treadY));
+        tierPos.push(...worldXYZ(s, outerD, treadY));
+      }
+      for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        tierIdx.push(bl, br, tl);
+        tierIdx.push(tl, br, tr);
+      }
+    }
+
+    // Riser — vertical, at d=outerD, from treadY up to nextTreadY.
+    // Field-facing normal (−perpDir).
+    if (row < SIDELINE_ROWS - 1) {
+      const start = tierPos.length / 3;
+      const nextTreadY = treadY + rowRise;
+      for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+        const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+        tierPos.push(...worldXYZ(s, outerD, treadY));
+        tierPos.push(...worldXYZ(s, outerD, nextTreadY));
+      }
+      for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        tierIdx.push(bl, br, tl);
+        tierIdx.push(tl, br, tr);
+      }
+    }
+  }
+  const tierGeom = new THREE.BufferGeometry();
+  tierGeom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(tierPos, 3),
+  );
+  tierGeom.setIndex(tierIdx);
+  tierGeom.computeVertexNormals();
+
+  return { wall: wallGeom, tier: tierGeom };
+}
+
+// Fills the ground-visible gap between the low box seats' back edge
+// and the main bowl wall. Without it, from a behind-the-plate camera
+// you see raw field between the box seats and the outfield bowl —
+// the seating doesn't read as continuous around the field. The fill
+// is a curved horizontal strip at the box seats' TOP height, fanning
+// from the box seats' back edge radially out to the bowl wall so its
+// far edge lands ON the wall regardless of angle. Same seat material
+// as the box seats so it reads as an extension of the seating deck.
+function buildSidelineBackFill(
+  origin: [number, number, number],
+  lineDir: [number, number, number],
+  perpDir: [number, number, number],
+): THREE.BufferGeometry {
+  // Match the tread height of the box-seat platform so the back-fill
+  // meets the tier's back edge flush (no vertical seam between the
+  // box seats and the fill panel).
+  const height = SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL;
+  // Narrow strip design: from the BOX SEATS' back edge radially out
+  // to the bowl wall at each column's angle. Runs along the full
+  // length of the box seats + a bit past the far end so it closes
+  // the wedge between the far-end corner and the wall at the
+  // foul-pole angle (previously visible as raw grass).
+  //
+  // The plate-centered fan design gets angularly TOO WIDE in the
+  // foul-pole direction (extends to a wall point 311 ft from plate),
+  // producing an oversized foul-territory fill. This strip stays
+  // narrow — the fill is only as wide as the box seats' perpendicular
+  // separation from the wall + a bit of angular fan at the far end.
+  // backOffset is the perpendicular distance FROM origin (not from
+  // the foul line — origin already sits SIDELINE_OFFSET ft off the
+  // foul line). Setting this to SIDELINE_DEPTH lands the fill's
+  // front edge flush with the box seats' OUTER edge; setting it to
+  // SIDELINE_OFFSET + SIDELINE_DEPTH (the previous value) pushed the
+  // fill 25 ft PAST the box seats and left a grass strip between
+  // them. So use SIDELINE_DEPTH here — the fill starts exactly where
+  // the box seats end.
+  const backOffset = SIDELINE_DEPTH;
+  // Extend PAST the box seats' far end by an amount that reaches the
+  // foul-line/wall intersection along the perpendicular direction.
+  // Along the foul line, the wall meets the line at ≈311 ft from
+  // plate (r(−π/4) = R_MEAN + R_AMP·cos(π/4)); the sideline stand
+  // near-plate origin is at ~40 ft from plate, so the box seats end
+  // ~SIDELINE_LENGTH ft further along the line. FAR_EXTEND ft of
+  // additional coverage past SIDELINE_LENGTH runs the strip out to
+  // (or slightly past) the line/wall intersection so no grass wedge
+  // remains at the far end.
+  const FAR_EXTEND = 60;
+  const TOTAL_LENGTH = SIDELINE_LENGTH + FAR_EXTEND;
+  const LENGTH_SEGMENTS = 96;
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+    const s = (TOTAL_LENGTH * i) / LENGTH_SEGMENTS;
+    // Front vertex: the back edge of the box seats' perpendicular
+    // strip at that column (extended past the box seats' actual far
+    // end, but continuing the same perp offset so the strip stays
+    // parallel to the foul line).
+    const fx = origin[0] + s * lineDir[0] + backOffset * perpDir[0];
+    const fz = origin[2] + s * lineDir[2] + backOffset * perpDir[2];
+    // Radial angle from home plate → radius on the bowl wall at that
+    // angle. Extending F radially out to the wall gives a back point
+    // that lands ON the wall, so the fill reaches the seating
+    // without a gap regardless of the box seats' orientation.
+    const rF = Math.sqrt(fx * fx + fz * fz);
+    const angF = Math.atan2(fz, fx);
+    const rWall = wallRadiusAtAngle(angF);
+    // If the strip's front vertex has already passed the wall
+    // radially (beyond the wall/line intersection), clamp back to
+    // the wall to avoid an inverted triangle. Otherwise geometry
+    // near the foul pole flips inside-out.
+    const useR = Math.max(rF, 0.01);
+    const dirX = fx / useR;
+    const dirZ = fz / useR;
+    const bx = dirX * rWall;
+    const bz = dirZ * rWall;
+    // If front is outside the wall radius (fx*fx+fz*fz > rWall²), the
+    // strip inverts. Skip this segment's back vertex by placing it
+    // ON the front vertex (degenerate triangle, no visible effect).
+    const backX = rF <= rWall ? bx : fx;
+    const backZ = rF <= rWall ? bz : fz;
+    positions.push(fx, height, fz); // 2i: front (box-seat side)
+    positions.push(backX, height, backZ); // 2i+1: back (wall side)
+  }
+  for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+    const fl = i * 2;
+    const bl = i * 2 + 1;
+    const fr = (i + 1) * 2;
+    const br = (i + 1) * 2 + 1;
+    // Both windings emitted; sidelineSeatsMat is DoubleSide so both
+    // are visible. This makes rendering robust regardless of which
+    // side (1B mirrors 3B) we're building.
+    indices.push(fl, fr, bl);
+    indices.push(bl, fr, br);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+// Curved box seats wrapping BEHIND home plate, connecting the 1B
+// sideline near-end to the 3B sideline near-end. Same 3-row / 5-ft
+// scale as the sideline stands, but built as an angular arc around
+// home plate rather than a straight run. Inner radius matches the
+// sideline near-end distance so the two sections meet without a gap.
+// Sweeps CCW from the 1B near-end angle through the +Z direction
+// (directly behind plate) to the 3B near-end angle — roughly a
+// 180-190° arc.
+function buildBackstopArcGeometry(
+  angleStart: number,
+  angleEnd: number,
+  innerRadius: number,
+): THREE.BufferGeometry {
+  const ARC_SEGMENTS_BACKSTOP = 72;
+  const rowDepth = SIDELINE_DEPTH / SIDELINE_ROWS;
+  const rowRise = SIDELINE_HEIGHT / SIDELINE_ROWS;
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let row = 0; row < SIDELINE_ROWS; row++) {
+    // Match the sideline tier: sit just below the wall's crest so the
+    // wrap-around reads consistently — wall dominates, crowd peeks
+    // over the top. Keeping the arc/wrap shape as-is (per user: "I
+    // like the way you went around the home plate region, keep that")
+    // — only the vertical placement changes.
+    const treadY =
+      SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL + row * rowRise;
+    const innerR = innerRadius + row * rowDepth;
+    const outerR = innerR + rowDepth;
+
+    // Tread — horizontal, normal +Y.
+    {
+      const start = positions.length / 3;
+      for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+        const t = i / ARC_SEGMENTS_BACKSTOP;
+        const angle = angleStart + (angleEnd - angleStart) * t;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        positions.push(innerR * cos, treadY, innerR * sin);
+        positions.push(outerR * cos, treadY, outerR * sin);
+      }
+      for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        indices.push(bl, br, tl);
+        indices.push(tl, br, tr);
+      }
+    }
+
+    // Riser — vertical at outerR, facing INWARD toward home plate.
+    if (row < SIDELINE_ROWS - 1) {
+      const start = positions.length / 3;
+      const nextTreadY = treadY + rowRise;
+      for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+        const t = i / ARC_SEGMENTS_BACKSTOP;
+        const angle = angleStart + (angleEnd - angleStart) * t;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        positions.push(outerR * cos, treadY, outerR * sin);
+        positions.push(outerR * cos, nextTreadY, outerR * sin);
+      }
+      for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        indices.push(bl, br, tl);
+        indices.push(tl, br, tr);
+      }
+    }
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+// Field-side wall in front of the backstop arc — the curved
+// counterpart to the straight sideline wall. Sweeps the same angular
+// arc as the tier at radius=innerRadius, rising from ground to
+// SIDELINE_WALL_HEIGHT. Hides the front rows of the arc tier from a
+// field-level camera and matches the sideline wall so the ring of
+// wall reads as one continuous barrier from foul line, around
+// backstop, to the other foul line.
+function buildBackstopWallGeometry(
+  angleStart: number,
+  angleEnd: number,
+  innerRadius: number,
+): THREE.BufferGeometry {
+  const ARC_SEGMENTS_BACKSTOP = 72;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+    const t = i / ARC_SEGMENTS_BACKSTOP;
+    const angle = angleStart + (angleEnd - angleStart) * t;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    positions.push(innerRadius * cos, 0, innerRadius * sin);
+    positions.push(
+      innerRadius * cos,
+      SIDELINE_WALL_HEIGHT,
+      innerRadius * sin,
+    );
+  }
+  for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+    const bl = i * 2;
+    const tl = i * 2 + 1;
+    const br = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    indices.push(bl, br, tl);
+    indices.push(tl, br, tr);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+// Horizontal back-fill from the backstop arc's outer edge out to the
+// main bowl wall at each angle. Closes the gap between the near-plate
+// box seats and the outfield bowl (same role the sideline back-fill
+// plays along the foul lines) so seating reads as continuous around
+// the whole field.
+function buildBackstopBackFill(
+  angleStart: number,
+  angleEnd: number,
+  boxOuterRadius: number,
+): THREE.BufferGeometry {
+  const ARC_SEGMENTS_BACKSTOP = 72;
+  // Same height as the sideline back-fill so the ring around the
+  // whole field lies on one continuous plane.
+  const height = SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL;
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+    const t = i / ARC_SEGMENTS_BACKSTOP;
+    const angle = angleStart + (angleEnd - angleStart) * t;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const rWall = wallRadiusAtAngle(angle);
+    // Front vertex — box-seat back edge at that angle.
+    positions.push(boxOuterRadius * cos, height, boxOuterRadius * sin);
+    // Back vertex — main bowl wall at that angle.
+    positions.push(rWall * cos, height, rWall * sin);
+  }
+  for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+    const fl = i * 2;
+    const bl = i * 2 + 1;
+    const fr = (i + 1) * 2;
+    const br = (i + 1) * 2 + 1;
+    indices.push(fl, fr, bl);
+    indices.push(bl, fr, br);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+function useSidelineGeometries() {
+  return useMemo(() => {
+    const s = Math.SQRT2 / 2;
+    // 1B foul line: from (0,0,0) toward (63.64, 0, -63.64).
+    // lineDir = (+s, 0, -s). Perpendicular pointing into 1B foul
+    // territory (right side of line when facing outfield from home):
+    // (+s, 0, +s). Origin: SIDELINE_NEAR along the line + SIDELINE
+    // OFFSET into the perpendicular.
+    const line1B: [number, number, number] = [s, 0, -s];
+    const perp1B: [number, number, number] = [s, 0, s];
+    const origin1B: [number, number, number] = [
+      SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
+      0,
+      -SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
+    ];
+    // 3B foul line: from (0,0,0) toward (-63.64, 0, -63.64).
+    // lineDir = (-s, 0, -s). Perpendicular into 3B foul territory:
+    // (-s, 0, +s). Symmetric origin on the -X side.
+    const line3B: [number, number, number] = [-s, 0, -s];
+    const perp3B: [number, number, number] = [-s, 0, s];
+    const origin3B: [number, number, number] = [
+      -SIDELINE_NEAR * s - SIDELINE_OFFSET * s,
+      0,
+      -SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
+    ];
+    // Backstop arc anchor: use the 1B sideline's front-inner corner
+    // (origin1B) as the near-plate endpoint. Compute its radial
+    // distance + angle from home plate — the arc's inner radius matches
+    // this distance and its endpoint angle matches this bearing.
+    const nearRadius = Math.sqrt(
+      origin1B[0] * origin1B[0] + origin1B[2] * origin1B[2],
+    );
+    const angle1B = Math.atan2(origin1B[2], origin1B[0]);
+    const angle3B = Math.atan2(origin3B[2], origin3B[0]);
+    // Sweep CCW from angle1B (slightly below +X axis) through the +Z
+    // direction (behind home plate, at +π/2) to angle3B (slightly below
+    // −X axis). Unwrap so the arc goes the LONG way (through +Z, not
+    // through the outfield / −Z which is already covered by the main
+    // bowl and sideline stands).
+    const arcStart = angle1B;
+    const arcEnd = angle3B < angle1B ? angle3B + 2 * Math.PI : angle3B;
+    const boxOuterRadius = nearRadius + SIDELINE_DEPTH;
+
+    return {
+      first: {
+        ...buildSidelineGeometry(origin1B, line1B, perp1B),
+        backFill: buildSidelineBackFill(origin1B, line1B, perp1B),
+      },
+      third: {
+        ...buildSidelineGeometry(origin3B, line3B, perp3B),
+        backFill: buildSidelineBackFill(origin3B, line3B, perp3B),
+      },
+      backstop: {
+        wall: buildBackstopWallGeometry(arcStart, arcEnd, nearRadius),
+        tier: buildBackstopArcGeometry(arcStart, arcEnd, nearRadius),
+        backFill: buildBackstopBackFill(arcStart, arcEnd, boxOuterRadius),
+      },
+    };
+  }, []);
+}
+
+// Field-side wall in front of the box seats. Same green + trim look
+// as the main bowl wall, but a distinct material so we can flag it as
+// DoubleSide without opting the giant outfield wall into that cost.
+// Leading face between decks — the vertical strip that bridges from
+// a lower-deck row up to the deck above's underside. Previously this
+// used wallMat (dark green), which stamped a thick black band between
+// decks; the visible height grows with CONCOURSE_RADIAL_OVERLAP, so a
+// dark material becomes very intrusive at high overlap values.
+// Concrete gray blends into the surrounding structure so the band
+// reads as a structural facade rather than a hard dark line.
+function useLeadingFaceMaterial() {
+  return useMemo(() => {
+    return new MeshStandardMaterial({
+      color: "#5b6470",
+      roughness: 0.9,
+      metalness: 0,
+      side: THREE.FrontSide,
+    });
+  }, []);
+}
+
+function useSidelineWallMaterial() {
+  return useMemo(() => {
+    const mat = new MeshStandardMaterial({
+      color: WALL_COLOR,
+      roughness: 0.85,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    });
+    return mat;
+  }, []);
+}
+
+function useSidelineSeatsMaterial() {
+  return useMemo(() => {
+    const mat = buildSeatsMaterial(
+      SIDELINE_WALL_HEIGHT,
+      SIDELINE_HEIGHT / SIDELINE_ROWS,
+      LOWER_PALETTE,
+    );
+    // Sideline & backstop-arc geometries are hand-built in world
+    // coords from mirror-image direction pairs (1B uses +x/−z along
+    // the line and +x/+z perpendicular; 3B mirrors). A single triangle
+    // order can't give inward-facing normals on both sides, so we
+    // just render both faces. Cheap — these are small stepped strips
+    // (a few hundred tris total), the DoubleSide cost is negligible
+    // and it fixes the 1B-side seats not rendering under FrontSide.
+    mat.side = THREE.DoubleSide;
+    return mat;
+  }, []);
+}
+
 export function StadiumBowl() {
   const wallGeom = useWallGeometry();
   const wallTrimGeom = useWallTrimGeometry();
   const lowerTierGeom = useLowerTierGeometry();
-  const leadingFaceGeom = useUpperDeckLeadingFaceGeometry();
+  const upperLeadingGeom = useUpperDeckLeadingFaceGeometry();
   const upperTierGeom = useUpperTierGeometry();
+  const topLeadingGeom = useTopDeckLeadingFaceGeometry();
+  const topTierGeom = useTopTierGeometry();
+  const sidelines = useSidelineGeometries();
   const wallMat = useWallMaterial();
   const trimMat = useWallTrimMaterial();
   const lowerSeatsMat = useLowerSeatsMaterial();
   const upperSeatsMat = useUpperSeatsMaterial();
+  const topSeatsMat = useTopSeatsMaterial();
+  const sidelineSeatsMat = useSidelineSeatsMaterial();
+  const sidelineWallMat = useSidelineWallMaterial();
+  const leadingFaceMat = useLeadingFaceMaterial();
+
   return (
     <group>
       <mesh geometry={wallGeom} material={wallMat} />
@@ -492,8 +1200,31 @@ export function StadiumBowl() {
       {/* Closes the sky between the lower deck top and the upper
           deck's cantilevered leading edge. Reuses the wall material
           so it reads as part of the bowl's structural facade. */}
-      <mesh geometry={leadingFaceGeom} material={wallMat} />
+      <mesh geometry={upperLeadingGeom} material={leadingFaceMat} />
       <mesh geometry={upperTierGeom} material={upperSeatsMat} />
+      {/* Same facade role between upper and top decks. */}
+      <mesh geometry={topLeadingGeom} material={leadingFaceMat} />
+      <mesh geometry={topTierGeom} material={topSeatsMat} />
+      {/* Box seats along the foul lines. Built directly in world
+          coords via useSidelineGeometries() so the wall+tier meshes
+          already sit in the right place — no wrapping group rotation
+          needed. Low to the ground (3 rows, ~5 ft tall) so they read
+          as premium sideline boxes, not full grandstands overlapping
+          the main bowl. */}
+      <mesh geometry={sidelines.first.wall} material={sidelineWallMat} />
+      <mesh geometry={sidelines.first.tier} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.first.backFill} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.third.wall} material={sidelineWallMat} />
+      <mesh geometry={sidelines.third.tier} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.third.backFill} material={sidelineSeatsMat} />
+      {/* Backstop arc — box seats wrapping BEHIND home plate,
+          connecting the 1B and 3B sideline near-ends. Same 3-row / 5-ft
+          scale as the sidelines. Back-fill closes the gap between the
+          arc's outer edge and the main bowl wall so seating reads as
+          continuous all the way around the field. */}
+      <mesh geometry={sidelines.backstop.wall} material={sidelineWallMat} />
+      <mesh geometry={sidelines.backstop.tier} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.backstop.backFill} material={sidelineSeatsMat} />
     </group>
   );
 }
