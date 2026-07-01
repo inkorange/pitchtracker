@@ -268,7 +268,11 @@ function useDirtMaterial() {
           `
           vec2 soilUV = vDirtWorldPos.xz * 0.25;
           vec3 sampled = texture2D(map, soilUV).rgb;
-          float STRENGTH = 0.5;
+          // STRENGTH sets how far the modulator swings around 1.0.
+          // 0.5 was almost invisible; 1.5 gives ±75% variation so the
+          // pebble/clump detail reads clearly while the base DIRT
+          // tone still dominates the average.
+          float STRENGTH = 1.5;
           vec3 modulator = 1.0 + (sampled - vec3(0.5)) * STRENGTH;
           diffuseColor.rgb *= modulator;
           `,
