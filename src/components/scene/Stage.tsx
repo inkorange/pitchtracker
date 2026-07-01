@@ -1,8 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { Line } from "@react-three/drei";
-import { MeshStandardMaterial, Path, Shape } from "three";
+import { Line, useTexture } from "@react-three/drei";
+import {
+  MeshStandardMaterial,
+  Path,
+  RepeatWrapping,
+  Shape,
+  SRGBColorSpace,
+} from "three";
 import { StadiumBowl, wallRadiusAtAngle } from "./StadiumBowl";
 
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
@@ -157,21 +163,22 @@ function useMowGrassMaterial() {
   }, []);
 }
 
-// Procedural dirt material — bump-map style. Instead of painting
-// color variation into the dirt, we perturb the surface normal from
-// a value-noise field so the directional lighting (lib/scene
-// Lighting.tsx) creates the highlights / shadows of a bumpy clay
-// surface. Color stays close to the base DIRT tone with only a
-// faint tint variation, so the relief comes from light interaction
-// with the displaced normals — not from baked color contrast.
-//
-// Shared by every dirt mesh (infield fan, base cutouts, home circle,
-// mound, basepaths) so the bump pattern is continuous across the
-// surface boundaries.
+// Dirt material — samples /soil.jpg at world XZ so the tiling is
+// continuous across every dirt mesh (infield fan, base cutouts, home
+// circle, mound, basepaths) regardless of each mesh's own UVs. Then
+// perturbs the normal from the same value-noise field the previous
+// procedural version used, so the texture still picks up light-side
+// / shadow-side highlights from directional lighting instead of
+// reading as a flat painted image.
 function useDirtMaterial() {
+  const soilTexture = useTexture("/soil.jpg");
   return useMemo(() => {
+    soilTexture.wrapS = RepeatWrapping;
+    soilTexture.wrapT = RepeatWrapping;
+    soilTexture.colorSpace = SRGBColorSpace;
     const mat = new MeshStandardMaterial({
-      color: DIRT,
+      color: 0xffffff, // let the texture drive color
+      map: soilTexture,
       roughness: 0.95,
       metalness: 0,
     });
@@ -238,20 +245,33 @@ function useDirtMaterial() {
           }
           `,
         )
+        // Replace the default map sampling (which uses per-mesh UVs)
+        // with a world-space sample so the texture tiles at a constant
+        // scale across every dirt mesh regardless of its individual
+        // size / UVs. 0.06 in world units = one texture repeat per
+        // ~16.7 ft, which reads as clay grain at close-camera view
+        // without becoming a visible pattern from a bird's-eye view.
+        .replace(
+          "#include <map_fragment>",
+          `
+          vec2 soilUV = vDirtWorldPos.xz * 0.06;
+          vec4 sampledDiffuseColor = texture2D(map, soilUV);
+          diffuseColor *= sampledDiffuseColor;
+          `,
+        )
         .replace(
           "#include <color_fragment>",
           `#include <color_fragment>
-          // Tiny tint variation only — the bump map carries the
-          // lighting-driven detail. Without this slight wash the dirt
-          // reads as a uniform brown plane.
+          // Subtle noise wash on top of the sampled texture so the
+          // repeat isn't perfectly uniform across the field. Narrow
+          // range because the texture already carries color detail.
           float tintN = dirtNoise(vDirtWorldPos.xz * 0.25);
-          vec3 base = diffuseColor.rgb * mix(0.88, 1.06, tintN);
-          diffuseColor.rgb = base;
+          diffuseColor.rgb *= mix(0.92, 1.05, tintN);
           `,
         );
     };
     return mat;
-  }, []);
+  }, [soilTexture]);
 }
 
 // Compute where the 95-ft-from-rubber arc intersects each foul line.

@@ -741,6 +741,63 @@ function buildSidelineGeometry(
   return { wall: wallGeom, tier: tierGeom };
 }
 
+// Fills the ground-visible gap between the low box seats' back edge
+// and the main bowl wall. Without it, from a behind-the-plate camera
+// you see raw field between the box seats and the outfield bowl —
+// the seating doesn't read as continuous around the field. The fill
+// is a curved horizontal strip at the box seats' TOP height, fanning
+// from the box seats' back edge radially out to the bowl wall so its
+// far edge lands ON the wall regardless of angle. Same seat material
+// as the box seats so it reads as an extension of the seating deck.
+function buildSidelineBackFill(
+  origin: [number, number, number],
+  lineDir: [number, number, number],
+  perpDir: [number, number, number],
+): THREE.BufferGeometry {
+  const height = SIDELINE_HEIGHT;
+  const backOffset = SIDELINE_OFFSET + SIDELINE_DEPTH;
+  const LENGTH_SEGMENTS = 48;
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+    const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+    // Front vertex: the back edge of the box seats at that column.
+    const fx = origin[0] + s * lineDir[0] + backOffset * perpDir[0];
+    const fz = origin[2] + s * lineDir[2] + backOffset * perpDir[2];
+    // Radial angle from home plate → radius on the bowl wall at that
+    // angle. Extending F radially out to the wall gives a back point
+    // that lands ON the wall, so the fill reaches the seating without
+    // a gap regardless of the box seats' orientation.
+    const rF = Math.sqrt(fx * fx + fz * fz);
+    const angF = Math.atan2(fz, fx);
+    const rWall = wallRadiusAtAngle(angF);
+    const bx = (fx / rF) * rWall;
+    const bz = (fz / rF) * rWall;
+    positions.push(fx, height, fz); // 0: front (box-seat side)
+    positions.push(bx, height, bz); // 1: back (bowl-wall side)
+  }
+  for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+    const fl = i * 2;
+    const bl = i * 2 + 1;
+    const fr = (i + 1) * 2;
+    const br = (i + 1) * 2 + 1;
+    // Winding chosen so the surface normal points +Y (up) — the top
+    // face is what a camera above the fill plane sees.
+    indices.push(fl, fr, bl);
+    indices.push(bl, fr, br);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
 function useSidelineGeometries() {
   return useMemo(() => {
     const s = Math.SQRT2 / 2;
@@ -767,8 +824,14 @@ function useSidelineGeometries() {
       -SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
     ];
     return {
-      first: buildSidelineGeometry(origin1B, line1B, perp1B),
-      third: buildSidelineGeometry(origin3B, line3B, perp3B),
+      first: {
+        ...buildSidelineGeometry(origin1B, line1B, perp1B),
+        backFill: buildSidelineBackFill(origin1B, line1B, perp1B),
+      },
+      third: {
+        ...buildSidelineGeometry(origin3B, line3B, perp3B),
+        backFill: buildSidelineBackFill(origin3B, line3B, perp3B),
+      },
     };
   }, []);
 }
@@ -822,8 +885,10 @@ export function StadiumBowl() {
           the main bowl. */}
       <mesh geometry={sidelines.first.wall} material={wallMat} />
       <mesh geometry={sidelines.first.tier} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.first.backFill} material={sidelineSeatsMat} />
       <mesh geometry={sidelines.third.wall} material={wallMat} />
       <mesh geometry={sidelines.third.tier} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.third.backFill} material={sidelineSeatsMat} />
     </group>
   );
 }
