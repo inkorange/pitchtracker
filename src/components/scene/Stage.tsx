@@ -176,8 +176,11 @@ function useDirtMaterial() {
     soilTexture.wrapS = RepeatWrapping;
     soilTexture.wrapT = RepeatWrapping;
     soilTexture.colorSpace = SRGBColorSpace;
+    // Base color is the original DIRT tone; the texture blends over
+    // it at 50% (see the map_fragment patch below) so the soil detail
+    // reads as subtle grain rather than fully replacing the color.
     const mat = new MeshStandardMaterial({
-      color: 0xffffff, // let the texture drive color
+      color: DIRT,
       map: soilTexture,
       roughness: 0.95,
       metalness: 0,
@@ -251,12 +254,18 @@ function useDirtMaterial() {
         // size / UVs. 0.25 in world units = one texture repeat per
         // ~4 ft, which reads as clay grain (individual pebbles + clay
         // clumps at scale) rather than a giant painted image.
+        //
+        // Blend the sampled texture at 50% over the base DIRT color
+        // so the soil pattern reads as a subtle overlay — the base
+        // dirt tone shows through, and the texture just adds grain
+        // and color variation.
         .replace(
           "#include <map_fragment>",
           `
           vec2 soilUV = vDirtWorldPos.xz * 0.25;
-          vec4 sampledDiffuseColor = texture2D(map, soilUV);
-          diffuseColor *= sampledDiffuseColor;
+          vec3 sampled = texture2D(map, soilUV).rgb;
+          vec3 fullyTextured = diffuseColor.rgb * sampled;
+          diffuseColor.rgb = mix(diffuseColor.rgb, fullyTextured, 0.5);
           `,
         )
         .replace(
