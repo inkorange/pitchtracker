@@ -2,7 +2,6 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useSyncExternalStore, type ReactNode } from "react";
-import { EffectComposer, DepthOfField } from "@react-three/postprocessing";
 import { Stage } from "./Stage";
 import { Lighting } from "./Lighting";
 import { CameraRig } from "./CameraRig";
@@ -85,45 +84,6 @@ export function Scene({
           presetOverride={presetOverride}
         />
         {children}
-        {/* Depth-of-field: crisp focus across the mound → strike zone
-            action, soft blur only on truly distant geometry (stadium
-            back rows, sky dome). focusDistance is fraction-of-far-
-            plane (near .02 → far 2500), so ~0.06 places the focal
-            plane ~150 ft from the camera — well past the plate area
-            but ahead of the ~300-ft outfield wall. focalLength widens
-            the sharp band around that plane so ribbons at any AB
-            preset stay crisp. bokehScale kept moderate so the
-            stadium reads as 'out of focus in the distance' rather
-            than smeared. multisampling=0 lets the postprocessing
-            pipeline do its own MSAA on the effect-composed buffer. */}
-        <EffectComposer multisampling={0}>
-          {/* Both focusDistance and focalLength are normalized to
-              camera.far (=2500 ft). Target: SHARP from the camera out
-              to ~90 ft (pitcher, batter, ball path, pitch card),
-              then blur ramps in quickly past that.
-
-              focusDistance=0.018 → focus plane at ~45 ft, roughly the
-              midpoint of the sharp region so blur is symmetric on
-              either side of it. Anything from ~0 to ~90 ft lands
-              inside the sharp band once focalLength widens it enough
-              (previous 0.10 was too tight — close-up trajectories
-              read as smeared, which the user flagged).
-
-              focalLength=0.05 → wide in-focus band (~125 ft total
-              width in world units). Extends the sharp region well
-              past the batter+pitch card while keeping distant
-              stadium rows firmly out of focus.
-
-              bokehScale=8 → aggressive blur beyond the sharp band.
-              Sky dome + stadium back rows read as strongly blurred
-              once past the focal region, giving the desired depth
-              cue without the near field getting soft. */}
-          <DepthOfField
-            focusDistance={0.018}
-            focalLength={0.05}
-            bokehScale={8}
-          />
-        </EffectComposer>
       </Suspense>
     </Canvas>
   );

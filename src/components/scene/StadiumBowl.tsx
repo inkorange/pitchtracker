@@ -789,73 +789,82 @@ function buildSidelineBackFill(
   // meets the tier's back edge flush (no vertical seam between the
   // box seats and the fill panel).
   const height = SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL;
-  const LENGTH_SEGMENTS = 64;
-
-  // Cover the ENTIRE foul-territory strip between the foul line and
-  // the bowl wall — from home plate all the way out to where the foul
-  // line meets the wall — not just the strip behind the box seats.
-  // Without this, from an aerial camera you see raw green grass in
-  // the wedge past the box seats' far end AND between the foul line
-  // and the sideline stands. Origin sits SIDELINE_OFFSET ft into foul
-  // territory from the line; back out to the line itself (perp = 0)
-  // for the front edge of the fill, then radially to the wall.
+  // Narrow strip design: from the BOX SEATS' back edge radially out
+  // to the bowl wall at each column's angle. Runs along the full
+  // length of the box seats + a bit past the far end so it closes
+  // the wedge between the far-end corner and the wall at the
+  // foul-pole angle (previously visible as raw grass).
   //
-  // FILL_LENGTH is how far along the FOUL LINE the fill extends
-  // (starting from the sideline stands' near-plate end). The foul
-  // line makes a 45° angle with the outfield bearing, so it meets
-  // the wall at R_MEAN + R_AMP·cos(π/4) ≈ 311 ft from home plate.
-  // 330 ft here (the real MLB foul-pole distance) safely covers it.
-  const FILL_LENGTH = 330;
-  // Foul line runs from HOME PLATE at angle -π/4 (1B) / -3π/4 (3B).
-  // Origin sits at (SIDELINE_NEAR + SIDELINE_OFFSET) offset along the
-  // foul line from plate + perp offset into foul territory. To land
-  // the front vertex ON the foul line at world position s along the
-  // line from PLATE, start from origin and back out the perp offset.
-  // s here is distance from home plate along the foul line.
-  const originPerpBackout: [number, number, number] = [
-    origin[0] - SIDELINE_OFFSET * perpDir[0],
-    origin[1] - SIDELINE_OFFSET * perpDir[1],
-    origin[2] - SIDELINE_OFFSET * perpDir[2],
-  ];
-  // originPerpBackout is now the point on the foul line at
-  // SIDELINE_NEAR ft from plate. Advance from there by (s − SIDELINE
-  // _NEAR) along lineDir to get the foul-line point at distance s.
+  // The plate-centered fan design gets angularly TOO WIDE in the
+  // foul-pole direction (extends to a wall point 311 ft from plate),
+  // producing an oversized foul-territory fill. This strip stays
+  // narrow — the fill is only as wide as the box seats' perpendicular
+  // separation from the wall + a bit of angular fan at the far end.
+  // backOffset is the perpendicular distance FROM origin (not from
+  // the foul line — origin already sits SIDELINE_OFFSET ft off the
+  // foul line). Setting this to SIDELINE_DEPTH lands the fill's
+  // front edge flush with the box seats' OUTER edge; setting it to
+  // SIDELINE_OFFSET + SIDELINE_DEPTH (the previous value) pushed the
+  // fill 25 ft PAST the box seats and left a grass strip between
+  // them. So use SIDELINE_DEPTH here — the fill starts exactly where
+  // the box seats end.
+  const backOffset = SIDELINE_DEPTH;
+  // Extend PAST the box seats' far end by an amount that reaches the
+  // foul-line/wall intersection along the perpendicular direction.
+  // Along the foul line, the wall meets the line at ≈311 ft from
+  // plate (r(−π/4) = R_MEAN + R_AMP·cos(π/4)); the sideline stand
+  // near-plate origin is at ~40 ft from plate, so the box seats end
+  // ~SIDELINE_LENGTH ft further along the line. FAR_EXTEND ft of
+  // additional coverage past SIDELINE_LENGTH runs the strip out to
+  // (or slightly past) the line/wall intersection so no grass wedge
+  // remains at the far end.
+  const FAR_EXTEND = 60;
+  const TOTAL_LENGTH = SIDELINE_LENGTH + FAR_EXTEND;
+  const LENGTH_SEGMENTS = 96;
 
   const positions: number[] = [];
   const indices: number[] = [];
 
   for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
-    // s is distance along the foul line from HOME PLATE.
-    const s = (FILL_LENGTH * i) / LENGTH_SEGMENTS;
-    const advance = s - SIDELINE_NEAR;
-    // Front vertex: point on the foul line at distance s from plate.
-    const fx = originPerpBackout[0] + advance * lineDir[0];
-    const fz = originPerpBackout[2] + advance * lineDir[2];
-    // Bowl wall at this angular direction. The foul line is a ray
-    // from the plate at constant angle, so angF is effectively fixed
-    // — but we compute per-vertex to be robust to the near-plate
-    // segments where numerical noise can flip the sign of a
-    // near-zero coordinate.
+    const s = (TOTAL_LENGTH * i) / LENGTH_SEGMENTS;
+    // Front vertex: the back edge of the box seats' perpendicular
+    // strip at that column (extended past the box seats' actual far
+    // end, but continuing the same perp offset so the strip stays
+    // parallel to the foul line).
+    const fx = origin[0] + s * lineDir[0] + backOffset * perpDir[0];
+    const fz = origin[2] + s * lineDir[2] + backOffset * perpDir[2];
+    // Radial angle from home plate → radius on the bowl wall at that
+    // angle. Extending F radially out to the wall gives a back point
+    // that lands ON the wall, so the fill reaches the seating
+    // without a gap regardless of the box seats' orientation.
     const rF = Math.sqrt(fx * fx + fz * fz);
     const angF = Math.atan2(fz, fx);
     const rWall = wallRadiusAtAngle(angF);
-    // Guard against the near-plate degenerate case (rF ≈ 0): fall
-    // back to lineDir as the radial direction so we don't divide by
-    // zero and produce a NaN vertex.
-    const dirX = rF > 0.01 ? fx / rF : lineDir[0];
-    const dirZ = rF > 0.01 ? fz / rF : lineDir[2];
+    // If the strip's front vertex has already passed the wall
+    // radially (beyond the wall/line intersection), clamp back to
+    // the wall to avoid an inverted triangle. Otherwise geometry
+    // near the foul pole flips inside-out.
+    const useR = Math.max(rF, 0.01);
+    const dirX = fx / useR;
+    const dirZ = fz / useR;
     const bx = dirX * rWall;
     const bz = dirZ * rWall;
-    positions.push(fx, height, fz); // 0: front (foul-line side)
-    positions.push(bx, height, bz); // 1: back (bowl-wall side)
+    // If front is outside the wall radius (fx*fx+fz*fz > rWall²), the
+    // strip inverts. Skip this segment's back vertex by placing it
+    // ON the front vertex (degenerate triangle, no visible effect).
+    const backX = rF <= rWall ? bx : fx;
+    const backZ = rF <= rWall ? bz : fz;
+    positions.push(fx, height, fz); // 2i: front (box-seat side)
+    positions.push(backX, height, backZ); // 2i+1: back (wall side)
   }
   for (let i = 0; i < LENGTH_SEGMENTS; i++) {
     const fl = i * 2;
     const bl = i * 2 + 1;
     const fr = (i + 1) * 2;
     const br = (i + 1) * 2 + 1;
-    // Winding chosen so the surface normal points +Y (up) — the top
-    // face is what a camera above the fill plane sees.
+    // Both windings emitted; sidelineSeatsMat is DoubleSide so both
+    // are visible. This makes rendering robust regardless of which
+    // side (1B mirrors 3B) we're building.
     indices.push(fl, fr, bl);
     indices.push(bl, fr, br);
   }
