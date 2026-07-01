@@ -603,9 +603,9 @@ function useTopSeatsMaterial() {
 // matches the main bowl's 40° so the row proportions read consistent
 // (rise 5 / depth 6 → atan(5/6) ≈ 40°). No structural wall — the
 // dugout-side railing gets absorbed by the first riser.
-const SIDELINE_OFFSET = 40;   // perpendicular distance from foul line
+const SIDELINE_OFFSET = 25;   // perpendicular distance from foul line
 const SIDELINE_NEAR = 30;     // start along the foul line (ft from plate)
-const SIDELINE_LENGTH = 220;  // total length along the foul line
+const SIDELINE_LENGTH = 240;  // total length along the foul line
 const SIDELINE_DEPTH = 6;
 const SIDELINE_HEIGHT = 5;
 const SIDELINE_ROWS = 3;
@@ -798,6 +798,127 @@ function buildSidelineBackFill(
   return geom;
 }
 
+// Curved box seats wrapping BEHIND home plate, connecting the 1B
+// sideline near-end to the 3B sideline near-end. Same 3-row / 5-ft
+// scale as the sideline stands, but built as an angular arc around
+// home plate rather than a straight run. Inner radius matches the
+// sideline near-end distance so the two sections meet without a gap.
+// Sweeps CCW from the 1B near-end angle through the +Z direction
+// (directly behind plate) to the 3B near-end angle — roughly a
+// 180-190° arc.
+function buildBackstopArcGeometry(
+  angleStart: number,
+  angleEnd: number,
+  innerRadius: number,
+): THREE.BufferGeometry {
+  const ARC_SEGMENTS_BACKSTOP = 72;
+  const rowDepth = SIDELINE_DEPTH / SIDELINE_ROWS;
+  const rowRise = SIDELINE_HEIGHT / SIDELINE_ROWS;
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let row = 0; row < SIDELINE_ROWS; row++) {
+    const treadY = row * rowRise;
+    const innerR = innerRadius + row * rowDepth;
+    const outerR = innerR + rowDepth;
+
+    // Tread — horizontal, normal +Y.
+    {
+      const start = positions.length / 3;
+      for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+        const t = i / ARC_SEGMENTS_BACKSTOP;
+        const angle = angleStart + (angleEnd - angleStart) * t;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        positions.push(innerR * cos, treadY, innerR * sin);
+        positions.push(outerR * cos, treadY, outerR * sin);
+      }
+      for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        indices.push(bl, br, tl);
+        indices.push(tl, br, tr);
+      }
+    }
+
+    // Riser — vertical at outerR, facing INWARD toward home plate.
+    if (row < SIDELINE_ROWS - 1) {
+      const start = positions.length / 3;
+      const nextTreadY = treadY + rowRise;
+      for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+        const t = i / ARC_SEGMENTS_BACKSTOP;
+        const angle = angleStart + (angleEnd - angleStart) * t;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        positions.push(outerR * cos, treadY, outerR * sin);
+        positions.push(outerR * cos, nextTreadY, outerR * sin);
+      }
+      for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        indices.push(bl, br, tl);
+        indices.push(tl, br, tr);
+      }
+    }
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
+// Horizontal back-fill from the backstop arc's outer edge out to the
+// main bowl wall at each angle. Closes the gap between the near-plate
+// box seats and the outfield bowl (same role the sideline back-fill
+// plays along the foul lines) so seating reads as continuous around
+// the whole field.
+function buildBackstopBackFill(
+  angleStart: number,
+  angleEnd: number,
+  boxOuterRadius: number,
+): THREE.BufferGeometry {
+  const ARC_SEGMENTS_BACKSTOP = 72;
+  const height = SIDELINE_HEIGHT;
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+    const t = i / ARC_SEGMENTS_BACKSTOP;
+    const angle = angleStart + (angleEnd - angleStart) * t;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const rWall = wallRadiusAtAngle(angle);
+    // Front vertex — box-seat back edge at that angle.
+    positions.push(boxOuterRadius * cos, height, boxOuterRadius * sin);
+    // Back vertex — main bowl wall at that angle.
+    positions.push(rWall * cos, height, rWall * sin);
+  }
+  for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+    const fl = i * 2;
+    const bl = i * 2 + 1;
+    const fr = (i + 1) * 2;
+    const br = (i + 1) * 2 + 1;
+    indices.push(fl, fr, bl);
+    indices.push(bl, fr, br);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
 function useSidelineGeometries() {
   return useMemo(() => {
     const s = Math.SQRT2 / 2;
@@ -823,6 +944,24 @@ function useSidelineGeometries() {
       0,
       -SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
     ];
+    // Backstop arc anchor: use the 1B sideline's front-inner corner
+    // (origin1B) as the near-plate endpoint. Compute its radial
+    // distance + angle from home plate — the arc's inner radius matches
+    // this distance and its endpoint angle matches this bearing.
+    const nearRadius = Math.sqrt(
+      origin1B[0] * origin1B[0] + origin1B[2] * origin1B[2],
+    );
+    const angle1B = Math.atan2(origin1B[2], origin1B[0]);
+    const angle3B = Math.atan2(origin3B[2], origin3B[0]);
+    // Sweep CCW from angle1B (slightly below +X axis) through the +Z
+    // direction (behind home plate, at +π/2) to angle3B (slightly below
+    // −X axis). Unwrap so the arc goes the LONG way (through +Z, not
+    // through the outfield / −Z which is already covered by the main
+    // bowl and sideline stands).
+    const arcStart = angle1B;
+    const arcEnd = angle3B < angle1B ? angle3B + 2 * Math.PI : angle3B;
+    const boxOuterRadius = nearRadius + SIDELINE_DEPTH;
+
     return {
       first: {
         ...buildSidelineGeometry(origin1B, line1B, perp1B),
@@ -831,6 +970,10 @@ function useSidelineGeometries() {
       third: {
         ...buildSidelineGeometry(origin3B, line3B, perp3B),
         backFill: buildSidelineBackFill(origin3B, line3B, perp3B),
+      },
+      backstop: {
+        tier: buildBackstopArcGeometry(arcStart, arcEnd, nearRadius),
+        backFill: buildBackstopBackFill(arcStart, arcEnd, boxOuterRadius),
       },
     };
   }, []);
@@ -889,6 +1032,13 @@ export function StadiumBowl() {
       <mesh geometry={sidelines.third.wall} material={wallMat} />
       <mesh geometry={sidelines.third.tier} material={sidelineSeatsMat} />
       <mesh geometry={sidelines.third.backFill} material={sidelineSeatsMat} />
+      {/* Backstop arc — box seats wrapping BEHIND home plate,
+          connecting the 1B and 3B sideline near-ends. Same 3-row / 5-ft
+          scale as the sidelines. Back-fill closes the gap between the
+          arc's outer edge and the main bowl wall so seating reads as
+          continuous all the way around the field. */}
+      <mesh geometry={sidelines.backstop.tier} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.backstop.backFill} material={sidelineSeatsMat} />
     </group>
   );
 }
