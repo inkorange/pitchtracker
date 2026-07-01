@@ -607,9 +607,23 @@ const SIDELINE_OFFSET = 25;   // perpendicular distance from foul line
 const SIDELINE_NEAR = 30;     // start along the foul line (ft from plate)
 const SIDELINE_LENGTH = 240;  // total length along the foul line
 const SIDELINE_DEPTH = 6;
-const SIDELINE_HEIGHT = 5;
-const SIDELINE_ROWS = 3;
-const SIDELINE_WALL_HEIGHT = 0.5; // ankle-high field-side lip only
+// One flat platform, tucked BEHIND the wall — the field view sees the
+// wall + one row of crowd heads peeking over. No stepped tiers (the
+// stepped tier read as "stands out on the field", which was wrong).
+// TREAD_BELOW_WALL: how far below the wall's crest the platform sits.
+// Small positive value → the crowd texture on the platform top pokes
+// just above the wall's line, matching real box seats behind a
+// dugout-height wall.
+const SIDELINE_HEIGHT = 0;
+const SIDELINE_ROWS = 1;
+const SIDELINE_TREAD_BELOW_WALL = 0.3;
+// Wall along the field-side of the box seats. A REAL wall (chest-high,
+// ~4 ft) — not a decorative lip. From a low field-level camera this
+// hides the stepped rows behind it so the box seats read as "premium
+// seating behind a wall", not as stands rising up out of the fair
+// grass. Referenced against real MLB sideline walls, which run 3–4 ft
+// where the netting takes over above.
+const SIDELINE_WALL_HEIGHT = 4;
 
 // Builds one sideline grandstand IN WORLD COORDS from three basis
 // vectors describing where the stand lives:
@@ -688,7 +702,14 @@ function buildSidelineGeometry(
   const tierPos: number[] = [];
   const tierIdx: number[] = [];
   for (let row = 0; row < SIDELINE_ROWS; row++) {
-    const treadY = SIDELINE_WALL_HEIGHT + row * rowRise;
+    // Box seats sit BEHIND the wall, top just under the wall's crest.
+    // With SIDELINE_ROWS=1 the tier is a single flat platform tucked
+    // in behind — from the field you see the wall + a thin band of
+    // crowd heads peeking over (real MLB box-seat look). Front row of
+    // the old 3-row stepped tier was reading as "stands rising in
+    // fair territory" — collapsing to 1 row hides that behind the wall.
+    const treadY =
+      SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL + row * rowRise;
     const innerD = row * rowDepth;
     const outerD = innerD + rowDepth;
 
@@ -754,7 +775,10 @@ function buildSidelineBackFill(
   lineDir: [number, number, number],
   perpDir: [number, number, number],
 ): THREE.BufferGeometry {
-  const height = SIDELINE_HEIGHT;
+  // Match the tread height of the box-seat platform so the back-fill
+  // meets the tier's back edge flush (no vertical seam between the
+  // box seats and the fill panel).
+  const height = SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL;
   const backOffset = SIDELINE_OFFSET + SIDELINE_DEPTH;
   const LENGTH_SEGMENTS = 48;
 
@@ -818,7 +842,13 @@ function buildBackstopArcGeometry(
   const indices: number[] = [];
 
   for (let row = 0; row < SIDELINE_ROWS; row++) {
-    const treadY = row * rowRise;
+    // Match the sideline tier: sit just below the wall's crest so the
+    // wrap-around reads consistently — wall dominates, crowd peeks
+    // over the top. Keeping the arc/wrap shape as-is (per user: "I
+    // like the way you went around the home plate region, keep that")
+    // — only the vertical placement changes.
+    const treadY =
+      SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL + row * rowRise;
     const innerR = innerRadius + row * rowDepth;
     const outerR = innerR + rowDepth;
 
@@ -875,6 +905,51 @@ function buildBackstopArcGeometry(
   return geom;
 }
 
+// Field-side wall in front of the backstop arc — the curved
+// counterpart to the straight sideline wall. Sweeps the same angular
+// arc as the tier at radius=innerRadius, rising from ground to
+// SIDELINE_WALL_HEIGHT. Hides the front rows of the arc tier from a
+// field-level camera and matches the sideline wall so the ring of
+// wall reads as one continuous barrier from foul line, around
+// backstop, to the other foul line.
+function buildBackstopWallGeometry(
+  angleStart: number,
+  angleEnd: number,
+  innerRadius: number,
+): THREE.BufferGeometry {
+  const ARC_SEGMENTS_BACKSTOP = 72;
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= ARC_SEGMENTS_BACKSTOP; i++) {
+    const t = i / ARC_SEGMENTS_BACKSTOP;
+    const angle = angleStart + (angleEnd - angleStart) * t;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    positions.push(innerRadius * cos, 0, innerRadius * sin);
+    positions.push(
+      innerRadius * cos,
+      SIDELINE_WALL_HEIGHT,
+      innerRadius * sin,
+    );
+  }
+  for (let i = 0; i < ARC_SEGMENTS_BACKSTOP; i++) {
+    const bl = i * 2;
+    const tl = i * 2 + 1;
+    const br = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    indices.push(bl, br, tl);
+    indices.push(tl, br, tr);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
 // Horizontal back-fill from the backstop arc's outer edge out to the
 // main bowl wall at each angle. Closes the gap between the near-plate
 // box seats and the outfield bowl (same role the sideline back-fill
@@ -886,7 +961,9 @@ function buildBackstopBackFill(
   boxOuterRadius: number,
 ): THREE.BufferGeometry {
   const ARC_SEGMENTS_BACKSTOP = 72;
-  const height = SIDELINE_HEIGHT;
+  // Same height as the sideline back-fill so the ring around the
+  // whole field lies on one continuous plane.
+  const height = SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL;
   const positions: number[] = [];
   const indices: number[] = [];
 
@@ -972,6 +1049,7 @@ function useSidelineGeometries() {
         backFill: buildSidelineBackFill(origin3B, line3B, perp3B),
       },
       backstop: {
+        wall: buildBackstopWallGeometry(arcStart, arcEnd, nearRadius),
         tier: buildBackstopArcGeometry(arcStart, arcEnd, nearRadius),
         backFill: buildBackstopBackFill(arcStart, arcEnd, boxOuterRadius),
       },
@@ -979,16 +1057,38 @@ function useSidelineGeometries() {
   }, []);
 }
 
+// Field-side wall in front of the box seats. Same green + trim look
+// as the main bowl wall, but a distinct material so we can flag it as
+// DoubleSide without opting the giant outfield wall into that cost.
+function useSidelineWallMaterial() {
+  return useMemo(() => {
+    const mat = new MeshStandardMaterial({
+      color: WALL_COLOR,
+      roughness: 0.85,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    });
+    return mat;
+  }, []);
+}
+
 function useSidelineSeatsMaterial() {
-  return useMemo(
-    () =>
-      buildSeatsMaterial(
-        SIDELINE_WALL_HEIGHT,
-        SIDELINE_HEIGHT / SIDELINE_ROWS,
-        LOWER_PALETTE,
-      ),
-    [],
-  );
+  return useMemo(() => {
+    const mat = buildSeatsMaterial(
+      SIDELINE_WALL_HEIGHT,
+      SIDELINE_HEIGHT / SIDELINE_ROWS,
+      LOWER_PALETTE,
+    );
+    // Sideline & backstop-arc geometries are hand-built in world
+    // coords from mirror-image direction pairs (1B uses +x/−z along
+    // the line and +x/+z perpendicular; 3B mirrors). A single triangle
+    // order can't give inward-facing normals on both sides, so we
+    // just render both faces. Cheap — these are small stepped strips
+    // (a few hundred tris total), the DoubleSide cost is negligible
+    // and it fixes the 1B-side seats not rendering under FrontSide.
+    mat.side = THREE.DoubleSide;
+    return mat;
+  }, []);
 }
 
 export function StadiumBowl() {
@@ -1006,6 +1106,7 @@ export function StadiumBowl() {
   const upperSeatsMat = useUpperSeatsMaterial();
   const topSeatsMat = useTopSeatsMaterial();
   const sidelineSeatsMat = useSidelineSeatsMaterial();
+  const sidelineWallMat = useSidelineWallMaterial();
 
   return (
     <group>
@@ -1026,10 +1127,10 @@ export function StadiumBowl() {
           needed. Low to the ground (3 rows, ~5 ft tall) so they read
           as premium sideline boxes, not full grandstands overlapping
           the main bowl. */}
-      <mesh geometry={sidelines.first.wall} material={wallMat} />
+      <mesh geometry={sidelines.first.wall} material={sidelineWallMat} />
       <mesh geometry={sidelines.first.tier} material={sidelineSeatsMat} />
       <mesh geometry={sidelines.first.backFill} material={sidelineSeatsMat} />
-      <mesh geometry={sidelines.third.wall} material={wallMat} />
+      <mesh geometry={sidelines.third.wall} material={sidelineWallMat} />
       <mesh geometry={sidelines.third.tier} material={sidelineSeatsMat} />
       <mesh geometry={sidelines.third.backFill} material={sidelineSeatsMat} />
       {/* Backstop arc — box seats wrapping BEHIND home plate,
@@ -1037,6 +1138,7 @@ export function StadiumBowl() {
           scale as the sidelines. Back-fill closes the gap between the
           arc's outer edge and the main bowl wall so seating reads as
           continuous all the way around the field. */}
+      <mesh geometry={sidelines.backstop.wall} material={sidelineWallMat} />
       <mesh geometry={sidelines.backstop.tier} material={sidelineSeatsMat} />
       <mesh geometry={sidelines.backstop.backFill} material={sidelineSeatsMat} />
     </group>

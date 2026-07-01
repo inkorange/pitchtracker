@@ -97,10 +97,18 @@ export function Scene({
             than smeared. multisampling=0 lets the postprocessing
             pipeline do its own MSAA on the effect-composed buffer. */}
         <EffectComposer multisampling={0}>
+          {/* focusDistance kept at 0.06 — same focal plane, user
+              confirmed the point-of-focus was right. focalLength
+              tightened (0.15 → 0.10) so the in-focus band around the
+              mound/plate is narrower; combined with the bigger
+              bokehScale (3 → 7) this makes anything past the focal
+              band blur more aggressively as it gets farther out.
+              Distant stadium rows and sky dome now read as strongly
+              out-of-focus while the pitcher/batter stay crisp. */}
           <DepthOfField
             focusDistance={0.06}
-            focalLength={0.15}
-            bokehScale={3}
+            focalLength={0.10}
+            bokehScale={7}
           />
         </EffectComposer>
       </Suspense>
