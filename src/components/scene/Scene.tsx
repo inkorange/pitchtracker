@@ -2,6 +2,7 @@
 
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useSyncExternalStore, type ReactNode } from "react";
+import { EffectComposer, DepthOfField } from "@react-three/postprocessing";
 import { Stage } from "./Stage";
 import { Lighting } from "./Lighting";
 import { CameraRig } from "./CameraRig";
@@ -84,6 +85,23 @@ export function Scene({
           presetOverride={presetOverride}
         />
         {children}
+        {/* Depth-of-field: crisp near-camera focus (the mound → strike
+            zone action) with a soft blur on distant geometry (stadium
+            tiers, sky). Focus distance sits at ~1% of the far plane
+            (near.02 → far 2500), which lands ~25 ft from the camera —
+            comfortably covering the ~5–60 ft range where the ribbons
+            live from any of the preset camera positions. bokehScale
+            is intentionally moderate so the stadium reads as "out of
+            focus in the distance" without smearing into abstract
+            blobs. multisampling=0 lets the postprocessing pipeline do
+            its own MSAA on the effect-composed buffer. */}
+        <EffectComposer multisampling={0}>
+          <DepthOfField
+            focusDistance={0.012}
+            focalLength={0.04}
+            bokehScale={3}
+          />
+        </EffectComposer>
       </Suspense>
     </Canvas>
   );

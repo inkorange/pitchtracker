@@ -31,16 +31,25 @@ const OUTFIELD_BEARING = -Math.PI / 2;
 
 const WALL_HEIGHT = 8;
 
-// Lower deck (closest to the field): begins 2 ft behind the wall, 24
-// ft deep, rises 22 ft. ~42° overall slope, but the surface is built
-// as N stepped rows so the geometry physically looks like stadium
-// stairs (visible treads + risers) rather than a smooth ramp.
+// Target slope from horizontal for every deck: 40° — i.e., the
+// interior angle at the base of the stands (measured between the
+// field extending outward and the stands sloping up-and-back) is 140°.
+// Real ballpark seating decks land around 30–40°; anything steeper
+// starts to read visually as a WALL of risers instead of a tilted
+// grandstand. tan(40°) ≈ 0.839, so we size every deck's rise as
+// depth × 0.839 (rounded to friendly ft values).
+
+// Lower deck (closest to the field): begins 2 ft behind the wall, 26
+// ft deep, rises 22 ft. Overall slope atan(22/26) ≈ 40.2°. The
+// surface is built as N stepped rows so the geometry physically
+// looks like stadium stairs (visible treads + risers) rather than a
+// smooth ramp.
 const LOWER_INNER_OFFSET = 2;
-const LOWER_DEPTH = 24;
+const LOWER_DEPTH = 26;
 const LOWER_RISE = 22;
 const LOWER_BASE_HEIGHT = WALL_HEIGHT;
 const LOWER_TOP_HEIGHT = LOWER_BASE_HEIGHT + LOWER_RISE;
-const LOWER_ROWS = 12; // → 2.0 ft tread, 1.83 ft rise per row
+const LOWER_ROWS = 12; // → 2.17 ft tread, 1.83 ft rise per row
 
 // Cantilever: the upper deck overhangs forward over the back of the
 // lower deck. CONCOURSE_RADIAL_OVERLAP ft of the upper-deck inner
@@ -54,28 +63,28 @@ const CONCOURSE_RADIAL_OVERLAP = 6;
 const CONCOURSE_VERTICAL_CLEARANCE = 4;
 
 // Upper deck (mid-tier / club level): cantilevered forward over the
-// lower deck back rows, sitting taller and deeper to dominate the
-// bowl silhouette.
+// lower deck back rows. 40 ft deep, 34 ft rise — same 40° slope as
+// the other decks so the whole silhouette leans consistently instead
+// of getting progressively steeper (and reading as a wall) upward.
 const UPPER_INNER_OFFSET =
   LOWER_INNER_OFFSET + LOWER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
-const UPPER_DEPTH = 32;
-const UPPER_RISE = 38;
+const UPPER_DEPTH = 40;
+const UPPER_RISE = 34;
 const UPPER_BASE_HEIGHT = LOWER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
 const UPPER_TOP_HEIGHT = UPPER_BASE_HEIGHT + UPPER_RISE;
-const UPPER_ROWS = 20; // → 1.6 ft tread, 1.9 ft rise per row
+const UPPER_ROWS = 18; // → 2.22 ft tread, 1.89 ft rise per row
 
 // Top deck (cheap seats / nosebleeds): cantilevered forward over the
-// upper deck's back rows, steepest and tallest of the three. Fewer
-// rows than the upper deck (16 vs 20) so each tread is slightly wider
-// — matches the low-poly aesthetic of a nosebleed section where
-// individual seats read less clearly at distance.
+// upper deck's back rows. Same 40° slope; fewer rows than the upper
+// deck (16 vs 18) so each tread is slightly wider, matching the
+// low-poly nosebleed feel.
 const TOP_INNER_OFFSET =
   UPPER_INNER_OFFSET + UPPER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
-const TOP_DEPTH = 30;
-const TOP_RISE = 42;
+const TOP_DEPTH = 40;
+const TOP_RISE = 34;
 const TOP_BASE_HEIGHT = UPPER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
 const TOP_TOP_HEIGHT = TOP_BASE_HEIGHT + TOP_RISE;
-const TOP_ROWS = 16; // → 1.875 ft tread, 2.625 ft rise per row
+const TOP_ROWS = 16; // → 2.5 ft tread, 2.125 ft rise per row
 
 const ARC_SEGMENTS = 256;
 const SEGMENT_ANGLE = (2 * Math.PI) / ARC_SEGMENTS;
@@ -591,8 +600,10 @@ function useTopSeatsMaterial() {
 const SIDELINE_OFFSET = 40;   // perpendicular distance from foul line
 const SIDELINE_NEAR = 30;     // start along the foul line (ft from plate)
 const SIDELINE_LENGTH = 220;  // total length along the foul line
-const SIDELINE_DEPTH = 24;    // radial depth (perpendicular to line)
-const SIDELINE_HEIGHT = 22;   // vertical rise
+// Depth/height match the lower deck's 40° slope for consistency with
+// the main bowl (rise 22 / depth 26 → atan(22/26) ≈ 40°).
+const SIDELINE_DEPTH = 26;
+const SIDELINE_HEIGHT = 22;
 const SIDELINE_ROWS = 12;
 const SIDELINE_WALL_HEIGHT = 8;
 
