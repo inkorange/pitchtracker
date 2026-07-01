@@ -248,13 +248,13 @@ function useDirtMaterial() {
         // Replace the default map sampling (which uses per-mesh UVs)
         // with a world-space sample so the texture tiles at a constant
         // scale across every dirt mesh regardless of its individual
-        // size / UVs. 0.06 in world units = one texture repeat per
-        // ~16.7 ft, which reads as clay grain at close-camera view
-        // without becoming a visible pattern from a bird's-eye view.
+        // size / UVs. 0.25 in world units = one texture repeat per
+        // ~4 ft, which reads as clay grain (individual pebbles + clay
+        // clumps at scale) rather than a giant painted image.
         .replace(
           "#include <map_fragment>",
           `
-          vec2 soilUV = vDirtWorldPos.xz * 0.06;
+          vec2 soilUV = vDirtWorldPos.xz * 0.25;
           vec4 sampledDiffuseColor = texture2D(map, soilUV);
           diffuseColor *= sampledDiffuseColor;
           `,
