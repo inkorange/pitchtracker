@@ -53,9 +53,9 @@ const LOWER_ROWS = 12; // → 2.0 ft tread, 1.83 ft rise per row
 const CONCOURSE_RADIAL_OVERLAP = 6;
 const CONCOURSE_VERTICAL_CLEARANCE = 4;
 
-// Upper deck (cheap seats / nosebleeds): cantilevered forward over
-// the lower deck back rows, sitting taller and deeper to dominate
-// the bowl silhouette.
+// Upper deck (mid-tier / club level): cantilevered forward over the
+// lower deck back rows, sitting taller and deeper to dominate the
+// bowl silhouette.
 const UPPER_INNER_OFFSET =
   LOWER_INNER_OFFSET + LOWER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
 const UPPER_DEPTH = 32;
@@ -63,6 +63,19 @@ const UPPER_RISE = 38;
 const UPPER_BASE_HEIGHT = LOWER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
 const UPPER_TOP_HEIGHT = UPPER_BASE_HEIGHT + UPPER_RISE;
 const UPPER_ROWS = 20; // → 1.6 ft tread, 1.9 ft rise per row
+
+// Top deck (cheap seats / nosebleeds): cantilevered forward over the
+// upper deck's back rows, steepest and tallest of the three. Fewer
+// rows than the upper deck (16 vs 20) so each tread is slightly wider
+// — matches the low-poly aesthetic of a nosebleed section where
+// individual seats read less clearly at distance.
+const TOP_INNER_OFFSET =
+  UPPER_INNER_OFFSET + UPPER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
+const TOP_DEPTH = 30;
+const TOP_RISE = 42;
+const TOP_BASE_HEIGHT = UPPER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
+const TOP_TOP_HEIGHT = TOP_BASE_HEIGHT + TOP_RISE;
+const TOP_ROWS = 16; // → 1.875 ft tread, 2.625 ft rise per row
 
 const ARC_SEGMENTS = 256;
 const SEGMENT_ANGLE = (2 * Math.PI) / ARC_SEGMENTS;
@@ -273,15 +286,62 @@ function useUpperTierGeometry() {
   );
 }
 
-// Leading face that closes the sky gap between the lower deck and the
-// upper deck. Without it, the vertical air between the top of the
-// back-most lower-deck tread and the cantilevered upper-deck base
-// height reads as raw sky from any field-level camera angle — the
-// two tiers look like they float apart instead of stacking. The face
-// is a vertical curved strip at the upper deck's inner radial offset,
-// painted with the same wall color as the rest of the bowl structure
-// so it reads as a continuation of the wall facade rather than a
-// separate element.
+function useTopTierGeometry() {
+  return useMemo(
+    () =>
+      buildSteppedTierGeometry(
+        TOP_INNER_OFFSET,
+        TOP_DEPTH,
+        TOP_BASE_HEIGHT,
+        TOP_RISE,
+        TOP_ROWS,
+      ),
+    [],
+  );
+}
+
+// Curved vertical leading-face strip at the given radial offset,
+// spanning from `faceBottomY` up to `faceTopY`. Used between decks
+// to close the sky gap between a lower deck's back-most tread and
+// the cantilevered upper deck's leading edge — without this, the
+// vertical air between them reads as raw sky from any field-level
+// camera angle. Painted with the wall material downstream so each
+// leading face reads as part of the bowl's structural facade.
+function buildLeadingFaceGeometry(
+  innerOffset: number,
+  bottomY: number,
+  topY: number,
+): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (let i = 0; i <= ARC_SEGMENTS; i++) {
+    const angle = -Math.PI + i * SEGMENT_ANGLE;
+    const wallR = wallRadiusAtAngle(angle);
+    const r = wallR + innerOffset;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    positions.push(r * cos, bottomY, r * sin);
+    positions.push(r * cos, topY, r * sin);
+  }
+  for (let i = 0; i < ARC_SEGMENTS; i++) {
+    const bl = i * 2;
+    const tl = i * 2 + 1;
+    const br = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    // Inward-facing normals (same winding as the wall).
+    indices.push(bl, br, tl);
+    indices.push(tl, br, tr);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
+  geom.setIndex(indices);
+  geom.computeVertexNormals();
+  return geom;
+}
+
 function useUpperDeckLeadingFaceGeometry() {
   return useMemo(() => {
     const lowerRowDepth = LOWER_DEPTH / LOWER_ROWS;
@@ -294,35 +354,27 @@ function useUpperDeckLeadingFaceGeometry() {
       (UPPER_INNER_OFFSET - LOWER_INNER_OFFSET) / lowerRowDepth,
     );
     const faceBottomY = LOWER_BASE_HEIGHT + rowIdx * lowerRowRise;
-
-    const positions: number[] = [];
-    const indices: number[] = [];
-    for (let i = 0; i <= ARC_SEGMENTS; i++) {
-      const angle = -Math.PI + i * SEGMENT_ANGLE;
-      const wallR = wallRadiusAtAngle(angle);
-      const r = wallR + UPPER_INNER_OFFSET;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      positions.push(r * cos, faceBottomY, r * sin);
-      positions.push(r * cos, UPPER_BASE_HEIGHT, r * sin);
-    }
-    for (let i = 0; i < ARC_SEGMENTS; i++) {
-      const bl = i * 2;
-      const tl = i * 2 + 1;
-      const br = (i + 1) * 2;
-      const tr = (i + 1) * 2 + 1;
-      // Inward-facing normals (same winding as the wall).
-      indices.push(bl, br, tl);
-      indices.push(tl, br, tr);
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(positions, 3),
+    return buildLeadingFaceGeometry(
+      UPPER_INNER_OFFSET,
+      faceBottomY,
+      UPPER_BASE_HEIGHT,
     );
-    geom.setIndex(indices);
-    geom.computeVertexNormals();
-    return geom;
+  }, []);
+}
+
+function useTopDeckLeadingFaceGeometry() {
+  return useMemo(() => {
+    const upperRowDepth = UPPER_DEPTH / UPPER_ROWS;
+    const upperRowRise = UPPER_RISE / UPPER_ROWS;
+    const rowIdx = Math.floor(
+      (TOP_INNER_OFFSET - UPPER_INNER_OFFSET) / upperRowDepth,
+    );
+    const faceBottomY = UPPER_BASE_HEIGHT + rowIdx * upperRowRise;
+    return buildLeadingFaceGeometry(
+      TOP_INNER_OFFSET,
+      faceBottomY,
+      TOP_BASE_HEIGHT,
+    );
   }, []);
 }
 
@@ -426,6 +478,32 @@ function buildSeatsMaterial(
         float aisleDist = abs(aisleFrac - 0.5);
         if (aisleDist > 0.46) seatColor = vec3(${palette.aisle});
 
+        // Crowd speckle: procedural per-cell coloring layered on top of
+        // the row/aisle pattern so the tiers read as PEOPLE sitting in
+        // seats, not solid painted sections. Sample world XZ at ~0.6 ft
+        // per cell (one 'person'), hash to pseudo-random 0–1, remap to
+        // a small palette of typical crowd colors (reds, blues, tans,
+        // whites, grays, warm skin tones). A second hash gates the
+        // 'presence' of each cell — some stay closer to seat base
+        // color (empty seat), others fully take on the crowd tint.
+        // Aisles keep their dark color regardless so aisle lines stay
+        // visible through the speckle.
+        if (aisleDist <= 0.46) {
+          vec2 crowdCell = floor(vStandsWorldPos.xz * 1.6);
+          float h1 = fract(sin(dot(crowdCell, vec2(12.9898, 78.233))) * 43758.5453);
+          float h2 = fract(sin(dot(crowdCell + 1.7, vec2(39.34, 91.7))) * 43758.5453);
+          vec3 crowd;
+          if      (h1 < 0.18) crowd = vec3(0.72, 0.20, 0.20); // red jersey
+          else if (h1 < 0.34) crowd = vec3(0.20, 0.35, 0.68); // blue jersey
+          else if (h1 < 0.48) crowd = vec3(0.82, 0.75, 0.60); // tan / hat brim
+          else if (h1 < 0.62) crowd = vec3(0.90, 0.90, 0.86); // white shirt
+          else if (h1 < 0.76) crowd = vec3(0.28, 0.28, 0.30); // gray / dark
+          else if (h1 < 0.88) crowd = vec3(0.85, 0.60, 0.45); // skin tone
+          else                crowd = vec3(0.75, 0.55, 0.20); // gold / mustard
+          float presence = smoothstep(0.15, 0.85, h2);
+          seatColor = mix(seatColor, crowd, presence * 0.62);
+        }
+
         diffuseColor.rgb = seatColor;
         `,
       );
@@ -448,6 +526,16 @@ const UPPER_PALETTE: SeatPalette = {
   darkRow: "0.09, 0.12, 0.23",
   lightRow: "0.14, 0.18, 0.33",
   aisle: "0.04, 0.05, 0.10",
+};
+
+// Top deck (nosebleeds): darkest band. The crowd speckle carries most
+// of the visual interest at this distance from the field — the seat
+// tint recedes behind the per-cell "people" colors.
+const TOP_PALETTE: SeatPalette = {
+  base: "#161e30",
+  darkRow: "0.07, 0.09, 0.18",
+  lightRow: "0.11, 0.14, 0.26",
+  aisle: "0.03, 0.04, 0.08",
 };
 
 function useLowerSeatsMaterial() {
@@ -474,16 +562,195 @@ function useUpperSeatsMaterial() {
   );
 }
 
+function useTopSeatsMaterial() {
+  return useMemo(
+    () =>
+      buildSeatsMaterial(
+        TOP_BASE_HEIGHT,
+        TOP_RISE / TOP_ROWS,
+        TOP_PALETTE,
+      ),
+    [],
+  );
+}
+
+// Sideline stands — straight grandstands running parallel to each
+// foul line, 40 ft off the line in foul territory. Real ballparks have
+// dedicated 1B-line and 3B-line seating that sits close to the field
+// and PARALLEL to the foul line, not curved back along the main bowl.
+// Without this, the sides of the smooth ellipse bowl sit ~220 ft off
+// the plate at 0°/180° bearings, leaving the baselines feeling
+// exposed. This drops in a rectangular stand along each foul line so
+// the viewer sees stands hugging the sidelines from a
+// behind-the-plate camera.
+//
+// Coord layout: build the stand centered on the foul-line direction
+// (1B → +x/-z axis at 45°) with local Z along the line and local X
+// perpendicular (out into foul territory), then rotate into place.
+// Local origin sits at the near-plate end of the sideline stand.
+const SIDELINE_OFFSET = 40;   // perpendicular distance from foul line
+const SIDELINE_NEAR = 30;     // start along the foul line (ft from plate)
+const SIDELINE_LENGTH = 220;  // total length along the foul line
+const SIDELINE_DEPTH = 24;    // radial depth (perpendicular to line)
+const SIDELINE_HEIGHT = 22;   // vertical rise
+const SIDELINE_ROWS = 12;
+const SIDELINE_WALL_HEIGHT = 8;
+
+// Builds one straight stepped-tier grandstand in LOCAL coordinates:
+//   local X: perpendicular offset from the reference line (foul line
+//            in world coords); the stand starts at localX = 0 and
+//            grows away from the field.
+//   local Y: vertical (up).
+//   local Z: length along the reference line.
+// The caller rotates/translates to place it along each foul line.
+function buildSidelineGeometry(): {
+  wall: THREE.BufferGeometry;
+  tier: THREE.BufferGeometry;
+} {
+  const rowDepth = SIDELINE_DEPTH / SIDELINE_ROWS;
+  const rowRise = SIDELINE_HEIGHT / SIDELINE_ROWS;
+  const LENGTH_SEGMENTS = 32; // low-poly along the length
+
+  // WALL — flat vertical strip at the front (localX = 0), running the
+  // length of the stand. Inward-facing normal is +X (toward the
+  // field). Height = 8 ft.
+  const wallPos: number[] = [];
+  const wallIdx: number[] = [];
+  for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+    const z = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+    wallPos.push(0, 0, z);
+    wallPos.push(0, SIDELINE_WALL_HEIGHT, z);
+  }
+  for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+    const bl = i * 2;
+    const tl = i * 2 + 1;
+    const br = (i + 1) * 2;
+    const tr = (i + 1) * 2 + 1;
+    // Winding order chosen so normal points in −X (toward the field,
+    // which is at the negative-X side in local coords once rotated).
+    wallIdx.push(bl, tl, br);
+    wallIdx.push(tl, tr, br);
+  }
+  const wallGeom = new THREE.BufferGeometry();
+  wallGeom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(wallPos, 3),
+  );
+  wallGeom.setIndex(wallIdx);
+  wallGeom.computeVertexNormals();
+
+  // TIER — stepped rows, tread and riser per row. Rows extend along
+  // local Z (length) and step outward in +X + upward in +Y.
+  const tierPos: number[] = [];
+  const tierIdx: number[] = [];
+  for (let row = 0; row < SIDELINE_ROWS; row++) {
+    const treadY = SIDELINE_WALL_HEIGHT + row * rowRise;
+    const innerX = row * rowDepth;
+    const outerX = innerX + rowDepth;
+
+    // Tread strip (horizontal top surface, normal +Y).
+    {
+      const start = tierPos.length / 3;
+      for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+        const z = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+        tierPos.push(innerX, treadY, z);
+        tierPos.push(outerX, treadY, z);
+      }
+      for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        // +Y-facing tread: bl → br → tl / tl → br → tr (CCW from above)
+        tierIdx.push(bl, br, tl);
+        tierIdx.push(tl, br, tr);
+      }
+    }
+
+    // Riser strip (vertical face facing field, normal −X).
+    if (row < SIDELINE_ROWS - 1) {
+      const start = tierPos.length / 3;
+      const topY = treadY + rowRise;
+      for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
+        const z = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+        tierPos.push(outerX, treadY, z);
+        tierPos.push(outerX, topY, z);
+      }
+      for (let i = 0; i < LENGTH_SEGMENTS; i++) {
+        const bl = start + i * 2;
+        const tl = start + i * 2 + 1;
+        const br = start + (i + 1) * 2;
+        const tr = start + (i + 1) * 2 + 1;
+        // −X-facing riser (faces the field). Winding mirrors the wall.
+        tierIdx.push(bl, tl, br);
+        tierIdx.push(tl, tr, br);
+      }
+    }
+  }
+  const tierGeom = new THREE.BufferGeometry();
+  tierGeom.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(tierPos, 3),
+  );
+  tierGeom.setIndex(tierIdx);
+  tierGeom.computeVertexNormals();
+
+  return { wall: wallGeom, tier: tierGeom };
+}
+
+function useSidelineGeometry() {
+  return useMemo(() => buildSidelineGeometry(), []);
+}
+
+function useSidelineSeatsMaterial() {
+  return useMemo(
+    () =>
+      buildSeatsMaterial(
+        SIDELINE_WALL_HEIGHT,
+        SIDELINE_HEIGHT / SIDELINE_ROWS,
+        LOWER_PALETTE,
+      ),
+    [],
+  );
+}
+
 export function StadiumBowl() {
   const wallGeom = useWallGeometry();
   const wallTrimGeom = useWallTrimGeometry();
   const lowerTierGeom = useLowerTierGeometry();
-  const leadingFaceGeom = useUpperDeckLeadingFaceGeometry();
+  const upperLeadingGeom = useUpperDeckLeadingFaceGeometry();
   const upperTierGeom = useUpperTierGeometry();
+  const topLeadingGeom = useTopDeckLeadingFaceGeometry();
+  const topTierGeom = useTopTierGeometry();
+  const sideline = useSidelineGeometry();
   const wallMat = useWallMaterial();
   const trimMat = useWallTrimMaterial();
   const lowerSeatsMat = useLowerSeatsMaterial();
   const upperSeatsMat = useUpperSeatsMaterial();
+  const topSeatsMat = useTopSeatsMaterial();
+  const sidelineSeatsMat = useSidelineSeatsMaterial();
+
+  // Sideline stands sit 40 ft off each foul line in foul territory,
+  // running parallel to the line. Foul lines head out at ±45° from
+  // home plate:
+  //   1B line direction (unit vec):  (+√2/2, 0, −√2/2)
+  //   1B outward-perp (into foul):   (+√2/2, 0, +√2/2)
+  // We build the stand in LOCAL coords (front wall on the field side)
+  // and place it via a group whose position moves 40 ft along the
+  // outward-perp AND SIDELINE_NEAR ft along the line direction, and
+  // whose rotation aligns the stand's local Z-axis with the line
+  // direction. For the 3B side we mirror across the Z=0 plane by
+  // negating X in the rotation.
+  const rot1B = Math.PI / 4; // 45° CW around Y from world +Z axis
+  const rot3B = -Math.PI / 4; // 45° CCW
+  // Local-origin position for each sideline stand: perpendicular
+  // offset (into foul territory) + start distance along the line.
+  const s = Math.SQRT2 / 2;
+  const nearX_1B = SIDELINE_NEAR * s + SIDELINE_OFFSET * s;
+  const nearZ_1B = -SIDELINE_NEAR * s + SIDELINE_OFFSET * s;
+  const nearX_3B = -SIDELINE_NEAR * s - SIDELINE_OFFSET * s;
+  const nearZ_3B = -SIDELINE_NEAR * s + SIDELINE_OFFSET * s;
+
   return (
     <group>
       <mesh geometry={wallGeom} material={wallMat} />
@@ -492,8 +759,23 @@ export function StadiumBowl() {
       {/* Closes the sky between the lower deck top and the upper
           deck's cantilevered leading edge. Reuses the wall material
           so it reads as part of the bowl's structural facade. */}
-      <mesh geometry={leadingFaceGeom} material={wallMat} />
+      <mesh geometry={upperLeadingGeom} material={wallMat} />
       <mesh geometry={upperTierGeom} material={upperSeatsMat} />
+      {/* Same facade role between upper and top decks. */}
+      <mesh geometry={topLeadingGeom} material={wallMat} />
+      <mesh geometry={topTierGeom} material={topSeatsMat} />
+      {/* Sideline stands — 1B side. Positioned in foul territory 40 ft
+          off the foul line, rotated so their length aligns with the
+          line direction. */}
+      <group position={[nearX_1B, 0, nearZ_1B]} rotation={[0, rot1B, 0]}>
+        <mesh geometry={sideline.wall} material={wallMat} />
+        <mesh geometry={sideline.tier} material={sidelineSeatsMat} />
+      </group>
+      {/* 3B side — mirror. */}
+      <group position={[nearX_3B, 0, nearZ_3B]} rotation={[0, rot3B, 0]}>
+        <mesh geometry={sideline.wall} material={wallMat} />
+        <mesh geometry={sideline.tier} material={sidelineSeatsMat} />
+      </group>
     </group>
   );
 }

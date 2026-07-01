@@ -304,11 +304,31 @@ export function AtBatReplayScene({
   const detailLanded =
     detailIdx < currentIdx || (detailIdx === currentIdx && phase !== "flying");
 
-  // Pin the metrics overlay to the clicked pitch and pause. We don't
-  // call jumpTo here — that would rewind currentIdx and hide every
-  // pitch after the click target, which is not what users expect when
-  // browsing a finished at-bat.
+  // Pin the metrics overlay to the clicked pitch and pause.
+  //
+  // If the click target is a PAST pitch (idx <= currentIdx): leave
+  // currentIdx alone so later pitches stay drawn. We don't rewind
+  // like jumpTo() does — hiding future pitches on a click-to-inspect
+  // is not the behavior users expect on a finished at-bat.
+  //
+  // If the click target is a FUTURE pitch (idx > currentIdx) while
+  // playback is still in progress: fast-forward currentIdx to that
+  // pitch so its ribbon is actually drawn (the render map filters
+  // out `i > currentIdx`), and land it (intraProgress=1, phase=
+  // settled) so it appears as a fully-flown pitch instead of a
+  // half-flying one. Without this, clicking a future dot would just
+  // highlight it with no visible ribbon and stop playback in an
+  // opaque state.
   const handleSelectPitch = useCallback((idx: number) => {
+    setCurrentIdx((prev) => {
+      if (idx > prev) {
+        setIntraProgress(1);
+        setPhase("settled");
+        settledTimerRef.current = 0;
+        return idx;
+      }
+      return prev;
+    });
     setSelectedDetailIdx(idx);
     setPlaying(false);
   }, []);
