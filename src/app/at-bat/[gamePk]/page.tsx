@@ -22,7 +22,10 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { gamePk } = await params;
-  return { title: `Game ${gamePk} · pitchtracker` };
+  return {
+    title: `Game ${gamePk} · pitchtracker`,
+    alternates: { canonical: `/at-bat/${gamePk}` },
+  };
 }
 
 interface PitchSummaryRow {

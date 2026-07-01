@@ -74,6 +74,13 @@ export const metadata: Metadata = {
   description:
     "Ask pitchtracker's AI any question about MLB pitchers, batters, at-bats, or specific games. Voice or text. Translates natural language into 3D pitch visualizations.",
   alternates: { canonical: "/ai" },
+  // Interactive chat page — no static content for Google to rank, and
+  // the URL itself doesn't map to a query anyone naturally searches
+  // for. Noindex tells Google to stop spending crawl budget here and
+  // routes authority to the pitcher / at-bat pages that actually
+  // answer search queries. `follow` stays on so the sidebar links to
+  // pitcher pages still transfer PageRank.
+  robots: { index: false, follow: true },
   openGraph: {
     title: "Ask pitchtracker · AI-powered MLB pitch analysis",
     description:

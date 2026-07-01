@@ -6,6 +6,7 @@ import { GameCard } from "@/components/games/GameCard";
 
 export const metadata: Metadata = {
   title: "At-bat replay · pitchtracker",
+  alternates: { canonical: "/at-bat" },
 };
 
 interface TeamRow {
