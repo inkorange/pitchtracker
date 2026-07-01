@@ -597,50 +597,82 @@ function useTopSeatsMaterial() {
 // (1B → +x/-z axis at 45°) with local Z along the line and local X
 // perpendicular (out into foul territory), then rotate into place.
 // Local origin sits at the near-plate end of the sideline stand.
+// Box seats along the baselines: LOW to the ground — 3 rows tall,
+// short. Real premium box seats sit maybe 4–8 ft above the field level
+// so fans get a low-angle vantage. Not full grandstands. Slope still
+// matches the main bowl's 40° so the row proportions read consistent
+// (rise 5 / depth 6 → atan(5/6) ≈ 40°). No structural wall — the
+// dugout-side railing gets absorbed by the first riser.
 const SIDELINE_OFFSET = 40;   // perpendicular distance from foul line
 const SIDELINE_NEAR = 30;     // start along the foul line (ft from plate)
 const SIDELINE_LENGTH = 220;  // total length along the foul line
-// Depth/height match the lower deck's 40° slope for consistency with
-// the main bowl (rise 22 / depth 26 → atan(22/26) ≈ 40°).
-const SIDELINE_DEPTH = 26;
-const SIDELINE_HEIGHT = 22;
-const SIDELINE_ROWS = 12;
-const SIDELINE_WALL_HEIGHT = 8;
+const SIDELINE_DEPTH = 6;
+const SIDELINE_HEIGHT = 5;
+const SIDELINE_ROWS = 3;
+const SIDELINE_WALL_HEIGHT = 0.5; // ankle-high field-side lip only
 
-// Builds one straight stepped-tier grandstand in LOCAL coordinates:
-//   local X: perpendicular offset from the reference line (foul line
-//            in world coords); the stand starts at localX = 0 and
-//            grows away from the field.
-//   local Y: vertical (up).
-//   local Z: length along the reference line.
-// The caller rotates/translates to place it along each foul line.
-function buildSidelineGeometry(): {
-  wall: THREE.BufferGeometry;
-  tier: THREE.BufferGeometry;
-} {
+// Builds one sideline grandstand IN WORLD COORDS from three basis
+// vectors describing where the stand lives:
+//
+//   origin  — world position of the front-plate corner (the vertex
+//             where the wall's near-plate end sits on the ground)
+//   lineDir — unit vector along the foul line, pointing away from
+//             home plate (defines the "length" direction of the stand)
+//   perpDir — unit vector perpendicular to the foul line, pointing
+//             AWAY from the field into foul territory (defines the
+//             "depth" direction — treads step outward this way)
+//
+// Every vertex = origin + s·lineDir + d·perpDir + h·(0,1,0) where s
+// runs 0..SIDELINE_LENGTH along the line, d runs 0..SIDELINE_DEPTH
+// perpendicular, and h is the vertex height. Building directly in
+// world coords sidesteps the rotation ambiguity that had the stands
+// pointing the wrong way (front wall not facing the field).
+function buildSidelineGeometry(
+  origin: [number, number, number],
+  lineDir: [number, number, number],
+  perpDir: [number, number, number],
+): { wall: THREE.BufferGeometry; tier: THREE.BufferGeometry } {
   const rowDepth = SIDELINE_DEPTH / SIDELINE_ROWS;
   const rowRise = SIDELINE_HEIGHT / SIDELINE_ROWS;
   const LENGTH_SEGMENTS = 32; // low-poly along the length
 
-  // WALL — flat vertical strip at the front (localX = 0), running the
-  // length of the stand. Inward-facing normal is +X (toward the
-  // field). Height = 8 ft.
+  const [ox, oy, oz] = origin;
+  const [lx, ly, lz] = lineDir;
+  const [px, py, pz] = perpDir;
+
+  // Vertex helper: given s along line, d perpendicular, h up →
+  // returns world (x,y,z).
+  const worldXYZ = (
+    s: number,
+    d: number,
+    h: number,
+  ): [number, number, number] => [
+    ox + s * lx + d * px,
+    oy + s * ly + d * py + h,
+    oz + s * lz + d * pz,
+  ];
+
+  // WALL — vertical strip along the near-field edge (d=0) running the
+  // full length. Inward-facing normal points toward the field
+  // (opposite of perpDir).
   const wallPos: number[] = [];
   const wallIdx: number[] = [];
   for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
-    const z = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
-    wallPos.push(0, 0, z);
-    wallPos.push(0, SIDELINE_WALL_HEIGHT, z);
+    const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+    wallPos.push(...worldXYZ(s, 0, 0)); // bottom
+    wallPos.push(...worldXYZ(s, 0, SIDELINE_WALL_HEIGHT)); // top
   }
   for (let i = 0; i < LENGTH_SEGMENTS; i++) {
     const bl = i * 2;
     const tl = i * 2 + 1;
     const br = (i + 1) * 2;
     const tr = (i + 1) * 2 + 1;
-    // Winding order chosen so normal points in −X (toward the field,
-    // which is at the negative-X side in local coords once rotated).
-    wallIdx.push(bl, tl, br);
-    wallIdx.push(tl, tr, br);
+    // Winding: as `s` increases we advance along +lineDir; +tl is
+    // upward. For the field-facing normal (−perpDir), triangles
+    // wound bl → br → tl / tl → br → tr give the cross product a
+    // −perpDir component.
+    wallIdx.push(bl, br, tl);
+    wallIdx.push(tl, br, tr);
   }
   const wallGeom = new THREE.BufferGeometry();
   wallGeom.setAttribute(
@@ -650,51 +682,51 @@ function buildSidelineGeometry(): {
   wallGeom.setIndex(wallIdx);
   wallGeom.computeVertexNormals();
 
-  // TIER — stepped rows, tread and riser per row. Rows extend along
-  // local Z (length) and step outward in +X + upward in +Y.
+  // TIER — stepped rows. Each row: horizontal tread at treadY spanning
+  // (innerD → outerD) along perpDir, then a vertical riser to next
+  // row's tread. Same winding convention as the main bowl tiers.
   const tierPos: number[] = [];
   const tierIdx: number[] = [];
   for (let row = 0; row < SIDELINE_ROWS; row++) {
     const treadY = SIDELINE_WALL_HEIGHT + row * rowRise;
-    const innerX = row * rowDepth;
-    const outerX = innerX + rowDepth;
+    const innerD = row * rowDepth;
+    const outerD = innerD + rowDepth;
 
-    // Tread strip (horizontal top surface, normal +Y).
+    // Tread — horizontal, normal +Y.
     {
       const start = tierPos.length / 3;
       for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
-        const z = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
-        tierPos.push(innerX, treadY, z);
-        tierPos.push(outerX, treadY, z);
+        const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+        tierPos.push(...worldXYZ(s, innerD, treadY));
+        tierPos.push(...worldXYZ(s, outerD, treadY));
       }
       for (let i = 0; i < LENGTH_SEGMENTS; i++) {
         const bl = start + i * 2;
         const tl = start + i * 2 + 1;
         const br = start + (i + 1) * 2;
         const tr = start + (i + 1) * 2 + 1;
-        // +Y-facing tread: bl → br → tl / tl → br → tr (CCW from above)
         tierIdx.push(bl, br, tl);
         tierIdx.push(tl, br, tr);
       }
     }
 
-    // Riser strip (vertical face facing field, normal −X).
+    // Riser — vertical, at d=outerD, from treadY up to nextTreadY.
+    // Field-facing normal (−perpDir).
     if (row < SIDELINE_ROWS - 1) {
       const start = tierPos.length / 3;
-      const topY = treadY + rowRise;
+      const nextTreadY = treadY + rowRise;
       for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
-        const z = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
-        tierPos.push(outerX, treadY, z);
-        tierPos.push(outerX, topY, z);
+        const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
+        tierPos.push(...worldXYZ(s, outerD, treadY));
+        tierPos.push(...worldXYZ(s, outerD, nextTreadY));
       }
       for (let i = 0; i < LENGTH_SEGMENTS; i++) {
         const bl = start + i * 2;
         const tl = start + i * 2 + 1;
         const br = start + (i + 1) * 2;
         const tr = start + (i + 1) * 2 + 1;
-        // −X-facing riser (faces the field). Winding mirrors the wall.
-        tierIdx.push(bl, tl, br);
-        tierIdx.push(tl, tr, br);
+        tierIdx.push(bl, br, tl);
+        tierIdx.push(tl, br, tr);
       }
     }
   }
@@ -709,8 +741,36 @@ function buildSidelineGeometry(): {
   return { wall: wallGeom, tier: tierGeom };
 }
 
-function useSidelineGeometry() {
-  return useMemo(() => buildSidelineGeometry(), []);
+function useSidelineGeometries() {
+  return useMemo(() => {
+    const s = Math.SQRT2 / 2;
+    // 1B foul line: from (0,0,0) toward (63.64, 0, -63.64).
+    // lineDir = (+s, 0, -s). Perpendicular pointing into 1B foul
+    // territory (right side of line when facing outfield from home):
+    // (+s, 0, +s). Origin: SIDELINE_NEAR along the line + SIDELINE
+    // OFFSET into the perpendicular.
+    const line1B: [number, number, number] = [s, 0, -s];
+    const perp1B: [number, number, number] = [s, 0, s];
+    const origin1B: [number, number, number] = [
+      SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
+      0,
+      -SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
+    ];
+    // 3B foul line: from (0,0,0) toward (-63.64, 0, -63.64).
+    // lineDir = (-s, 0, -s). Perpendicular into 3B foul territory:
+    // (-s, 0, +s). Symmetric origin on the -X side.
+    const line3B: [number, number, number] = [-s, 0, -s];
+    const perp3B: [number, number, number] = [-s, 0, s];
+    const origin3B: [number, number, number] = [
+      -SIDELINE_NEAR * s - SIDELINE_OFFSET * s,
+      0,
+      -SIDELINE_NEAR * s + SIDELINE_OFFSET * s,
+    ];
+    return {
+      first: buildSidelineGeometry(origin1B, line1B, perp1B),
+      third: buildSidelineGeometry(origin3B, line3B, perp3B),
+    };
+  }, []);
 }
 
 function useSidelineSeatsMaterial() {
@@ -733,34 +793,13 @@ export function StadiumBowl() {
   const upperTierGeom = useUpperTierGeometry();
   const topLeadingGeom = useTopDeckLeadingFaceGeometry();
   const topTierGeom = useTopTierGeometry();
-  const sideline = useSidelineGeometry();
+  const sidelines = useSidelineGeometries();
   const wallMat = useWallMaterial();
   const trimMat = useWallTrimMaterial();
   const lowerSeatsMat = useLowerSeatsMaterial();
   const upperSeatsMat = useUpperSeatsMaterial();
   const topSeatsMat = useTopSeatsMaterial();
   const sidelineSeatsMat = useSidelineSeatsMaterial();
-
-  // Sideline stands sit 40 ft off each foul line in foul territory,
-  // running parallel to the line. Foul lines head out at ±45° from
-  // home plate:
-  //   1B line direction (unit vec):  (+√2/2, 0, −√2/2)
-  //   1B outward-perp (into foul):   (+√2/2, 0, +√2/2)
-  // We build the stand in LOCAL coords (front wall on the field side)
-  // and place it via a group whose position moves 40 ft along the
-  // outward-perp AND SIDELINE_NEAR ft along the line direction, and
-  // whose rotation aligns the stand's local Z-axis with the line
-  // direction. For the 3B side we mirror across the Z=0 plane by
-  // negating X in the rotation.
-  const rot1B = Math.PI / 4; // 45° CW around Y from world +Z axis
-  const rot3B = -Math.PI / 4; // 45° CCW
-  // Local-origin position for each sideline stand: perpendicular
-  // offset (into foul territory) + start distance along the line.
-  const s = Math.SQRT2 / 2;
-  const nearX_1B = SIDELINE_NEAR * s + SIDELINE_OFFSET * s;
-  const nearZ_1B = -SIDELINE_NEAR * s + SIDELINE_OFFSET * s;
-  const nearX_3B = -SIDELINE_NEAR * s - SIDELINE_OFFSET * s;
-  const nearZ_3B = -SIDELINE_NEAR * s + SIDELINE_OFFSET * s;
 
   return (
     <group>
@@ -775,18 +814,16 @@ export function StadiumBowl() {
       {/* Same facade role between upper and top decks. */}
       <mesh geometry={topLeadingGeom} material={wallMat} />
       <mesh geometry={topTierGeom} material={topSeatsMat} />
-      {/* Sideline stands — 1B side. Positioned in foul territory 40 ft
-          off the foul line, rotated so their length aligns with the
-          line direction. */}
-      <group position={[nearX_1B, 0, nearZ_1B]} rotation={[0, rot1B, 0]}>
-        <mesh geometry={sideline.wall} material={wallMat} />
-        <mesh geometry={sideline.tier} material={sidelineSeatsMat} />
-      </group>
-      {/* 3B side — mirror. */}
-      <group position={[nearX_3B, 0, nearZ_3B]} rotation={[0, rot3B, 0]}>
-        <mesh geometry={sideline.wall} material={wallMat} />
-        <mesh geometry={sideline.tier} material={sidelineSeatsMat} />
-      </group>
+      {/* Box seats along the foul lines. Built directly in world
+          coords via useSidelineGeometries() so the wall+tier meshes
+          already sit in the right place — no wrapping group rotation
+          needed. Low to the ground (3 rows, ~5 ft tall) so they read
+          as premium sideline boxes, not full grandstands overlapping
+          the main bowl. */}
+      <mesh geometry={sidelines.first.wall} material={wallMat} />
+      <mesh geometry={sidelines.first.tier} material={sidelineSeatsMat} />
+      <mesh geometry={sidelines.third.wall} material={wallMat} />
+      <mesh geometry={sidelines.third.tier} material={sidelineSeatsMat} />
     </group>
   );
 }
