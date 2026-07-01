@@ -97,18 +97,31 @@ export function Scene({
             than smeared. multisampling=0 lets the postprocessing
             pipeline do its own MSAA on the effect-composed buffer. */}
         <EffectComposer multisampling={0}>
-          {/* focusDistance kept at 0.06 — same focal plane, user
-              confirmed the point-of-focus was right. focalLength
-              tightened (0.15 → 0.10) so the in-focus band around the
-              mound/plate is narrower; combined with the bigger
-              bokehScale (3 → 7) this makes anything past the focal
-              band blur more aggressively as it gets farther out.
-              Distant stadium rows and sky dome now read as strongly
-              out-of-focus while the pitcher/batter stay crisp. */}
+          {/* Both focusDistance and focalLength are normalized to
+              camera.far (=2500 ft). Target: SHARP from the camera out
+              to ~90 ft (pitcher, batter, ball path, pitch card),
+              then blur ramps in quickly past that.
+
+              focusDistance=0.018 → focus plane at ~45 ft, roughly the
+              midpoint of the sharp region so blur is symmetric on
+              either side of it. Anything from ~0 to ~90 ft lands
+              inside the sharp band once focalLength widens it enough
+              (previous 0.10 was too tight — close-up trajectories
+              read as smeared, which the user flagged).
+
+              focalLength=0.05 → wide in-focus band (~125 ft total
+              width in world units). Extends the sharp region well
+              past the batter+pitch card while keeping distant
+              stadium rows firmly out of focus.
+
+              bokehScale=8 → aggressive blur beyond the sharp band.
+              Sky dome + stadium back rows read as strongly blurred
+              once past the focal region, giving the desired depth
+              cue without the near field getting soft. */}
           <DepthOfField
-            focusDistance={0.06}
-            focalLength={0.10}
-            bokehScale={7}
+            focusDistance={0.018}
+            focalLength={0.05}
+            bokehScale={8}
           />
         </EffectComposer>
       </Suspense>

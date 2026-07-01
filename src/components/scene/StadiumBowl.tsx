@@ -779,27 +779,64 @@ function buildSidelineBackFill(
   // meets the tier's back edge flush (no vertical seam between the
   // box seats and the fill panel).
   const height = SIDELINE_WALL_HEIGHT - SIDELINE_TREAD_BELOW_WALL;
-  const backOffset = SIDELINE_OFFSET + SIDELINE_DEPTH;
-  const LENGTH_SEGMENTS = 48;
+  const LENGTH_SEGMENTS = 64;
+
+  // Cover the ENTIRE foul-territory strip between the foul line and
+  // the bowl wall — from home plate all the way out to where the foul
+  // line meets the wall — not just the strip behind the box seats.
+  // Without this, from an aerial camera you see raw green grass in
+  // the wedge past the box seats' far end AND between the foul line
+  // and the sideline stands. Origin sits SIDELINE_OFFSET ft into foul
+  // territory from the line; back out to the line itself (perp = 0)
+  // for the front edge of the fill, then radially to the wall.
+  //
+  // FILL_LENGTH is how far along the FOUL LINE the fill extends
+  // (starting from the sideline stands' near-plate end). The foul
+  // line makes a 45° angle with the outfield bearing, so it meets
+  // the wall at R_MEAN + R_AMP·cos(π/4) ≈ 311 ft from home plate.
+  // 330 ft here (the real MLB foul-pole distance) safely covers it.
+  const FILL_LENGTH = 330;
+  // Foul line runs from HOME PLATE at angle -π/4 (1B) / -3π/4 (3B).
+  // Origin sits at (SIDELINE_NEAR + SIDELINE_OFFSET) offset along the
+  // foul line from plate + perp offset into foul territory. To land
+  // the front vertex ON the foul line at world position s along the
+  // line from PLATE, start from origin and back out the perp offset.
+  // s here is distance from home plate along the foul line.
+  const originPerpBackout: [number, number, number] = [
+    origin[0] - SIDELINE_OFFSET * perpDir[0],
+    origin[1] - SIDELINE_OFFSET * perpDir[1],
+    origin[2] - SIDELINE_OFFSET * perpDir[2],
+  ];
+  // originPerpBackout is now the point on the foul line at
+  // SIDELINE_NEAR ft from plate. Advance from there by (s − SIDELINE
+  // _NEAR) along lineDir to get the foul-line point at distance s.
 
   const positions: number[] = [];
   const indices: number[] = [];
 
   for (let i = 0; i <= LENGTH_SEGMENTS; i++) {
-    const s = (SIDELINE_LENGTH * i) / LENGTH_SEGMENTS;
-    // Front vertex: the back edge of the box seats at that column.
-    const fx = origin[0] + s * lineDir[0] + backOffset * perpDir[0];
-    const fz = origin[2] + s * lineDir[2] + backOffset * perpDir[2];
-    // Radial angle from home plate → radius on the bowl wall at that
-    // angle. Extending F radially out to the wall gives a back point
-    // that lands ON the wall, so the fill reaches the seating without
-    // a gap regardless of the box seats' orientation.
+    // s is distance along the foul line from HOME PLATE.
+    const s = (FILL_LENGTH * i) / LENGTH_SEGMENTS;
+    const advance = s - SIDELINE_NEAR;
+    // Front vertex: point on the foul line at distance s from plate.
+    const fx = originPerpBackout[0] + advance * lineDir[0];
+    const fz = originPerpBackout[2] + advance * lineDir[2];
+    // Bowl wall at this angular direction. The foul line is a ray
+    // from the plate at constant angle, so angF is effectively fixed
+    // — but we compute per-vertex to be robust to the near-plate
+    // segments where numerical noise can flip the sign of a
+    // near-zero coordinate.
     const rF = Math.sqrt(fx * fx + fz * fz);
     const angF = Math.atan2(fz, fx);
     const rWall = wallRadiusAtAngle(angF);
-    const bx = (fx / rF) * rWall;
-    const bz = (fz / rF) * rWall;
-    positions.push(fx, height, fz); // 0: front (box-seat side)
+    // Guard against the near-plate degenerate case (rF ≈ 0): fall
+    // back to lineDir as the radial direction so we don't divide by
+    // zero and produce a NaN vertex.
+    const dirX = rF > 0.01 ? fx / rF : lineDir[0];
+    const dirZ = rF > 0.01 ? fz / rF : lineDir[2];
+    const bx = dirX * rWall;
+    const bz = dirZ * rWall;
+    positions.push(fx, height, fz); // 0: front (foul-line side)
     positions.push(bx, height, bz); // 1: back (bowl-wall side)
   }
   for (let i = 0; i < LENGTH_SEGMENTS; i++) {
