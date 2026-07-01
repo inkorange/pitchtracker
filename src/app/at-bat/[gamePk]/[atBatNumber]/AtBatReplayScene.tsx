@@ -142,14 +142,25 @@ export function AtBatReplayScene({
 
   // currentIdx ∈ [0, pitches.length). Within a pitch, intraProgress
   // climbs 0 → 1 across the flight; once at 1, it sits at 1 during the
-  // post-pitch delay; then advances to the next pitch. Always starts
-  // at 0 — even when ?pitch=N is in the URL — so the user gets a full
-  // pitch-by-pitch playback rather than landing on a pre-populated
-  // scene with all preceding pitches already drawn.
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [intraProgress, setIntraProgress] = useState(0);
-  const [phase, setPhase] = useState<"flying" | "settled" | "done">("flying");
-  const [playing, setPlaying] = useState(true);
+  // post-pitch delay; then advances to the next pitch.
+  //
+  // Deep-link handling: when the URL carries ?pitch=N (initialHighlight
+  // Idx set), seed the state so pitches 0..N are already drawn and the
+  // target pitch is at rest — no intro animation. Users who share a
+  // URL with a specific pitch land on that pitch, not on the first
+  // pitch auto-playing forward. Without the URL param, start at pitch
+  // 0 mid-flight and auto-play as before.
+  const seededFromUrl = initialHighlightIdx != null;
+  const [currentIdx, setCurrentIdx] = useState(
+    () => initialHighlightIdx ?? 0,
+  );
+  const [intraProgress, setIntraProgress] = useState(() =>
+    seededFromUrl ? 1 : 0,
+  );
+  const [phase, setPhase] = useState<"flying" | "settled" | "done">(() =>
+    seededFromUrl ? "settled" : "flying",
+  );
+  const [playing, setPlaying] = useState(() => !seededFromUrl);
   const [followMode, setFollowMode] = useState(false);
   const settledTimerRef = useRef(0);
 
@@ -249,12 +260,13 @@ export function AtBatReplayScene({
   // overlay reads; null = use the active pitch (auto-updates with
   // playback). Click empty space (Scene onPointerMissed) to clear.
   //
-  // NOTE: we deliberately don't seed this from the URL's ?pitch=N.
-  // Seeding would lock the overlay to the linked pitch and freeze it
-  // there as playback advances. The deep-link is for "land here and
-  // watch from pitch 1"; the highlight follows playback naturally.
+  // Deep-link seed: when the URL carries ?pitch=N we start with that
+  // pitch selected so the metrics overlay is visible on the target
+  // pitch immediately — matches the "no intro animation, land on this
+  // pitch" contract the URL implies. Once the user clicks anywhere
+  // else the selection follows their input normally.
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
-    null,
+    () => initialHighlightIdx,
   );
 
   // Reset playback to the first pitch whenever `pitches` flips
