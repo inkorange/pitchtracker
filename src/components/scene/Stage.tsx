@@ -10,6 +10,7 @@ import {
   SRGBColorSpace,
 } from "three";
 import { StadiumBowl, wallRadiusAtAngle } from "./StadiumBowl";
+import { useEnvToggles } from "@/lib/env-toggles-store";
 
 // Three.js coords: plate at (0, 0, 0), mound at z = -60.5,
 // 1B at (+63.64, 0, -63.64), 2B at (0, 0, -127.28), 3B at (-63.64, 0, -63.64).
@@ -311,27 +312,73 @@ const FOUL_HIT = (() => {
 export function Stage() {
   const mowMaterial = useMowGrassMaterial();
   const dirtMaterial = useDirtMaterial();
+  const { stadium, field } = useEnvToggles();
   return (
     <group>
-      <OutfieldGrass material={mowMaterial} />
-      <InfieldDirtFan material={dirtMaterial} />
-      <InfieldGrassDiamond material={mowMaterial} />
-      <FoulLineBasepath side="first" material={dirtMaterial} />
-      <FoulLineBasepath side="third" material={dirtMaterial} />
-      <BaseCutout position={FIRST_BASE} material={dirtMaterial} />
-      <BaseCutout position={SECOND_BASE} material={dirtMaterial} />
-      <BaseCutout position={THIRD_BASE} material={dirtMaterial} />
-      <HomePlateArea material={dirtMaterial} />
-      <MoundDirt material={dirtMaterial} />
-      <FoulLines />
-      <Base position={FIRST_BASE} />
-      <Base position={SECOND_BASE} />
-      <Base position={THIRD_BASE} />
+      {/* Field group — everything gets stripped when the field toggle
+          is off, INCLUDING the mound (bump + dirt) and the batter's
+          circle (HomePlateArea dirt). Only the pentagon HOME PLATE
+          and the StrikeZone stay behind. Per user: "if we remove the
+          field, I want the mound and batter's circle to be removed,
+          but leave the plate." */}
+      {field ? (
+        <>
+          <OutfieldGrass material={mowMaterial} />
+          <InfieldDirtFan material={dirtMaterial} />
+          <InfieldGrassDiamond material={mowMaterial} />
+          <FoulLineBasepath side="first" material={dirtMaterial} />
+          <FoulLineBasepath side="third" material={dirtMaterial} />
+          <BaseCutout position={FIRST_BASE} material={dirtMaterial} />
+          <BaseCutout position={SECOND_BASE} material={dirtMaterial} />
+          <BaseCutout position={THIRD_BASE} material={dirtMaterial} />
+          <HomePlateArea material={dirtMaterial} />
+          <MoundDirt material={dirtMaterial} />
+          <FoulLines />
+          <Base position={FIRST_BASE} />
+          <Base position={SECOND_BASE} />
+          <Base position={THIRD_BASE} />
+          <Mound />
+        </>
+      ) : null}
+      {/* Always-on core: home plate + strike zone so pitch playback
+          still reads even with the surrounding field stripped. */}
       <HomePlate />
-      <Mound />
       <StrikeZone />
-      <StadiumBowl />
+      {/* Fallback ground plane when the field is off — a flat light
+          grey plane at grass-Y so the eye still gets a "ground here"
+          reference. Without this, home plate + strike zone appear to
+          float on the sky-blue clear color and it's hard to gauge
+          scene depth. */}
+      {!field ? <PlaceholderGround /> : null}
+      {stadium ? <StadiumBowl /> : null}
     </group>
+  );
+}
+
+// =====================================================================
+// Placeholder ground: rendered ONLY when the field toggle is off.
+// A flat, matte light-grey plane at grass-Y giving the eye a ground
+// reference so the plate + strike zone don't appear to float on the
+// sky. Sized to match the outfield grass plane so from any camera
+// angle you still see "the field goes out this far" even without
+// grass detail. Slightly BELOW Y_GRASS_BASE so it doesn't z-fight
+// the plate or dirt patches if the toggle ever flips mid-frame.
+// =====================================================================
+function PlaceholderGround() {
+  return (
+    <mesh
+      position={[0, Y_GRASS_BASE - 0.02, -200]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={-1}
+      receiveShadow
+    >
+      <planeGeometry args={[1400, 1400]} />
+      <meshStandardMaterial
+        color="#c8ccd0"
+        roughness={0.95}
+        metalness={0}
+      />
+    </mesh>
   );
 }
 
@@ -353,6 +400,7 @@ function OutfieldGrass({ material }: { material: MeshStandardMaterial }) {
       // angles the grass ends up sorted AFTER pitch ribbons, masking
       // them. Drawing grass first removes that ambiguity entirely.
       renderOrder={-1}
+      receiveShadow
     >
       <planeGeometry args={[1400, 1400]} />
     </mesh>
@@ -380,6 +428,7 @@ function InfieldDirtFan({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_DIRT_FAN, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      receiveShadow
     >
       <shapeGeometry args={[shape]} />
     </mesh>
@@ -513,6 +562,7 @@ function HomePlateArea({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_DIRT_FEATURE, 0]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      receiveShadow
     >
       <circleGeometry args={[HOME_AREA_R, 48]} />
     </mesh>
@@ -525,6 +575,7 @@ function MoundDirt({ material }: { material: MeshStandardMaterial }) {
       position={[0, Y_DIRT_FEATURE, -PLATE_TO_MOUND]}
       rotation={[-Math.PI / 2, 0, 0]}
       material={material}
+      receiveShadow
     >
       <circleGeometry args={[MOUND_R, 32]} />
     </mesh>

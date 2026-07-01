@@ -7,6 +7,7 @@ import { Scene } from "@/components/scene/Scene";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
 import { CameraPad } from "@/components/controls/CameraPad";
+import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
 import { TransportBar } from "@/components/controls/TransportBar";
 import { HeatGridPlane } from "@/components/scene/HeatGridPlane";
 import {
@@ -455,7 +456,11 @@ export function ComparisonScene({
         ))}
         {heatGrid ? <HeatGridPlane grid={heatGrid} /> : null}
       </Scene>
-      <CameraPad current={preset} onChange={handlePresetChange} />
+      <CameraPad
+        current={preset}
+        onChange={handlePresetChange}
+        leftSlot={<EnvToggleGear />}
+      />
       {showTracers && (
         <TransportBar flightDuration={flightDuration} onProgressChange={setProgress} />
       )}

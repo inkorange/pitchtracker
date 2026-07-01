@@ -31,60 +31,65 @@ const OUTFIELD_BEARING = -Math.PI / 2;
 
 const WALL_HEIGHT = 8;
 
-// Target slope from horizontal for every deck: 40° — i.e., the
-// interior angle at the base of the stands (measured between the
-// field extending outward and the stands sloping up-and-back) is 140°.
-// Real ballpark seating decks land around 30–40°; anything steeper
-// starts to read visually as a WALL of risers instead of a tilted
-// grandstand. tan(40°) ≈ 0.839, so we size every deck's rise as
-// depth × 0.839 (rounded to friendly ft values).
+// Deck slopes: ~30° across all three decks — each row steps back
+// noticeably further than it steps up (tread > rise), so the deck
+// visibly LEANS BACK away from the field. Steeper slopes (45°, 58°)
+// read as vertical walls of seats from field-level cameras; the ~30°
+// silhouette matches the user's sketch of diagonal deck lines
+// pitched shallowly upward-and-back.
 
-// Lower deck (closest to the field): begins 2 ft behind the wall, 26
-// ft deep, rises 22 ft. Overall slope atan(22/26) ≈ 40.2°. The
-// surface is built as N stepped rows so the geometry physically
-// looks like stadium stairs (visible treads + risers) rather than a
-// smooth ramp.
+// Lower deck (closest to the field): begins 2 ft behind the wall,
+// 30 ft deep, rises 18 ft → atan(18/30) ≈ 31°. Shallow enough that
+// treads (2.5 ft) are visibly wider than risers (1.5 ft), so the
+// deck leans back through each row instead of stepping up sharply.
 const LOWER_INNER_OFFSET = 2;
-const LOWER_DEPTH = 26;
-const LOWER_RISE = 22;
+const LOWER_DEPTH = 30;
+const LOWER_RISE = 18;
 const LOWER_BASE_HEIGHT = WALL_HEIGHT;
 const LOWER_TOP_HEIGHT = LOWER_BASE_HEIGHT + LOWER_RISE;
-const LOWER_ROWS = 12; // → 2.17 ft tread, 1.83 ft rise per row
+const LOWER_ROWS = 12; // → 2.5 ft tread, 1.5 ft rise per row
 
-// Cantilever: the upper deck overhangs forward over the back of the
-// lower deck. CONCOURSE_RADIAL_OVERLAP ft of the upper-deck inner
-// edge sits inside the lower deck's outer-edge radial position, so
-// the rearmost rows of the lower bowl are physically under the
-// upper-deck overhang — classic two-deck stadium look. The vertical
-// CLEARANCE is the under-deck height between the lower deck's top
-// and the upper deck's underside; that's where the concourse /
-// standing area lives in a real ballpark.
-const CONCOURSE_RADIAL_OVERLAP = 6;
-const CONCOURSE_VERTICAL_CLEARANCE = 4;
+// Cantilever: the deck above overhangs forward over the back rows of
+// the deck below. CONCOURSE_RADIAL_OVERLAP ft of the upper-deck inner
+// edge sits inside the lower deck's outer-edge radial position — the
+// bigger this value, the more the stadium reads as STACKED (decks
+// piled forward) rather than SPLAYED (decks fanning out backward).
+// CONCOURSE_VERTICAL_CLEARANCE is the vertical gap between one deck's
+// top-row height and the next deck's underside — this becomes the
+// visible "leading face" band between decks, so keep it thin.
+const CONCOURSE_RADIAL_OVERLAP = 14;
+// Number of rows of the DECK BELOW that the deck above interlocks
+// with. Instead of stacking with a positive vertical clearance
+// between deck top and next deck base, the deck above's base sits
+// this many rows BELOW the deck below's top — so from the field the
+// two decks read as INTERLOCKED (the front rows of the upper deck
+// slide down behind the top rows of the lower deck), matching the
+// user's sketch: each next-level line starts LOWER than the previous
+// line's top, not higher.
+const CONCOURSE_ROW_OVERLAP = 3;
 
-// Upper deck (mid-tier / club level): cantilevered forward over the
-// lower deck back rows. 40 ft deep, 34 ft rise — same 40° slope as
-// the other decks so the whole silhouette leans consistently instead
-// of getting progressively steeper (and reading as a wall) upward.
+// Upper deck (mid-tier / club level): 36 ft deep, 22 ft rise →
+// atan(22/36) ≈ 31°. Same shallow lean as the lower deck so the
+// whole stack reads consistently tilted back.
 const UPPER_INNER_OFFSET =
   LOWER_INNER_OFFSET + LOWER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
-const UPPER_DEPTH = 40;
-const UPPER_RISE = 34;
-const UPPER_BASE_HEIGHT = LOWER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
+const UPPER_DEPTH = 36;
+const UPPER_RISE = 22;
+const UPPER_BASE_HEIGHT =
+  LOWER_TOP_HEIGHT - CONCOURSE_ROW_OVERLAP * (LOWER_RISE / LOWER_ROWS);
 const UPPER_TOP_HEIGHT = UPPER_BASE_HEIGHT + UPPER_RISE;
-const UPPER_ROWS = 18; // → 2.22 ft tread, 1.89 ft rise per row
+const UPPER_ROWS = 18; // → 2.0 ft tread, 1.22 ft rise per row
 
-// Top deck (cheap seats / nosebleeds): cantilevered forward over the
-// upper deck's back rows. Same 40° slope; fewer rows than the upper
-// deck (16 vs 18) so each tread is slightly wider, matching the
-// low-poly nosebleed feel.
+// Top deck (cheap seats / nosebleeds): 32 ft deep, 20 ft rise →
+// atan(20/32) ≈ 32°. Same shallow lean as the other decks.
 const TOP_INNER_OFFSET =
   UPPER_INNER_OFFSET + UPPER_DEPTH - CONCOURSE_RADIAL_OVERLAP;
-const TOP_DEPTH = 40;
-const TOP_RISE = 34;
-const TOP_BASE_HEIGHT = UPPER_TOP_HEIGHT + CONCOURSE_VERTICAL_CLEARANCE;
+const TOP_DEPTH = 32;
+const TOP_RISE = 20;
+const TOP_BASE_HEIGHT =
+  UPPER_TOP_HEIGHT - CONCOURSE_ROW_OVERLAP * (UPPER_RISE / UPPER_ROWS);
 const TOP_TOP_HEIGHT = TOP_BASE_HEIGHT + TOP_RISE;
-const TOP_ROWS = 16; // → 2.5 ft tread, 2.125 ft rise per row
+const TOP_ROWS = 16; // → 2.0 ft tread, 1.25 ft rise per row
 
 const ARC_SEGMENTS = 256;
 const SEGMENT_ANGLE = (2 * Math.PI) / ARC_SEGMENTS;
@@ -318,28 +323,43 @@ function useTopTierGeometry() {
 // leading face reads as part of the bowl's structural facade.
 function buildLeadingFaceGeometry(
   innerOffset: number,
-  bottomY: number,
-  topY: number,
+  innerY: number,
+  outerOffset: number,
+  outerY: number,
 ): THREE.BufferGeometry {
+  // Cantilever underside: a slanted panel bridging the FRONT-INNER
+  // edge of the deck above (near-plate side, at height innerY, radial
+  // offset innerOffset from wall) to the BACK-OUTER edge of the deck
+  // below (further from plate, at height outerY, radial offset
+  // outerOffset). Since the deck above cantilevers OVER the deck
+  // below, innerOffset < outerOffset — the panel slopes from the
+  // upper deck's front (near-plate, higher) down-and-out to the
+  // lower deck's back edge, matching how real cantilevered stadium
+  // decks look from the field. Previous design was a vertical WALL
+  // at innerOffset, which read as a big grey slab in the wrong
+  // orientation ("in the wrong direction" per user).
   const positions: number[] = [];
   const indices: number[] = [];
   for (let i = 0; i <= ARC_SEGMENTS; i++) {
     const angle = -Math.PI + i * SEGMENT_ANGLE;
     const wallR = wallRadiusAtAngle(angle);
-    const r = wallR + innerOffset;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
-    positions.push(r * cos, bottomY, r * sin);
-    positions.push(r * cos, topY, r * sin);
+    const rInner = wallR + innerOffset;
+    const rOuter = wallR + outerOffset;
+    positions.push(rInner * cos, innerY, rInner * sin); // 0: inner
+    positions.push(rOuter * cos, outerY, rOuter * sin); // 1: outer
   }
   for (let i = 0; i < ARC_SEGMENTS; i++) {
-    const bl = i * 2;
-    const tl = i * 2 + 1;
-    const br = (i + 1) * 2;
-    const tr = (i + 1) * 2 + 1;
-    // Inward-facing normals (same winding as the wall).
-    indices.push(bl, br, tl);
-    indices.push(tl, br, tr);
+    const il = i * 2;
+    const ol = i * 2 + 1;
+    const ir = (i + 1) * 2;
+    const or_ = (i + 1) * 2 + 1;
+    // Winding chosen so the normal points DOWN and slightly IN
+    // (toward the plate) — this is the underside a field-level
+    // camera sees.
+    indices.push(il, ir, ol);
+    indices.push(ol, ir, or_);
   }
   const geom = new THREE.BufferGeometry();
   geom.setAttribute(
@@ -353,36 +373,25 @@ function buildLeadingFaceGeometry(
 
 function useUpperDeckLeadingFaceGeometry() {
   return useMemo(() => {
-    const lowerRowDepth = LOWER_DEPTH / LOWER_ROWS;
-    const lowerRowRise = LOWER_RISE / LOWER_ROWS;
-    // Which lower-deck row's front edge lines up with the upper deck's
-    // inner radial offset — the face starts at that row's tread Y, so
-    // it sits flush against the back of one of the lower-deck rows
-    // rather than starting above or below it.
-    const rowIdx = Math.floor(
-      (UPPER_INNER_OFFSET - LOWER_INNER_OFFSET) / lowerRowDepth,
-    );
-    const faceBottomY = LOWER_BASE_HEIGHT + rowIdx * lowerRowRise;
+    // Inner edge: front-inner corner of the UPPER deck (near-plate).
+    // Outer edge: back-outer corner of the LOWER deck (further out,
+    // top of the lower tier at LOWER_TOP_HEIGHT).
     return buildLeadingFaceGeometry(
       UPPER_INNER_OFFSET,
-      faceBottomY,
       UPPER_BASE_HEIGHT,
+      LOWER_INNER_OFFSET + LOWER_DEPTH,
+      LOWER_TOP_HEIGHT,
     );
   }, []);
 }
 
 function useTopDeckLeadingFaceGeometry() {
   return useMemo(() => {
-    const upperRowDepth = UPPER_DEPTH / UPPER_ROWS;
-    const upperRowRise = UPPER_RISE / UPPER_ROWS;
-    const rowIdx = Math.floor(
-      (TOP_INNER_OFFSET - UPPER_INNER_OFFSET) / upperRowDepth,
-    );
-    const faceBottomY = UPPER_BASE_HEIGHT + rowIdx * upperRowRise;
     return buildLeadingFaceGeometry(
       TOP_INNER_OFFSET,
-      faceBottomY,
       TOP_BASE_HEIGHT,
+      UPPER_INNER_OFFSET + UPPER_DEPTH,
+      UPPER_TOP_HEIGHT,
     );
   }, []);
 }
@@ -1116,6 +1125,24 @@ function useSidelineGeometries() {
 // Field-side wall in front of the box seats. Same green + trim look
 // as the main bowl wall, but a distinct material so we can flag it as
 // DoubleSide without opting the giant outfield wall into that cost.
+// Leading face between decks — the vertical strip that bridges from
+// a lower-deck row up to the deck above's underside. Previously this
+// used wallMat (dark green), which stamped a thick black band between
+// decks; the visible height grows with CONCOURSE_RADIAL_OVERLAP, so a
+// dark material becomes very intrusive at high overlap values.
+// Concrete gray blends into the surrounding structure so the band
+// reads as a structural facade rather than a hard dark line.
+function useLeadingFaceMaterial() {
+  return useMemo(() => {
+    return new MeshStandardMaterial({
+      color: "#5b6470",
+      roughness: 0.9,
+      metalness: 0,
+      side: THREE.FrontSide,
+    });
+  }, []);
+}
+
 function useSidelineWallMaterial() {
   return useMemo(() => {
     const mat = new MeshStandardMaterial({
@@ -1163,6 +1190,7 @@ export function StadiumBowl() {
   const topSeatsMat = useTopSeatsMaterial();
   const sidelineSeatsMat = useSidelineSeatsMaterial();
   const sidelineWallMat = useSidelineWallMaterial();
+  const leadingFaceMat = useLeadingFaceMaterial();
 
   return (
     <group>
@@ -1172,10 +1200,10 @@ export function StadiumBowl() {
       {/* Closes the sky between the lower deck top and the upper
           deck's cantilevered leading edge. Reuses the wall material
           so it reads as part of the bowl's structural facade. */}
-      <mesh geometry={upperLeadingGeom} material={wallMat} />
+      <mesh geometry={upperLeadingGeom} material={leadingFaceMat} />
       <mesh geometry={upperTierGeom} material={upperSeatsMat} />
       {/* Same facade role between upper and top decks. */}
-      <mesh geometry={topLeadingGeom} material={wallMat} />
+      <mesh geometry={topLeadingGeom} material={leadingFaceMat} />
       <mesh geometry={topTierGeom} material={topSeatsMat} />
       {/* Box seats along the foul lines. Built directly in world
           coords via useSidelineGeometries() so the wall+tier meshes

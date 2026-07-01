@@ -68,6 +68,11 @@ export function Scene({
   return (
     <Canvas
       frameloop={pageActive ? "always" : "never"}
+      // shadows enables the shadow-map pass; individual lights and
+      // meshes still opt in via castShadow / receiveShadow. Off
+      // globally would skip the pass entirely and save perf; on
+      // means we pay the cost only for lights/meshes that request it.
+      shadows
       gl={{ antialias: true, powerPreference: "high-performance" }}
       dpr={[1, 2]}
       style={{ background: "#7ea7c8" }}

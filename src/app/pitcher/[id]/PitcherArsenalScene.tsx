@@ -10,6 +10,7 @@ import { Ribbon } from "@/components/ribbon/Ribbon";
 import { HistoricalPitchLines } from "@/components/ribbon/HistoricalPitchLines";
 import { RECENT_RIBBON_CAP } from "@/lib/viz/scene-tuning";
 import { CameraPad } from "@/components/controls/CameraPad";
+import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
 import { TunnelMesh } from "@/components/scene/TunnelMesh";
 import { HeatGridPlane } from "@/components/scene/HeatGridPlane";
 import { Batter, frontPresetForStand } from "@/components/scene/BatterSilhouette";
@@ -448,7 +449,11 @@ export function PitcherArsenalScene({
       {/* Bottom-of-screen controls swap with the mode. Camera pad +
           tunnel toggle for arsenal browsing; transport bar for
           at-bat playback. */}
-      <CameraPad current={preset} onChange={handlePresetChange} />
+      <CameraPad
+        current={preset}
+        onChange={handlePresetChange}
+        leftSlot={<EnvToggleGear />}
+      />
       {inAtBatMode ? (
         <AtBatPlaybackBar
           state={playback.state}

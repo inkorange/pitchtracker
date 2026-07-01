@@ -11,6 +11,8 @@ import { BallTracer } from "@/components/ribbon/BallTracer";
 import { Batter, frontPresetForStand } from "@/components/scene/BatterSilhouette";
 import { BaseballGlyph } from "@/components/icons/BaseballGlyph";
 import { CameraPad } from "@/components/controls/CameraPad";
+import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
+import { useEnvToggles } from "@/lib/env-toggles-store";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
@@ -94,6 +96,7 @@ export function AtBatReplayScene({
 
   const [preset, setPreset] = useState<CameraPreset>(initialCamera);
   const [presetTick, setPresetTick] = useState(0);
+  const { batter: batterVisible } = useEnvToggles();
 
   // Update URL params without forcing a scroll or history entry. The
   // page is fully driven by these params on first load, so keeping
@@ -370,7 +373,7 @@ export function AtBatReplayScene({
           progress={intraProgress}
           phase={phase}
         />
-        {batterStand ? <Batter stand={batterStand} /> : null}
+        {batterStand && batterVisible ? <Batter stand={batterStand} /> : null}
         {/* Outcome chip on every pitch that has already landed (idx <
             currentIdx, plus the active pitch once it's settled). */}
         {prepared.map((p, i) => {
@@ -403,7 +406,11 @@ export function AtBatReplayScene({
         ) : null}
       </Scene>
 
-      <CameraPad current={preset} onChange={handlePresetChange} />
+      <CameraPad
+        current={preset}
+        onChange={handlePresetChange}
+        leftSlot={<EnvToggleGear />}
+      />
 
       <button
         type="button"
