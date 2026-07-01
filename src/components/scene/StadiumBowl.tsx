@@ -614,7 +614,17 @@ const SIDELINE_DEPTH = 6;
 // Small positive value → the crowd texture on the platform top pokes
 // just above the wall's line, matching real box seats behind a
 // dugout-height wall.
-const SIDELINE_HEIGHT = 0;
+//
+// SIDELINE_HEIGHT stays NONZERO on purpose. It's not used to size a
+// stepped tier (SIDELINE_ROWS=1 means no risers), but the crowd
+// shader in buildSeatsMaterial divides by rowRise (=SIDELINE_HEIGHT/
+// SIDELINE_ROWS) to compute a row index. Rowrise=0 → division by zero
+// → NaN color → the box-seat platform AND back-fill panel render as
+// invisible pixels, and the field grass shows through the gap between
+// box-seat top and bowl-wall top. Setting it to 2 keeps the shader
+// numerically safe (row index is still constant across the flat
+// platform, so the crowd speckle overlays it as one uniform color).
+const SIDELINE_HEIGHT = 2;
 const SIDELINE_ROWS = 1;
 const SIDELINE_TREAD_BELOW_WALL = 0.3;
 // Wall along the field-side of the box seats. A REAL wall (chest-high,
