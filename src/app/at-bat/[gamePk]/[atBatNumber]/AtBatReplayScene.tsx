@@ -142,14 +142,32 @@ export function AtBatReplayScene({
 
   // currentIdx ∈ [0, pitches.length). Within a pitch, intraProgress
   // climbs 0 → 1 across the flight; once at 1, it sits at 1 during the
-  // post-pitch delay; then advances to the next pitch. Always starts
-  // at 0 — even when ?pitch=N is in the URL — so the user gets a full
-  // pitch-by-pitch playback rather than landing on a pre-populated
-  // scene with all preceding pitches already drawn.
-  const [currentIdx, setCurrentIdx] = useState(0);
-  const [intraProgress, setIntraProgress] = useState(0);
-  const [phase, setPhase] = useState<"flying" | "settled" | "done">("flying");
-  const [playing, setPlaying] = useState(true);
+  // post-pitch delay; then advances to the next pitch. The scene
+  // renders pitches with index <= currentIdx (see the map filter
+  // below), so currentIdx doubles as the "how many pitches are
+  // drawn so far" cursor.
+  //
+  // Deep-link handling: when the URL carries ?pitch=N (initialHighlight
+  // Idx set), we want the viewer to land on a FULLY-DRAWN at-bat —
+  // every pitch in the sequence visible with pitch N highlighted —
+  // not to see only pitches 0..N with the rest hidden as if playback
+  // paused mid-AB. So we advance currentIdx all the way to the last
+  // pitch (all ribbons drawn), set phase='done' (end of AB, no auto-
+  // advance), and use selectedDetailIdx to spotlight pitch N. Without
+  // the URL param, start at pitch 0 mid-flight and auto-play as
+  // before.
+  const seededFromUrl = initialHighlightIdx != null;
+  const lastIdx = Math.max(0, prepared.length - 1);
+  const [currentIdx, setCurrentIdx] = useState(
+    () => (seededFromUrl ? lastIdx : 0),
+  );
+  const [intraProgress, setIntraProgress] = useState(() =>
+    seededFromUrl ? 1 : 0,
+  );
+  const [phase, setPhase] = useState<"flying" | "settled" | "done">(() =>
+    seededFromUrl ? "done" : "flying",
+  );
+  const [playing, setPlaying] = useState(() => !seededFromUrl);
   const [followMode, setFollowMode] = useState(false);
   const settledTimerRef = useRef(0);
 
@@ -249,12 +267,13 @@ export function AtBatReplayScene({
   // overlay reads; null = use the active pitch (auto-updates with
   // playback). Click empty space (Scene onPointerMissed) to clear.
   //
-  // NOTE: we deliberately don't seed this from the URL's ?pitch=N.
-  // Seeding would lock the overlay to the linked pitch and freeze it
-  // there as playback advances. The deep-link is for "land here and
-  // watch from pitch 1"; the highlight follows playback naturally.
+  // Deep-link seed: when the URL carries ?pitch=N we start with that
+  // pitch selected so the metrics overlay is visible on the target
+  // pitch immediately — matches the "no intro animation, land on this
+  // pitch" contract the URL implies. Once the user clicks anywhere
+  // else the selection follows their input normally.
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
-    null,
+    () => initialHighlightIdx,
   );
 
   // Reset playback to the first pitch whenever `pitches` flips
