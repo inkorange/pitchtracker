@@ -252,20 +252,25 @@ function useDirtMaterial() {
         // with a world-space sample so the texture tiles at a constant
         // scale across every dirt mesh regardless of its individual
         // size / UVs. 0.25 in world units = one texture repeat per
-        // ~4 ft, which reads as clay grain (individual pebbles + clay
+        // ~4 ft — reads as clay grain (individual pebbles + clay
         // clumps at scale) rather than a giant painted image.
         //
-        // Blend the sampled texture at 50% over the base DIRT color
-        // so the soil pattern reads as a subtle overlay — the base
-        // dirt tone shows through, and the texture just adds grain
-        // and color variation.
+        // Overlay the sample as a CENTERED modulator around 1.0
+        // rather than a straight multiply. If the sampled pixel is
+        // 0.5 the modulator lands on 1.0 (no change to base color);
+        // brighter pixels push slightly above 1.0, darker pixels
+        // slightly below. STRENGTH controls how much variation. This
+        // preserves the base DIRT tone (previous straight-multiply
+        // darkened the whole surface because soil.jpg averages < 1)
+        // while still surfacing the texture's grain and mottling.
         .replace(
           "#include <map_fragment>",
           `
           vec2 soilUV = vDirtWorldPos.xz * 0.25;
           vec3 sampled = texture2D(map, soilUV).rgb;
-          vec3 fullyTextured = diffuseColor.rgb * sampled;
-          diffuseColor.rgb = mix(diffuseColor.rgb, fullyTextured, 0.5);
+          float STRENGTH = 0.5;
+          vec3 modulator = 1.0 + (sampled - vec3(0.5)) * STRENGTH;
+          diffuseColor.rgb *= modulator;
           `,
         )
         .replace(
