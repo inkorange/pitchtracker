@@ -142,23 +142,30 @@ export function AtBatReplayScene({
 
   // currentIdx ∈ [0, pitches.length). Within a pitch, intraProgress
   // climbs 0 → 1 across the flight; once at 1, it sits at 1 during the
-  // post-pitch delay; then advances to the next pitch.
+  // post-pitch delay; then advances to the next pitch. The scene
+  // renders pitches with index <= currentIdx (see the map filter
+  // below), so currentIdx doubles as the "how many pitches are
+  // drawn so far" cursor.
   //
   // Deep-link handling: when the URL carries ?pitch=N (initialHighlight
-  // Idx set), seed the state so pitches 0..N are already drawn and the
-  // target pitch is at rest — no intro animation. Users who share a
-  // URL with a specific pitch land on that pitch, not on the first
-  // pitch auto-playing forward. Without the URL param, start at pitch
-  // 0 mid-flight and auto-play as before.
+  // Idx set), we want the viewer to land on a FULLY-DRAWN at-bat —
+  // every pitch in the sequence visible with pitch N highlighted —
+  // not to see only pitches 0..N with the rest hidden as if playback
+  // paused mid-AB. So we advance currentIdx all the way to the last
+  // pitch (all ribbons drawn), set phase='done' (end of AB, no auto-
+  // advance), and use selectedDetailIdx to spotlight pitch N. Without
+  // the URL param, start at pitch 0 mid-flight and auto-play as
+  // before.
   const seededFromUrl = initialHighlightIdx != null;
+  const lastIdx = Math.max(0, prepared.length - 1);
   const [currentIdx, setCurrentIdx] = useState(
-    () => initialHighlightIdx ?? 0,
+    () => (seededFromUrl ? lastIdx : 0),
   );
   const [intraProgress, setIntraProgress] = useState(() =>
     seededFromUrl ? 1 : 0,
   );
   const [phase, setPhase] = useState<"flying" | "settled" | "done">(() =>
-    seededFromUrl ? "settled" : "flying",
+    seededFromUrl ? "done" : "flying",
   );
   const [playing, setPlaying] = useState(() => !seededFromUrl);
   const [followMode, setFollowMode] = useState(false);
