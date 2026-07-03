@@ -297,12 +297,24 @@ export async function generateMetadata({
   // for stability), so each filter permalink has a self-canonical URL
   // and Google can index it as its own page instead of consolidating
   // it under the bare slug URL.
+  //
+  // BUT — a query param whose value equals the page's DEFAULT for
+  // that param must NOT be included in the canonical: the resulting
+  // page's content is identical to the bare URL's, and emitting
+  // ?season=2025 (when 2025 is the default season) as a self-canonical
+  // produces Google Search Console's "Duplicate without user-selected
+  // canonical" error. Bare URL and `?season=<current-year>` URL then
+  // sit as two self-canonicalized pages with identical bodies.
+  //
+  // For `season` the default is `currentYear` — computed above. Other
+  // SEO keys (pitch, hand, outcome, event, veloMin, veloMax) default
+  // to empty, which the length > 0 check already handles.
   const canonicalQs = new URLSearchParams();
   for (const key of SEO_QUERY_KEYS) {
     const value = sp[key];
-    if (typeof value === "string" && value.length > 0) {
-      canonicalQs.set(key, value);
-    }
+    if (typeof value !== "string" || value.length === 0) continue;
+    if (key === "season" && Number(value) === currentYear) continue;
+    canonicalQs.set(key, value);
   }
   canonicalQs.sort();
   const canonicalPath = `/pitcher/${pitcherId}/${slugifyPitcherName(pitcher.full_name)}`;
