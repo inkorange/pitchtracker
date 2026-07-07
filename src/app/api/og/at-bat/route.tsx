@@ -189,7 +189,7 @@ export async function GET(request: Request) {
               color: "rgba(255,255,255,0.45)",
             }}
           >
-            pitchtracker
+            PitchTracker
           </div>
           <div style={{ fontSize: 36, fontWeight: 600 }}>{finalLabel}</div>
         </div>
@@ -214,7 +214,7 @@ function Fallback() {
         fontFamily: "Geist, system-ui, sans-serif",
       }}
     >
-      pitchtracker · at-bat replay
+      PitchTracker · at-bat replay
     </div>
   );
 }

@@ -75,7 +75,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const atBatN = Number(atBatNumber);
   const ogUrl = `/api/og/at-bat?gamePk=${gamePk}&atBatNumber=${atBatNumber}`;
   if (!Number.isFinite(gamePkN) || !Number.isFinite(atBatN)) {
-    return { title: `At-bat replay · pitchtracker` };
+    return { title: `At-bat replay · PitchTracker` };
   }
   // Resolve the players so the title carries both names — the lift
   // for "Lindor at-bats vs Skenes" / "Skenes vs Lindor" queries.
@@ -101,18 +101,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: titlePhrase,
     description: pitcherName
-      ? `${matchupPhrase}, at-bat #${atBatN} — pitch-by-pitch 3D replay on pitchtracker.`
+      ? `${matchupPhrase}, at-bat #${atBatN} — pitch-by-pitch 3D replay on PitchTracker.`
       : `Pitch-by-pitch 3D replay of a single at-bat.`,
     alternates: { canonical },
     openGraph: {
-      title: `${titlePhrase} · pitchtracker`,
+      title: `${titlePhrase} · PitchTracker`,
       description: "Pitch-by-pitch 3D replay of a single at-bat.",
       url: canonical,
       images: [{ url: ogUrl, width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary_large_image",
-      title: `${titlePhrase} · pitchtracker`,
+      title: `${titlePhrase} · PitchTracker`,
       images: [ogUrl],
     },
   };

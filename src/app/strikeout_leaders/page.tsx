@@ -20,7 +20,7 @@ import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 //     fine and keeps the skill's screenshot run cheap.
 
 export const metadata: Metadata = {
-  title: "MLB Strikeout Leaders · pitchtracker",
+  title: "MLB Strikeout Leaders · PitchTracker",
   description:
     "Top 10 MLB strikeout leaders for the current season — generated from live Statcast data, refreshed daily.",
   // Don't index the screenshot target itself — Google should land
@@ -156,7 +156,7 @@ export default async function StrikeoutLeadersPage() {
               <div className="relative w-[260px] h-[45px]">
                 <Image
                   src="/pitchtracker-logo.svg"
-                  alt="pitchtracker"
+                  alt="PitchTracker"
                   fill
                   sizes="260px"
                   className="object-contain object-right"
@@ -264,7 +264,7 @@ export default async function StrikeoutLeadersPage() {
             replay for every active pitcher.
           </div>
           <div className="text-[13px] text-white/55 uppercase tracking-[0.18em] text-right">
-            pitchtracker
+            PitchTracker
           </div>
         </footer>
       </div>

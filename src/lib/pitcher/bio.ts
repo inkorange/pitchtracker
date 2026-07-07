@@ -115,7 +115,7 @@ export function buildPitcherBio(input: PitcherBioInput): string[] {
   // 3. Optional volume sentence — only when meaningful.
   if (input.seasonPitchCount && input.seasonPitchCount >= 100) {
     out.push(
-      `pitchtracker has indexed ${input.seasonPitchCount.toLocaleString()} of his ${input.aggregatesSeason} pitches.`,
+      `PitchTracker has indexed ${input.seasonPitchCount.toLocaleString()} of his ${input.aggregatesSeason} pitches.`,
     );
   }
 

@@ -7,7 +7,7 @@ import { TeamLogo } from "@/components/team/TeamLogo";
 import { TopNav } from "@/components/chrome/TopNav";
 
 export const metadata: Metadata = {
-  title: "Browse pitchers by team · pitchtracker",
+  title: "Browse pitchers by team · PitchTracker",
   description:
     "All 30 MLB teams and their pitching staffs — jump to any pitcher's 3D arsenal in one click.",
   alternates: { canonical: "/browse" },
