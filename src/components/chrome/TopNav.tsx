@@ -47,11 +47,11 @@ export function TopNav({ back, title, summary, rightSlot }: TopNavProps) {
         <Link
           href="/"
           className="inline-flex items-center flex-shrink-0"
-          aria-label="pitchtracker home"
+          aria-label="PitchTracker home"
         >
           <Image
             src="/pitchtracker-logo.svg"
-            alt="pitchtracker"
+            alt="PitchTracker"
             width={65}
             height={20}
             className="h-5 w-auto mt-1"

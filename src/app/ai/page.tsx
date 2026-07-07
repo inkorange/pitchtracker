@@ -40,8 +40,8 @@ const SAMPLE_QUERIES: Array<{ q: string; what: string }> = [
 
 const FAQS: Array<{ q: string; a: string }> = [
   {
-    q: "What can the pitchtracker AI assistant do?",
-    a: "It translates natural-language questions about MLB pitchers, batters, and at-bats into the right page on pitchtracker. Ask for a pitcher's arsenal, a specific game's strikeouts, a matchup between two players, a velocity range, or aggregate stats. It either navigates you to the answer or replies with the number in chat for stat questions.",
+    q: "What can the PitchTracker AI assistant do?",
+    a: "It translates natural-language questions about MLB pitchers, batters, and at-bats into the right page on PitchTracker. Ask for a pitcher's arsenal, a specific game's strikeouts, a matchup between two players, a velocity range, or aggregate stats. It either navigates you to the answer or replies with the number in chat for stat questions.",
   },
   {
     q: "How do I open the AI chat?",
@@ -70,9 +70,9 @@ const FAQS: Array<{ q: string; a: string }> = [
 ];
 
 export const metadata: Metadata = {
-  title: "Ask pitchtracker · Natural-language MLB pitch analysis",
+  title: "Ask PitchTracker · Natural-language MLB pitch analysis",
   description:
-    "Ask pitchtracker's AI any question about MLB pitchers, batters, at-bats, or specific games. Voice or text. Translates natural language into 3D pitch visualizations.",
+    "Ask PitchTracker's AI any question about MLB pitchers, batters, at-bats, or specific games. Voice or text. Translates natural language into 3D pitch visualizations.",
   alternates: { canonical: "/ai" },
   // Interactive chat page — no static content for Google to rank, and
   // the URL itself doesn't map to a query anyone naturally searches
@@ -82,15 +82,15 @@ export const metadata: Metadata = {
   // pitcher pages still transfer PageRank.
   robots: { index: false, follow: true },
   openGraph: {
-    title: "Ask pitchtracker · AI-powered MLB pitch analysis",
+    title: "Ask PitchTracker · AI-powered MLB pitch analysis",
     description:
       "Voice or text. Ask for a pitcher's arsenal, a game's strikeouts, a head-to-head matchup, or an aggregate stat — the AI navigates you there.",
     url: "/ai",
-    images: [{ url: "/logo.png", width: 256, height: 256, alt: "pitchtracker" }],
+    images: [{ url: "/logo.png", width: 256, height: 256, alt: "PitchTracker" }],
   },
   twitter: {
     card: "summary",
-    title: "Ask pitchtracker · AI-powered MLB pitch analysis",
+    title: "Ask PitchTracker · AI-powered MLB pitch analysis",
     description:
       "Voice or text. Ask for a pitcher's arsenal, a game's strikeouts, a head-to-head matchup, or an aggregate stat.",
     images: ["/logo.png"],
@@ -104,11 +104,11 @@ export default function AiLandingPage() {
   const softwareJsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "Ask pitchtracker",
+    name: "Ask PitchTracker",
     applicationCategory: "SportsApplication",
     operatingSystem: "Web browser",
     description:
-      "Natural-language assistant for the pitchtracker MLB pitch-visualization tool. Translates voice or text queries into 3D pitch arsenal views, at-bat replays, matchup analyses, and aggregate stat answers.",
+      "Natural-language assistant for the PitchTracker MLB pitch-visualization tool. Translates voice or text queries into 3D pitch arsenal views, at-bat replays, matchup analyses, and aggregate stat answers.",
     url: absoluteUrl("/ai"),
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     featureList: [
@@ -149,12 +149,12 @@ export default function AiLandingPage() {
             AI assistant
           </div>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
-            Ask pitchtracker
+            Ask PitchTracker
           </h1>
           <p className="text-lg text-white/75 leading-relaxed">
             Ask any question about MLB pitchers, batters, at-bats, or specific
             games. The AI translates your natural-language query — typed or
-            spoken — into the right 3D pitch view on pitchtracker.
+            spoken — into the right 3D pitch view on PitchTracker.
           </p>
           <p className="text-sm text-white/55 leading-relaxed">
             Open the floating sparkle icon in the bottom-left corner of any
@@ -218,7 +218,7 @@ export default function AiLandingPage() {
               href="/"
               className="px-3 py-1.5 rounded-md bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-sm transition-colors"
             >
-              Open pitchtracker
+              Open PitchTracker
             </Link>
             <Link
               href="/browse"

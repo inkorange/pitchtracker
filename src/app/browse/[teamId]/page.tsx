@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!team) return { title: "Team" };
   const canonical = `/browse/${teamId}`;
   const title = `${team.name} pitchers`;
-  const description = `Every active pitcher on the ${team.name}. Browse rosters, compare arsenals, and watch pitch-by-pitch 3D at-bat replays on pitchtracker.`;
+  const description = `Every active pitcher on the ${team.name}. Browse rosters, compare arsenals, and watch pitch-by-pitch 3D at-bat replays on PitchTracker.`;
   const ogImage = teamLogoUrl(teamId);
   return {
     title,
@@ -36,13 +36,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       type: "website",
       url: canonical,
-      title: `${title} · pitchtracker`,
+      title: `${title} · PitchTracker`,
       description,
       images: [{ url: ogImage, alt: team.name }],
     },
     twitter: {
       card: "summary",
-      title: `${title} · pitchtracker`,
+      title: `${title} · PitchTracker`,
       description,
       images: [ogImage],
     },

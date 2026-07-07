@@ -21,7 +21,7 @@ export async function generateMetadata({
   }
   const ogUrl = `/api/og/explore?${ogParams.toString()}`;
   return {
-    title: "Explore · pitchtracker",
+    title: "Explore · PitchTracker",
     description:
       "Mine the Statcast pitch dataset by handedness, count, outcome, pitch type, season, and more.",
     alternates: { canonical: "/explore" },

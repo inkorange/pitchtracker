@@ -38,7 +38,7 @@ export default function Home() {
             />
             <Image
               src="/pitchtracker-logo.svg"
-              alt="pitchtracker"
+              alt="PitchTracker"
               width={290}
               height={50}
               className="h-10 sm:h-20 w-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"

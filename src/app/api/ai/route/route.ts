@@ -429,7 +429,7 @@ export async function POST(request: Request) {
         }),
         navigate: tool({
           description:
-            "Send the user to a URL on pitchtracker. Always a relative path starting with /.",
+            "Send the user to a URL on PitchTracker. Always a relative path starting with /.",
           inputSchema: z.object({
             url: z
               .string()

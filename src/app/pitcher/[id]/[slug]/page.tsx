@@ -244,7 +244,7 @@ export async function generateMetadata({
 
   // Title: filter-aware when scoped, otherwise leads with the
   // headline keywords. Renders through the root layout's
-  // `%s · pitchtracker` template.
+  // `%s · PitchTracker` template.
   //
   // "MLB Statcast data" replaces the previous "pitch tracking" phrase
   // — much higher real-world search volume, and accurately describes
@@ -279,11 +279,11 @@ export async function generateMetadata({
   //   instead of the same template across 4,000 pages.
   let description: string;
   if (hasFilter) {
-    description = `${pitcher.full_name} ${seoPhrase} — every pitch in 3D on pitchtracker. Arsenal, movement plot, velocity histograms, and at-bat replay.${statsLine}`;
+    description = `${pitcher.full_name} ${seoPhrase} — every pitch in 3D on PitchTracker. Arsenal, movement plot, velocity histograms, and at-bat replay.${statsLine}`;
   } else if (arsenalPhrase) {
-    description = `${pitcher.full_name} MLB Statcast data — ${arsenalPhrase} arsenal. ${roleLine}${debutLine}. Pitch-by-pitch 3D arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.`;
+    description = `${pitcher.full_name} MLB Statcast data — ${arsenalPhrase} arsenal. ${roleLine}${debutLine}. Pitch-by-pitch 3D arsenal, movement plot, velocity histograms, and at-bat replay on PitchTracker.`;
   } else {
-    description = `${pitcher.full_name} MLB Statcast data — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on pitchtracker.${statsLine}`;
+    description = `${pitcher.full_name} MLB Statcast data — every pitch in 3D. Arsenal, movement plot, velocity histograms, and at-bat replay on PitchTracker.${statsLine}`;
   }
 
   // Headshot at 1200px for the OG / Twitter card. Google prefers
@@ -341,13 +341,13 @@ export async function generateMetadata({
     openGraph: {
       type: "profile",
       url: canonical,
-      title: `${titlePhrase} · pitchtracker`,
+      title: `${titlePhrase} · PitchTracker`,
       description,
       images: [{ url: headshotUrl, alt: pitcher.full_name }],
     },
     twitter: {
       card: "summary",
-      title: `${titlePhrase} · pitchtracker`,
+      title: `${titlePhrase} · PitchTracker`,
       description,
       images: [headshotUrl],
     },

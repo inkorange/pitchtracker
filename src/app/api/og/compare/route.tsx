@@ -91,7 +91,7 @@ export async function GET(request: Request) {
             marginBottom: 30,
           }}
         >
-          <span>pitchtracker</span>
+          <span>PitchTracker</span>
           <span>compare</span>
         </div>
 
@@ -208,7 +208,7 @@ function Fallback() {
         gap: 16,
       }}
     >
-      <div style={{ fontSize: 60, fontWeight: 600 }}>pitchtracker</div>
+      <div style={{ fontSize: 60, fontWeight: 600 }}>PitchTracker</div>
       <div style={{ fontSize: 20, color: "#7a8694", letterSpacing: 4, textTransform: "uppercase" }}>
         compare two pitchers in 3D
       </div>

@@ -38,16 +38,16 @@ const SITE_URL =
 // (in-depth analysis, MLB pitcher data, live Statcast, 3D arsenal,
 // at-bat replay, leaderboards) widens the surface area.
 const HOMEPAGE_TITLE =
-  "pitchtracker · in-depth MLB pitcher analysis with Statcast";
+  "PitchTracker · in-depth MLB pitcher analysis with Statcast";
 const HOMEPAGE_DESCRIPTION =
-  "pitchtracker — in-depth analysis of MLB pitcher data using live Statcast feeds. 3D arsenal visualization, pitch-by-pitch at-bat replay, season leaderboards across velo / whiff% / CSW / spin / VAA, and game-by-game stats for every active pitcher.";
+  "PitchTracker — in-depth analysis of MLB pitcher data using live Statcast feeds. 3D arsenal visualization, pitch-by-pitch at-bat replay, season leaderboards across velo / whiff% / CSW / spin / VAA, and game-by-game stats for every active pitcher.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  applicationName: "pitchtracker",
+  applicationName: "PitchTracker",
   title: {
     default: HOMEPAGE_TITLE,
-    template: "%s · pitchtracker",
+    template: "%s · PitchTracker",
   },
   description: HOMEPAGE_DESCRIPTION,
   // Default canonical points at the homepage. Every page that renders
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    siteName: "pitchtracker",
+    siteName: "PitchTracker",
     url: SITE_URL,
     title: HOMEPAGE_TITLE,
     description: HOMEPAGE_DESCRIPTION,
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
         url: "/logo.png",
         width: 256,
         height: 256,
-        alt: "pitchtracker",
+        alt: "PitchTracker",
       },
     ],
   },
@@ -97,13 +97,13 @@ export const metadata: Metadata = {
 // "site name" line in search results. Without this, Google falls back
 // to the registrable domain, which for a subdomain like
 // pitchtracker.chriswest.tech renders as "chriswest.tech" — masking
-// pitchtracker entirely in SERPs. The og:site_name and applicationName
+// PitchTracker entirely in SERPs. The og:site_name and applicationName
 // fields above are secondary signals; the JSON-LD here is what
 // actually wins the site-name slot.
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "pitchtracker",
+  name: "PitchTracker",
   url: SITE_URL,
 };
 

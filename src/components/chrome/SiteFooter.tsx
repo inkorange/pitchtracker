@@ -36,7 +36,7 @@ export function SiteFooter() {
             href="/ai"
             className="hover:text-white/85 underline-offset-2 hover:underline transition-colors"
           >
-            Ask pitchtracker
+            Ask PitchTracker
           </a>{" "}
           — natural-language pitch analysis (voice or text).
         </p>

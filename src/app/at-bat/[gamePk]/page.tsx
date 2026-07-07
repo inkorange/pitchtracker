@@ -20,11 +20,78 @@ interface PageProps {
   params: Promise<{ gamePk: string }>;
 }
 
+// Format a YYYY-MM-DD game_date to a human month/day/year phrase for
+// titles + descriptions. Parses in UTC so a date like "2026-05-15"
+// doesn't shift by one when the server is in a west-of-UTC timezone.
+function formatGameDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return null;
+  const d = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { gamePk } = await params;
+  const gamePkN = Number(gamePk);
+  const canonical = `/at-bat/${gamePk}`;
+  if (!Number.isFinite(gamePkN)) {
+    return { title: "Game · PitchTracker", alternates: { canonical } };
+  }
+  // Fetch the game + both team names so the title carries the actual
+  // matchup and date ("Yankees @ Red Sox · May 15, 2026") instead of
+  // the numeric gamePk ("Game 823932"). The pitch_games row is cheap
+  // and cached, and teams are a small dimension table — worst case
+  // this adds two round-trips to metadata generation. Falls back to
+  // the numeric ID if either lookup fails, so a stale/unsynced game
+  // still gets a valid page.
+  const supabase = await createClient();
+  const { data: game } = await supabase
+    .from("pitch_games")
+    .select("game_date, home_team_id, away_team_id")
+    .eq("game_pk", gamePkN)
+    .maybeSingle();
+  const homeId = game?.home_team_id ?? null;
+  const awayId = game?.away_team_id ?? null;
+  const teamIds = [homeId, awayId].filter((v): v is number => typeof v === "number");
+  const { data: teams } =
+    teamIds.length > 0
+      ? await supabase
+          .from("pitch_teams")
+          .select("mlb_id, name")
+          .in("mlb_id", teamIds)
+      : { data: [] as Array<{ mlb_id: number; name: string }> };
+  const teamById = new Map((teams ?? []).map((t) => [t.mlb_id, t.name]));
+  const awayName = awayId != null ? teamById.get(awayId) ?? null : null;
+  const homeName = homeId != null ? teamById.get(homeId) ?? null : null;
+  const dateLabel = formatGameDate(game?.game_date ?? null);
+  const matchup =
+    awayName && homeName ? `${awayName} @ ${homeName}` : null;
+  const title = matchup
+    ? dateLabel
+      ? `${matchup} · ${dateLabel} · PitchTracker`
+      : `${matchup} · PitchTracker`
+    : `Game #${gamePkN} · PitchTracker`;
+  const description = matchup
+    ? `${matchup}${dateLabel ? ` on ${dateLabel}` : ""} — box score plus pitch-by-pitch 3D at-bat replays on PitchTracker.`
+    : `Every at-bat from this MLB game, with pitch-by-pitch 3D replays on PitchTracker.`;
   return {
-    title: `Game ${gamePk} · pitchtracker`,
-    alternates: { canonical: `/at-bat/${gamePk}` },
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url: canonical,
+    },
+    twitter: { card: "summary", title, description },
   };
 }
 

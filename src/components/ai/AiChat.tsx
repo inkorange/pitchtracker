@@ -239,7 +239,7 @@ export function AiChat() {
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
             <div className="flex items-center gap-2 text-sm">
               <span className="inline-block h-2 w-2 rounded-full bg-gradient-to-br from-fuchsia-500 to-cyan-400" />
-              <span className="font-medium">Ask pitchtracker</span>
+              <span className="font-medium">Ask PitchTracker</span>
             </div>
             <div className="flex items-center gap-1.5">
               {messages.length > 0 && (

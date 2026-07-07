@@ -20,7 +20,7 @@ export default function Loading() {
           />
           <Image
             src="/pitchtracker-logo.svg"
-            alt="pitchtracker"
+            alt="PitchTracker"
             width={65}
             height={20}
             className="h-5 w-auto"

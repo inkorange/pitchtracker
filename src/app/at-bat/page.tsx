@@ -5,7 +5,7 @@ import { TopNav } from "@/components/chrome/TopNav";
 import { GameCard } from "@/components/games/GameCard";
 
 export const metadata: Metadata = {
-  title: "At-bat replay · pitchtracker",
+  title: "At-bat replay · PitchTracker",
   alternates: { canonical: "/at-bat" },
 };
 

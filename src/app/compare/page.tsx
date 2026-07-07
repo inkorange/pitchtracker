@@ -61,8 +61,36 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
   if (sp.aSeason) og.set("aSeason", sp.aSeason);
   if (sp.bSeason) og.set("bSeason", sp.bSeason);
   const ogUrl = `/api/og/compare?${og.toString()}`;
+  // When both slots are filled with real pitcher IDs, upgrade the
+  // title to name the actual matchup ("Skenes vs Crochet · Compare")
+  // so browser tabs, share history, and analytics reports carry the
+  // real players instead of the generic phrase. Page is still
+  // noindex so Google doesn't touch it — this is purely a
+  // human-readability improvement.
+  const aId = Number(sp.a);
+  const bId = Number(sp.b);
+  let matchup: string | null = null;
+  if (Number.isFinite(aId) && Number.isFinite(bId)) {
+    const supabase = await createClient();
+    const { data: pitchers } = await supabase
+      .from("pitch_pitchers")
+      .select("mlb_id, full_name")
+      .in("mlb_id", [aId, bId]);
+    const byId = new Map(
+      (pitchers ?? []).map((p) => [p.mlb_id, p.full_name]),
+    );
+    const aName = byId.get(aId) ?? null;
+    const bName = byId.get(bId) ?? null;
+    if (aName && bName) matchup = `${aName} vs ${bName}`;
+  }
+  const title = matchup
+    ? `${matchup} · Compare · PitchTracker`
+    : "Compare pitchers · PitchTracker";
+  const ogTitle = matchup
+    ? `${matchup} — arsenals compared in 3D`
+    : "Compare pitchers in 3D";
   return {
-    title: "Compare pitchers · pitchtracker",
+    title,
     alternates: { canonical: "/compare" },
     // Every combination of ?a=X&b=Y is a distinct URL to Google —
     // hundreds of thousands of theoretical permutations. Users don't
@@ -74,7 +102,7 @@ export async function generateMetadata({ searchParams }: PageProps): Promise<Met
     // names → arsenal pages) still pass authority.
     robots: { index: false, follow: true },
     openGraph: {
-      title: "Compare pitchers in 3D",
+      title: ogTitle,
       description: "Two pitchers' arsenals overlaid in shared 3D space.",
       images: [{ url: ogUrl, width: 1200, height: 630 }],
     },
@@ -632,7 +660,7 @@ async function EmptyState({ aId, bId }: { aId: number | null; bId: number | null
             />
             <Image
               src="/pitchtracker-logo.svg"
-              alt="pitchtracker"
+              alt="PitchTracker"
               width={65}
               height={20}
               className="h-5 w-auto"
