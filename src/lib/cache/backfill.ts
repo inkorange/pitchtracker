@@ -15,6 +15,22 @@ import type { TablesInsert } from "@/lib/supabase/types";
 // times during a single server render (the compare page calls per side).
 const inFlight = new Map<string, Promise<void>>();
 
+// Retention floor — MUST match /api/cron/evict-old-seasons's env
+// default (PITCH_DATA_KEEP_YEARS). Without this guard, an old-season
+// page view triggers a Savant backfill, we write ~3K rows to
+// pitch_game_pitches, and the nightly eviction cron deletes them
+// again the next night → thrash. With the guard, on-demand writes
+// are skipped entirely for seasons outside the retention window;
+// old-season pages show the empty state instead of quietly bloating
+// the table between eviction runs.
+const RETENTION_KEEP_YEARS = Number(
+  process.env.PITCH_DATA_KEEP_YEARS ?? "0",
+);
+function isRetainedSeason(season: number): boolean {
+  const currentYear = new Date().getFullYear();
+  return season >= currentYear - Math.max(0, RETENTION_KEEP_YEARS);
+}
+
 export async function ensurePitcherSeasonCache(
   pitcherId: number,
   season: number,
@@ -39,6 +55,13 @@ async function doEnsure(
   force: boolean,
   skipRecompute: boolean,
 ): Promise<void> {
+  // Retention guard: skip writing rows for seasons outside the
+  // retention window. Without this, on-demand backfills for old
+  // pitcher-season page views would thrash the nightly eviction cron.
+  // The page shows the empty state instead — same behavior as when
+  // Savant is unreachable.
+  if (!isRetainedSeason(season)) return;
+
   const supabase = createAdminClient();
 
   // "Already cached?" check via the pitch_pitcher_games mapping table.
@@ -240,6 +263,15 @@ async function doEnsureGame(
     return;
   }
   if (fresh.length === 0) return;
+
+  // Retention guard: skip writing rows for games in seasons outside
+  // the retention window. Game season is extracted from Savant's own
+  // game_date on the first row (YYYY-MM-DD prefix). Without this,
+  // team+date lookups landing on old games would repopulate rows the
+  // nightly eviction cron just deleted. Old-game landings will show
+  // the empty state — same behavior as when Savant is unreachable.
+  const gameSeason = Number(fresh[0].game_date.slice(0, 4));
+  if (Number.isFinite(gameSeason) && !isRetainedSeason(gameSeason)) return;
 
   // Make sure the game row exists (FK requirement). The schedule
   // refresh cron usually populates pitch_games, but be defensive: if

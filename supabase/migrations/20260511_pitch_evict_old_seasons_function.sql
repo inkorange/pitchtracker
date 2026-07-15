@@ -1,8 +1,10 @@
 -- Frees DB space by purging seasons older than p_keep_through.
--- Current architecture keeps current + previous season hot in
--- pitch_game_pitches; older data is lazily re-fetched from Savant on
--- demand via the existing ensurePitcherSeasonCache machinery when a
--- user navigates to an old season.
+-- Current architecture keeps ONLY the current season hot in
+-- pitch_game_pitches by default (PITCH_DATA_KEEP_YEARS=0); older
+-- data is lazily re-fetched from Savant on demand via
+-- ensurePitcherSeasonCache when a user navigates to an old season,
+-- and the on-demand backfill self-guards against writing rows for
+-- seasons outside the retention window so we don't thrash the table.
 --
 -- Called daily by /api/cron/evict-old-seasons.
 -- Returns deleted row counts per table for monitoring.
