@@ -8,6 +8,15 @@ import { RankingsStrip } from "@/components/home/RankingsStrip";
 import { YesterdayGamesStrip } from "@/components/home/YesterdayGamesStrip";
 import { StripFallback } from "@/components/home/StripFallback";
 
+// ISR revalidate: rebuild the homepage's static HTML at most every
+// 5 minutes so DailyPickStrip / RankingsStrip / YesterdayGamesStrip
+// pick up the daily cron's DB writes. Without this the page is
+// pre-rendered ONCE at deploy time — the Pitch of the Day stays
+// frozen at whatever the DB showed at build time and only refreshes
+// on the next deploy. 5 min beats the daily update cadence with room
+// to spare while still serving CDN-cached HTML on the fast path.
+export const revalidate = 300;
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#0a0e14] text-white/90">
