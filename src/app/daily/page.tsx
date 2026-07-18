@@ -14,6 +14,13 @@ export const metadata: Metadata = {
   alternates: { canonical: "/daily" },
 };
 
+// Same ISR revalidate as the homepage — the daily-features table is
+// written once per day by refresh-notable-at-bats; 5-min revalidate
+// keeps CDN-cached HTML but picks up the daily update within minutes
+// of the cron completing. Without this the page pre-renders once at
+// build time and stays frozen until the next deploy.
+export const revalidate = 300;
+
 interface DailyFeatureRow {
   feature_kind: string;
   feature_date: string;
