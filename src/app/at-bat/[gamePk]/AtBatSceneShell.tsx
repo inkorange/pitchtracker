@@ -34,6 +34,11 @@ export function AtBatSceneShell() {
     ? (cameraParam as CameraPreset)
     : "front";
 
+  // `?shot=hero` puts the scene in screenshot mode: a static, well-
+  // framed still that renders even in a headless/unfocused tab. Used by
+  // the automated social-share capture (and OG image) pipeline.
+  const screenshotMode = searchParams.get("shot") === "hero";
+
   const [pitches, setPitches] = useState<ReplayPitch[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -103,6 +108,7 @@ export function AtBatSceneShell() {
       pitches={pitches}
       initialCamera={initialCamera}
       initialHighlightIdx={initialHighlightIdx}
+      screenshotMode={screenshotMode}
     />
   );
 }

@@ -16,9 +16,10 @@ import { useEnvToggles } from "@/lib/env-toggles-store";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { statcastToThree } from "@/lib/viz/coords";
 import { categorizeDescription, OUTCOME_COLORS, getPitchLabel } from "@/lib/viz/colors";
-import type {
-  CameraPosition,
-  CameraPreset,
+import {
+  heroPreset,
+  type CameraPosition,
+  type CameraPreset,
 } from "@/lib/viz/camera-presets";
 
 export interface ReplayPitch {
@@ -67,6 +68,14 @@ interface AtBatReplaySceneProps {
   // through. The highlight just shows the metrics overlay on that
   // specific pitch once it's landed (or when manually clicked).
   initialHighlightIdx: number | null;
+  // Screenshot mode (`?shot=hero`): render a static, deterministic
+  // still for automated social-share / OG capture. Forces the render
+  // loop on even in an unfocused/headless tab, pins the close "hero"
+  // FRONT framing regardless of the camera preset, and seeds the
+  // at-bat to its finished state (all ribbons drawn, featured pitch
+  // highlighted) with playback paused so nothing animates under the
+  // capture.
+  screenshotMode?: boolean;
 }
 
 interface PreparedPitch {
@@ -89,6 +98,7 @@ export function AtBatReplayScene({
   pitches,
   initialCamera,
   initialHighlightIdx,
+  screenshotMode = false,
 }: AtBatReplaySceneProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -160,17 +170,20 @@ export function AtBatReplayScene({
   // the URL param, start at pitch 0 mid-flight and auto-play as
   // before.
   const seededFromUrl = initialHighlightIdx != null;
+  // Screenshot mode always lands on the finished at-bat (like a deep
+  // link) so the capture never catches a mid-flight frame.
+  const staticSeed = seededFromUrl || screenshotMode;
   const lastIdx = Math.max(0, prepared.length - 1);
   const [currentIdx, setCurrentIdx] = useState(
-    () => (seededFromUrl ? lastIdx : 0),
+    () => (staticSeed ? lastIdx : 0),
   );
   const [intraProgress, setIntraProgress] = useState(() =>
-    seededFromUrl ? 1 : 0,
+    staticSeed ? 1 : 0,
   );
   const [phase, setPhase] = useState<"flying" | "settled" | "done">(() =>
-    seededFromUrl ? "done" : "flying",
+    staticSeed ? "done" : "flying",
   );
-  const [playing, setPlaying] = useState(() => !seededFromUrl);
+  const [playing, setPlaying] = useState(() => !staticSeed);
   const [followMode, setFollowMode] = useState(false);
   const settledTimerRef = useRef(0);
 
@@ -259,10 +272,15 @@ export function AtBatReplayScene({
 
   // Front-preset camera angle depends on batter handedness. Shared
   // helper — same logic mirrored on the pitcher page's inline at-bat
-  // playback.
-  const frontPresetOverride: CameraPosition | null = useMemo(
-    () => frontPresetForStand(preset, batterStand),
-    [preset, batterStand],
+  // playback. In screenshot mode we instead pin the deterministic
+  // close "hero" framing (independent of the camera preset) so the
+  // still is well-composed and reproducible.
+  const cameraOverride: CameraPosition | null = useMemo(
+    () =>
+      screenshotMode
+        ? heroPreset(batterStand)
+        : frontPresetForStand(preset, batterStand),
+    [screenshotMode, preset, batterStand],
   );
 
   // Manual selection — when the user clicks a ribbon, we jump there
@@ -276,7 +294,7 @@ export function AtBatReplayScene({
   // pitch" contract the URL implies. Once the user clicks anywhere
   // else the selection follows their input normally.
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
-    () => initialHighlightIdx,
+    () => initialHighlightIdx ?? (screenshotMode ? lastIdx : null),
   );
 
   // Reset playback to the first pitch whenever `pitches` flips
@@ -341,7 +359,8 @@ export function AtBatReplayScene({
       <Scene
         preset={preset}
         presetTick={presetTick}
-        presetOverride={frontPresetOverride}
+        presetOverride={cameraOverride}
+        forceRender={screenshotMode}
         onPointerMissed={() => setSelectedDetailIdx(null)}
       >
         <ReplayDriver
