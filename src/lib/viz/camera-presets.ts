@@ -53,3 +53,27 @@ export const CAMERA_PRESETS: Record<CameraPreset, CameraPosition> = {
     target: [0, 3, -15],
   },
 };
+
+// Close FRONT framing tuned for static stills — the `?shot=hero` deep
+// link used by OG images and the automated social-share screenshots.
+//
+// The default `front` preset targets the release point (~55 ft out) to
+// frame the whole pitch tunnel; on a live, animating canvas that reads
+// fine, but as a frozen still it looks wide and empty (batter tiny at
+// the top, acres of outfield below). This preset instead pins the
+// camera low behind the plate looking at the batter + plate so the
+// hitter and the featured pitch's end fill the frame — the same framing
+// the live front camera settles into, but applied deterministically.
+//
+// Stand-aware x-offset mirrors the live front camera (camera shifts to
+// the batter's side of the plate). Falls back to the RHB offset when
+// stand is unknown so a screenshot is always deterministic even without
+// batter handedness. Matches frontPresetForStand's values so the still
+// looks identical to the interactive front view.
+export function heroPreset(stand: "L" | "R" | null): CameraPosition {
+  const cameraX = stand === "L" ? 0.8 : -0.8;
+  return {
+    position: [cameraX, 3.9, 10],
+    target: [0, 2.8, -20],
+  };
+}

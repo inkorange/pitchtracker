@@ -18,6 +18,13 @@ interface SceneProps {
   // Used by the at-bat replay to angle the front camera based on
   // batter handedness; pass through to CameraRig.
   presetOverride?: CameraPosition | null;
+  // Force the render loop on regardless of tab focus / visibility.
+  // Automated screenshots (headless browsers, and background or
+  // unfocused tabs) report no focus, which drops the frameloop to
+  // "never" below and leaves the WebGL canvas blank or frozen on its
+  // first frame. Screenshot mode (`?shot=hero`) sets this so the scene
+  // reliably renders for capture.
+  forceRender?: boolean;
   children: ReactNode;
   onPointerMissed?: () => void;
 }
@@ -57,6 +64,7 @@ export function Scene({
   preset,
   presetTick,
   presetOverride,
+  forceRender = false,
   children,
   onPointerMissed,
 }: SceneProps) {
@@ -67,7 +75,7 @@ export function Scene({
   );
   return (
     <Canvas
-      frameloop={pageActive ? "always" : "never"}
+      frameloop={forceRender || pageActive ? "always" : "never"}
       // shadows enables the shadow-map pass; individual lights and
       // meshes still opt in via castShadow / receiveShadow. Off
       // globally would skip the pass entirely and save perf; on
