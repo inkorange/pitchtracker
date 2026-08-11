@@ -29,6 +29,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Refresh the leaderboard materialized views (pitch_top_velocity_7d,
+  // pitch_top_strikeouts_current) that back the homepage FeaturedStrip,
+  // /velocity_leaders, and /strikeout_leaders. Before this hook the two
+  // pitch_top_* RPCs full-scanned the 377 MB pitch_game_pitches heap on
+  // every pageview — ~7,500 scans/day and the top Disk IO consumers on
+  // the Supabase Portfolio project. With the MVs in place, the RPCs
+  // are thin readers of a few thousand rows and the refresh below is
+  // the ONLY heavy scan per day. REFRESH CONCURRENTLY takes ACCESS
+  // SHARE (not EXCLUSIVE) so leaderboard reads keep serving during
+  // the rebuild. Best-effort: a failure here doesn't fail the whole
+  // rankings cron, since the MV keeps yesterday's snapshot until the
+  // next successful refresh.
+  const { error: mvErr } = await supabase.rpc("pitch_refresh_leaderboards");
+  if (mvErr) {
+    console.error("[refresh-rankings] leaderboard MV refresh failed:", mvErr);
+  }
+
   // Sanity-check: count rows by category so the response is useful
   // for monitoring (each category should have 5 rows once the season
   // has enough pitches).
@@ -40,5 +57,9 @@ export async function GET(request: Request) {
   for (const r of counts ?? []) {
     byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
   }
-  return NextResponse.json({ season, counts: byCategory });
+  return NextResponse.json({
+    season,
+    counts: byCategory,
+    leaderboards_refreshed: mvErr == null,
+  });
 }

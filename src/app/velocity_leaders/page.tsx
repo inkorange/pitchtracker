@@ -36,6 +36,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// ISR revalidate: hold the pre-rendered HTML for 1 hour before the
+// next background regeneration. The underlying pitch_top_velocity_7d
+// materialized view is refreshed once per day by refresh-rankings
+// (see /api/cron/refresh-rankings), so hourly is far more than fresh
+// enough for the visible list. Every additional CDN cache hit here
+// is one fewer Supabase RPC call — combined with the MV migration
+// this is the multiplier that gets the Disk IO cost down to near-zero.
+export const revalidate = 3600;
+
 interface LeaderboardRow {
   rank: number;
   pitcher_id: number;

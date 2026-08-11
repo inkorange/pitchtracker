@@ -1074,6 +1074,10 @@ export type Database = {
         Args: { p_season: number }
         Returns: undefined
       }
+      pitch_refresh_leaderboards: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
       pitch_top_strikeouts: {
         Args: { p_season: number; p_limit?: number }
         Returns: { rank: number; pitcher_id: number; strikeouts: number }[]

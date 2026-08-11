@@ -30,6 +30,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// ISR revalidate: same 1-hour cadence as /velocity_leaders. The
+// backing pitch_top_strikeouts_current materialized view is refreshed
+// once per day by refresh-rankings, so hourly is far more than fresh
+// enough. Combined with the MV migration this collapses the daily
+// leaderboard read cost from thousands of full-table scans to a
+// handful of CDN cache misses.
+export const revalidate = 3600;
+
 interface LeaderboardRow {
   rank: number;
   pitcher_id: number;
