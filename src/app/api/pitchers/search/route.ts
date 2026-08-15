@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { botIdGuard } from "@/lib/botid-guard";
 
 export async function GET(request: Request) {
+  const botBlock = await botIdGuard();
+  if (botBlock) return botBlock;
+
   const url = new URL(request.url);
   const q = (url.searchParams.get("q") ?? "").trim();
   if (q.length === 0) {

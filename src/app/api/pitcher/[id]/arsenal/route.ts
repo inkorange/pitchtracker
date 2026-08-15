@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
+import { botIdGuard } from "@/lib/botid-guard";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
@@ -32,6 +33,9 @@ interface ArsenalParams {
 }
 
 export async function GET(request: Request, { params }: ArsenalParams) {
+  const botBlock = await botIdGuard();
+  if (botBlock) return botBlock;
+
   const { id } = await params;
   const pitcherId = Number(id);
   if (!Number.isFinite(pitcherId)) {

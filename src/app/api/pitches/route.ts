@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchGamePitches } from "@/lib/savant/client";
 import type { TablesInsert } from "@/lib/supabase/types";
+import { botIdGuard } from "@/lib/botid-guard";
 
 export const maxDuration = 60;
 
@@ -12,6 +13,9 @@ const FRESHNESS_DAYS = 7;
 // and returns. Fresh = fetched_at is within FRESHNESS_DAYS of game_date,
 // to allow Statcast retroactive corrections.
 export async function GET(request: Request) {
+  const botBlock = await botIdGuard();
+  if (botBlock) return botBlock;
+
   const url = new URL(request.url);
   const gamePkParam = url.searchParams.get("gamePk");
   const pitcherIdParam = url.searchParams.get("pitcherId");
