@@ -19,6 +19,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
     "ai": "^6.0.180",
+    "botid": "^1.5.11",
     "next": "16.2.4",
     "nuqs": "^2.8.9",
     "papaparse": "^5.5.3",

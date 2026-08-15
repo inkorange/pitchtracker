@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
+import { botIdGuard } from "@/lib/botid-guard";
 
 // Typeahead + team-filter feed for the "Find at-bats" picker on
 // /pitcher/[id]. Scoped to batters/teams this pitcher actually faced
@@ -82,6 +83,9 @@ const SUGGESTION_LIMIT = 10;
 const SEARCH_LIMIT = 12;
 
 export async function GET(request: Request, { params }: RouteParams) {
+  const botBlock = await botIdGuard();
+  if (botBlock) return botBlock;
+
   const { id } = await params;
   const pitcherId = Number(id);
   if (!Number.isFinite(pitcherId)) {
