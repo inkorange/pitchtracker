@@ -171,9 +171,11 @@ function PitcherSide({
       <div style={{ fontSize: 40, fontWeight: 600, lineHeight: 1.1, textAlign: "center" }}>
         {name}
       </div>
+      {/* Composed into one template string so this div has a single
+          text child — Satori (next/og) throws on multi-child elements
+          that lack an explicit `display`. */}
       <div style={{ fontSize: 18, color: "#7a8694", letterSpacing: 2 }}>
-        {throws ? `${throws}HP · ` : ""}
-        {season}
+        {`${throws ? `${throws}HP · ` : ""}${season}`}
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
         {arsenal.map((pt) => (
