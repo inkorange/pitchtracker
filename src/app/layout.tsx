@@ -134,6 +134,23 @@ const websiteJsonLd = {
   url: SITE_URL,
 };
 
+// Schema.org Organization — the second corroborating entity signal
+// Google's SiteNames algorithm weights when deciding whether to
+// override the registrable-domain default. The WebSite schema above
+// asserts "the site is called PitchTracker"; this asserts "PitchTracker
+// is a real organization with a logo and a URL", which is what lets
+// Google promote the subdomain into its own site-name slot in the SERP
+// instead of falling back to "chriswest.tech". `logo` should reference
+// a square-ish PNG at ≥112px per side per Google's Organization
+// guidelines — /logo.png is 256×256, comfortably above the floor.
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "PitchTracker",
+  url: SITE_URL,
+  logo: `${SITE_URL}/logo.png`,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -156,6 +173,12 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(organizationJsonLd),
+          }}
         />
         <NuqsAdapter>
           {children}
