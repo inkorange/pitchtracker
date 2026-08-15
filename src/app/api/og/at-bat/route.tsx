@@ -11,13 +11,44 @@ export const runtime = "nodejs";
 // pitch in the AB rendered as a colored dot row (pitch type color
 // with an outcome-colored ring), final result.
 
+// Completed at-bats are immutable, and this route costs 4 Supabase
+// queries plus an MLB Stats API call per render. Every at-bat page
+// emits an og:image pointing here, so crawlers hitting at-bat URLs
+// fan out into requests against this route — cache aggressively.
+const OG_CACHE_HEADERS = {
+  "cache-control":
+    "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+} as const;
+
+const OG_SIZE = { width: 1200, height: 630 } as const;
+
+// An OG image must never 500. Crawlers treat a failed image fetch as a
+// broken card, and a spike of them trips Vercel's error alerting (which
+// is exactly how the 2026-08-16 alert surfaced). Any throw below —
+// Satori layout constraint, Supabase hiccup, MLB Stats API failure —
+// degrades to the branded fallback card instead.
 export async function GET(request: Request) {
+  try {
+    return await renderAtBatOg(request);
+  } catch (err) {
+    console.error("[og/at-bat] render failed, serving fallback:", err);
+    return new ImageResponse(<Fallback />, {
+      ...OG_SIZE,
+      headers: OG_CACHE_HEADERS,
+    });
+  }
+}
+
+async function renderAtBatOg(request: Request) {
   const url = new URL(request.url);
   const gamePk = Number(url.searchParams.get("gamePk"));
   const atBatNumber = Number(url.searchParams.get("atBatNumber"));
 
   if (!Number.isFinite(gamePk) || !Number.isFinite(atBatNumber)) {
-    return new ImageResponse(<Fallback />, { width: 1200, height: 630 });
+    return new ImageResponse(<Fallback />, {
+      ...OG_SIZE,
+      headers: OG_CACHE_HEADERS,
+    });
   }
 
   const supabase = await createClient();
@@ -32,7 +63,10 @@ export async function GET(request: Request) {
 
   const pitches = pitchesRaw ?? [];
   if (pitches.length === 0) {
-    return new ImageResponse(<Fallback />, { width: 1200, height: 630 });
+    return new ImageResponse(<Fallback />, {
+      ...OG_SIZE,
+      headers: OG_CACHE_HEADERS,
+    });
   }
 
   const first = pitches[0];
@@ -105,6 +139,11 @@ export async function GET(request: Request) {
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {/* Satori (next/og) requires an explicit `display` on any
+              element with more than one child. Interpolating several
+              expressions into one line produces multiple child nodes,
+              so these text runs are composed into a single template
+              string instead — one text child, no display needed. */}
           <div
             style={{
               fontSize: 18,
@@ -113,14 +152,24 @@ export async function GET(request: Request) {
               color: "rgba(255,255,255,0.45)",
             }}
           >
-            At-bat replay · {matchup} · {game?.game_date ?? ""}
+            {`At-bat replay · ${matchup} · ${game?.game_date ?? ""}`}
           </div>
           <div style={{ fontSize: 56, fontWeight: 600, lineHeight: 1.05 }}>
             {pitcherName}
           </div>
-          <div style={{ fontSize: 28, color: "rgba(255,255,255,0.65)" }}>
-            <span style={{ color: "rgba(255,255,255,0.4)" }}>vs</span>{" "}
-            {batterName}
+          {/* The dimmed "vs" needs its own color, so it stays a
+              separate node — which means this div DOES need an
+              explicit display. */}
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              fontSize: 28,
+              color: "rgba(255,255,255,0.65)",
+            }}
+          >
+            <span style={{ color: "rgba(255,255,255,0.4)" }}>vs</span>
+            <span>{batterName}</span>
           </div>
         </div>
 
@@ -164,10 +213,11 @@ export async function GET(request: Request) {
                     color: "rgba(255,255,255,0.55)",
                   }}
                 >
-                  P{p.pitch_number}
-                  {p.release_speed
-                    ? ` · ${Number(p.release_speed).toFixed(0)}`
-                    : ""}
+                  {`P${p.pitch_number}${
+                    p.release_speed
+                      ? ` · ${Number(p.release_speed).toFixed(0)}`
+                      : ""
+                  }`}
                 </div>
               </div>
             );
@@ -195,7 +245,7 @@ export async function GET(request: Request) {
         </div>
       </div>
     ),
-    { width: 1200, height: 630 },
+    { ...OG_SIZE, headers: OG_CACHE_HEADERS },
   );
 }
 
