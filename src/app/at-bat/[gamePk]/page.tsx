@@ -20,6 +20,17 @@ interface PageProps {
   params: Promise<{ gamePk: string }>;
 }
 
+// ISR: pre-render the page's HTML per-URL and regenerate in the
+// background at most once per hour. Game-level pitch data is
+// frozen after the game ends, so a bot enumerating game IDs (or
+// Googlebot crawling the sitemap + internal links) hits static
+// HTML from the edge cache — the DB is only touched on the first
+// request per URL per hour per region. Combined with the CDN
+// s-maxage in next.config.ts, this is what killed the ~117K
+// pitch_game_pitches SELECTs we saw in pg_stat_statements
+// during the disk-IO audit.
+export const revalidate = 3600;
+
 // Format a YYYY-MM-DD game_date to a human month/day/year phrase for
 // titles + descriptions. Parses in UTC so a date like "2026-05-15"
 // doesn't shift by one when the server is in a west-of-UTC timezone.

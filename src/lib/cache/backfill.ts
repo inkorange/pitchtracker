@@ -238,6 +238,18 @@ export async function ensureGameCache(
   return p;
 }
 
+// Bot-defense guard: user routes call ensureGameCache(gamePk) with
+// the game_pk from the URL, and a crawler enumerating that space
+// would trigger a Savant CSV fetch for every miss. Real human
+// interest in games older than ~30 days is vanishingly rare (the
+// homepage / sitemap only surface recent + notable at-bats); anything
+// deeper is almost certainly bot-driven. For those old-and-uncached
+// games we short-circuit before the Savant hit and let the page
+// render its empty state. Cron backfill callers pass force=true and
+// bypass this guard so daily precaching / on-demand admin backfills
+// still work.
+const ON_DEMAND_MAX_AGE_DAYS = 30;
+
 async function doEnsureGame(
   gamePk: number,
   force: boolean,
@@ -254,6 +266,23 @@ async function doEnsureGame(
       .eq("game_pk", gamePk)
       .limit(1);
     if ((existing ?? []).length > 0) return;
+
+    // Age gate: for lazy backfills, look up the game_date in
+    // pitch_games and skip the Savant fetch if the game is older
+    // than ON_DEMAND_MAX_AGE_DAYS. If the game_pk isn't in
+    // pitch_games at all we also skip — a real MLB game_pk always
+    // has a row from the daily refresh-games cron, so a miss here
+    // is either a bot fishing invalid IDs or an ancient game that
+    // pre-dates our schedule window.
+    const { data: gameRow } = await supabase
+      .from("pitch_games")
+      .select("game_date")
+      .eq("game_pk", gamePk)
+      .maybeSingle();
+    if (!gameRow?.game_date) return;
+    const ageMs = Date.now() - Date.parse(gameRow.game_date + "T00:00:00Z");
+    const ageDays = ageMs / (1000 * 60 * 60 * 24);
+    if (ageDays > ON_DEMAND_MAX_AGE_DAYS) return;
   }
 
   let fresh: SavantPitchRow[];

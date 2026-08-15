@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureGameCache } from "@/lib/cache/backfill";
+import { checkRateLimit, clientIpFromRequest } from "@/lib/rate-limit";
 
 // Returns every pitch in a single at-bat, ordered by pitch_number,
 // shaped to match the ReplayPitch type the at-bat replay machinery
@@ -14,21 +15,61 @@ import { ensureGameCache } from "@/lib/cache/backfill";
 // /api/pitches (which takes a gamePk), but a focused at-bat fetch
 // returns ~5 rows instead of ~250 per game and keeps the inline
 // playback responsive.
+//
+// This endpoint is JSON — it has ZERO SEO value. All bot-defense
+// levers below are safe to enable without hurting crawler-driven
+// discoverability of the parent HTML page (/at-bat/[gamePk]/[atBatNumber]/[slug]):
+//   1) X-Robots-Tag: noindex, nofollow on the response — some bots
+//      that ignore robots.txt still honor this header.
+//   2) Per-IP rate limit — a real user visiting the page fires this
+//      exactly once per navigation; anything hitting it > 30x/min
+//      or > 500x/day is definitely bot traffic.
+//   3) cache-control s-maxage bumped 120s → 3600s. A single at-bat's
+//      pitch data is immutable once the game ends, so a longer edge
+//      cache is safe and absorbs bot enumeration cheaply.
 
 interface RouteParams {
   params: Promise<{ gamePk: string; atBatNumber: string }>;
 }
 
-export async function GET(_request: Request, { params }: RouteParams) {
+const RATE_LIMIT = { perMinute: 30, perDay: 500 };
+
+const NOINDEX_HEADERS = {
+  "cache-control": "public, s-maxage=3600, stale-while-revalidate=86400",
+  "x-robots-tag": "noindex, nofollow",
+} as const;
+
+export async function GET(request: Request, { params }: RouteParams) {
   const { gamePk, atBatNumber } = await params;
   const gamePkN = Number(gamePk);
   const atBatN = Number(atBatNumber);
   if (!Number.isFinite(gamePkN) || !Number.isFinite(atBatN)) {
-    return NextResponse.json({ error: "Invalid gamePk or atBatNumber" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid gamePk or atBatNumber" },
+      { status: 400, headers: NOINDEX_HEADERS },
+    );
+  }
+
+  const ip = clientIpFromRequest(request);
+  const rl = checkRateLimit("at-bat-pitches", ip, RATE_LIMIT);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded", reason: rl.reason },
+      {
+        status: 429,
+        headers: {
+          ...NOINDEX_HEADERS,
+          "retry-after": String(rl.retryAfterSeconds ?? 60),
+        },
+      },
+    );
   }
 
   const supabase = await createClient();
-  // Lazy backfill: same pattern the at-bat replay page uses.
+  // Lazy backfill: same pattern the at-bat replay page uses. The
+  // 30-day age guard in ensureGameCache means old-game enumeration
+  // by bots no longer triggers Savant fetches — the guard short-
+  // circuits before the CSV download.
   await ensureGameCache(gamePkN);
 
   const { data, error } = await supabase
@@ -41,10 +82,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
     .order("pitch_number", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500, headers: NOINDEX_HEADERS },
+    );
   }
   return NextResponse.json(
     { pitches: data ?? [] },
-    { headers: { "cache-control": "public, max-age=120" } },
+    { headers: NOINDEX_HEADERS },
   );
 }
