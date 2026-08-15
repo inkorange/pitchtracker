@@ -3,36 +3,9 @@ import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { BotIdClient } from "botid/client";
 import { SiteFooter } from "@/components/chrome/SiteFooter";
 import { AiChat } from "@/components/ai/AiChat";
 import "./globals.css";
-
-// Vercel BotID protected routes. Each entry names a JSON API route
-// (path pattern + method) that BotID should challenge on. Only
-// JSON endpoints — no SEO value, so blocking bad bots here can't
-// hurt Googlebot / Bingbot etc. (which don't hit JSON APIs).
-//
-// The <BotIdClient> in the <head> below injects a small script that
-// collects the browser-side signals BotID needs. Legitimate users
-// hitting the endpoints AFTER loading a page in the browser carry
-// those signals and pass checkBotId(); bots that hit the JSON URL
-// directly (no page load, no signals) get isBot=true and are 401'd
-// by the server-side checkBotId() gate in each route handler.
-//
-// Path patterns support wildcards (compiled to regex internally by
-// BotID's client). All routes below fetch heavy pitch data or
-// per-pitcher aggregates — exactly the URL space the recent
-// observability alert flagged as being enumerated.
-const BOTID_PROTECT = [
-  { path: "/api/at-bat/*/pitches", method: "GET" },
-  { path: "/api/pitches", method: "GET" },
-  { path: "/api/pitcher/*/arsenal", method: "GET" },
-  { path: "/api/pitcher/*/matchups", method: "GET" },
-  { path: "/api/pitcher/*/batters", method: "GET" },
-  { path: "/api/pitchers/search", method: "GET" },
-  { path: "/api/search", method: "POST" },
-] as const;
 
 const GA_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-LWQ9HE34Y6";
@@ -161,14 +134,6 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} antialiased dark`}
     >
-      <head>
-        {/* BotIdClient must live in <head> so the signal-collection
-            script runs before any protected fetch fires. Reads the
-            BOTID_PROTECT constant above so the "which routes are
-            protected" list has a single source of truth alongside
-            the server-side checkBotId() gates. */}
-        <BotIdClient protect={[...BOTID_PROTECT]} />
-      </head>
       <body className="bg-[#0a0e14] text-white/90">
         <script
           type="application/ld+json"

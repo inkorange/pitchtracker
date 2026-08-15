@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
-import { botIdGuard } from "@/lib/botid-guard";
 
 // Returns every at-bat the given pitcher faced this batter in across
 // the selected season. Drives the matchups list on /pitcher/[id]
@@ -57,9 +56,6 @@ interface PitchRow {
 }
 
 export async function GET(request: Request, { params }: RouteParams) {
-  const botBlock = await botIdGuard();
-  if (botBlock) return botBlock;
-
   const { id } = await params;
   const pitcherId = Number(id);
   const url = new URL(request.url);

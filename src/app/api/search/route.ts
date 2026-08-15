@@ -8,7 +8,6 @@ import {
 } from "@/lib/savant/search";
 import { computeAggregates, type SearchAggregates } from "@/lib/savant/aggregates";
 import type { SavantPitchRow } from "@/lib/savant/client";
-import { botIdGuard } from "@/lib/botid-guard";
 
 // Wide queries can spend a lot of time in the Savant fetch + CSV
 // parse, especially on cold cache. Bumping max duration past the
@@ -144,9 +143,6 @@ function hasAnyFilter(q: SearchQuery): boolean {
 }
 
 export async function POST(request: Request) {
-  const botBlock = await botIdGuard();
-  if (botBlock) return botBlock;
-
   let body: unknown;
   try {
     body = await request.json();

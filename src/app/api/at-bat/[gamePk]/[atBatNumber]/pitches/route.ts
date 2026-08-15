@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { checkRateLimit, clientIpFromRequest } from "@/lib/rate-limit";
-import { botIdGuard } from "@/lib/botid-guard";
 
 // Returns every pitch in a single at-bat, ordered by pitch_number,
 // shaped to match the ReplayPitch type the at-bat replay machinery
@@ -41,13 +40,6 @@ const NOINDEX_HEADERS = {
 } as const;
 
 export async function GET(request: Request, { params }: RouteParams) {
-  // Vercel BotID: blocks 401 when the request lacks the client-side
-  // signal (bot hitting the JSON URL directly without loading a page).
-  // Runs first so cheap requests get rejected before we touch params
-  // or the DB.
-  const botBlock = await botIdGuard();
-  if (botBlock) return botBlock;
-
   const { gamePk, atBatNumber } = await params;
   const gamePkN = Number(gamePk);
   const atBatN = Number(atBatNumber);
