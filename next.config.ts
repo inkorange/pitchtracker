@@ -60,8 +60,20 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
       },
       {
+        // At-bat pages get a longer CDN cache than the shared
+        // PUBLIC_PAGE_CACHE profile: a single at-bat's pitch data is
+        // frozen the moment the game ends, so 1h s-maxage is safe and
+        // absorbs the bot-enumeration traffic that was showing up in
+        // pg_stat_statements. Combined with the pages' own ISR
+        // revalidate=3600 the DB only pays once per URL per hour per
+        // edge region.
         source: "/at-bat/:path*",
-        headers: [{ key: "Cache-Control", value: PUBLIC_PAGE_CACHE }],
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=3600, stale-while-revalidate=86400",
+          },
+        ],
       },
       {
         source: "/browse/:path*",

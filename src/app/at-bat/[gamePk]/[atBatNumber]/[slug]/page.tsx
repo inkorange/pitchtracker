@@ -29,6 +29,13 @@ interface PageProps {
   searchParams: Promise<{ camera?: string; pitch?: string; event?: string }>;
 }
 
+// ISR: pre-render + regenerate at most once per hour per URL. A
+// single at-bat's pitch data never changes once the game is over,
+// so this is safe to cache aggressively. Turns bot / crawler
+// enumeration of the (gamePk × atBatNumber × slug) URL space
+// into edge-cache hits instead of Supabase full scans.
+export const revalidate = 3600;
+
 // Resolve the canonical {pitcher-slug}-vs-{batter-slug} for an at-bat.
 // Returns null when the AB doesn't exist (caller 404s) or has no
 // resolvable pitcher (caller falls back to a stub URL). Cached at the
