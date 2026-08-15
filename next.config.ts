@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withBotId } from "botid/next/config";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
@@ -117,4 +118,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// withBotId sets up the proxy rewrites BotID needs to shuttle the
+// client-side invisible-CAPTCHA signals into the server-side
+// checkBotId() call in production. Without this wrapper the signals
+// never reach the server, checkBotId() returns isBot=true for every
+// request, and the /api/at-bat/*/pitches (and other protected)
+// endpoints 401 every real browser fetch — exactly the outage on
+// 2026-08-15 traced back to the PR #85 config gap.
+export default withBotId(nextConfig);
