@@ -143,7 +143,8 @@ type CandidateRow = PitchForScoring & {
   pitch_number: number;
   pitcher_id: number | null;
   batter_id: number | null;
-  pitch_games?: { game_date: string } | null;
+  // Attached client-side from the game map (pitch rows don't carry a date).
+  game_date_resolved?: string | null;
 };
 
 type FeaturePick = {
@@ -180,33 +181,70 @@ function etDates(now: Date) {
   };
 }
 
-// Pull every whiff in a game-date range, paging past PostgREST's 1000-row
-// cap. Filtering to whiff descriptions server-side is what makes the pick
-// phase cheap: ~250 rows for a single day and ~1,700 for a 7-day window,
-// versus ~4,500/day if we fetched everything and filtered in JS.
-async function fetchWhiffCandidates(
+type GameRef = { game_pk: number; game_date: string };
+
+// Resolve which games fall in a date range. Cheap: pitch_games is one row
+// per game and pitch_games_date_idx covers this directly.
+async function fetchGamesInRange(
   supabase: ReturnType<typeof createAdminClient>,
   fromDate: string,
   toDate: string,
+): Promise<{ games: GameRef[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from("pitch_games")
+    .select("game_pk, game_date")
+    .gte("game_date", fromDate)
+    .lte("game_date", toDate)
+    .limit(2000);
+  if (error) return { games: [], error: error.message };
+  return { games: (data ?? []) as GameRef[], error: null };
+}
+
+// Pull every whiff for a set of games, paging past PostgREST's 1000-row cap.
+//
+// Filter by game_pk, NOT by an embedded pitch_games.game_date filter. Every
+// index on pitch_game_pitches leads with game_pk (pkey, at_bat_idx, ...) and
+// there is none on description or on the joined date — so the embedded-date
+// form plans as a full scan of a multi-million-row table and dies on the
+// statement timeout. Resolving game_pks first turns the same work into an
+// index nested loop: ~32ms for a day's whiffs.
+//
+// Restricting to whiff descriptions is still what keeps the payload small:
+// ~250 rows for a single day and ~1,700 for a 7-day window, versus ~4,500/day
+// if we fetched everything and filtered in JS.
+async function fetchWhiffCandidates(
+  supabase: ReturnType<typeof createAdminClient>,
+  games: GameRef[],
 ): Promise<{ rows: CandidateRow[]; error: string | null }> {
+  const dateByPk = new Map(games.map((g) => [g.game_pk, g.game_date]));
+  const pks = games.map((g) => g.game_pk);
+  const PK_CHUNK = 40; // keeps the IN list (and each response) modest
   const PAGE = 1000;
   const MAX_PAGES = 20;
   const out: CandidateRow[] = [];
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const { data, error } = await supabase
-      .from("pitch_game_pitches")
-      .select(`${PITCH_SELECT}, pitch_games!inner(game_date)`)
-      .gte("pitch_games.game_date", fromDate)
-      .lte("pitch_games.game_date", toDate)
-      .in("description", WHIFF_DESCRIPTIONS)
-      .order("game_pk", { ascending: true })
-      .order("at_bat_number", { ascending: true })
-      .order("pitch_number", { ascending: true })
-      .range(page * PAGE, (page + 1) * PAGE - 1);
-    if (error) return { rows: out, error: error.message };
-    const rows = (data ?? []) as unknown as CandidateRow[];
-    out.push(...rows);
-    if (rows.length < PAGE) break;
+
+  for (let i = 0; i < pks.length; i += PK_CHUNK) {
+    const chunk = pks.slice(i, i + PK_CHUNK);
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const { data, error } = await supabase
+        .from("pitch_game_pitches")
+        .select(PITCH_SELECT)
+        .in("game_pk", chunk)
+        .in("description", WHIFF_DESCRIPTIONS)
+        .order("game_pk", { ascending: true })
+        .order("at_bat_number", { ascending: true })
+        .order("pitch_number", { ascending: true })
+        .range(page * PAGE, (page + 1) * PAGE - 1);
+      if (error) return { rows: out, error: error.message };
+      const rows = (data ?? []) as unknown as CandidateRow[];
+      for (const r of rows) {
+        // game_date isn't on the pitch row; attach it from the game map so
+        // bestCandidate() can key the feature by the date of the game.
+        r.game_date_resolved = dateByPk.get(r.game_pk) ?? null;
+      }
+      out.push(...rows);
+      if (rows.length < PAGE) break;
+    }
   }
   return { rows: out, error: null };
 }
@@ -219,7 +257,7 @@ function bestCandidate(rows: CandidateRow[]): FeaturePick | null {
     if (best && scored.score <= best.score) continue;
     best = {
       game_pk: p.game_pk,
-      game_date: p.pitch_games?.game_date ?? "",
+      game_date: p.game_date_resolved ?? "",
       at_bat_number: p.at_bat_number,
       pitch_number: p.pitch_number,
       pitcher_id: p.pitcher_id,
@@ -270,25 +308,27 @@ export async function GET(request: Request) {
   // Was there even MLB baseball yesterday? Distinguishes "off-day, so
   // no pick is correct" from "games happened but we produced nothing",
   // which is a real failure worth alerting on.
-  const { count: scheduledYesterday } = await supabase
-    .from("pitch_games")
-    .select("game_pk", { count: "exact", head: true })
-    .eq("game_date", yesterdayET);
-
-  const { data: cachedGameRows } = await supabase
-    .from("pitch_game_pitches")
-    .select("game_pk, pitch_games!inner(game_date)")
-    .eq("pitch_games.game_date", yesterdayET)
-    .limit(1000);
-  const cachedYesterday = new Set(
-    (cachedGameRows ?? []).map((r) => r.game_pk),
-  ).size;
-
-  const { rows: potdRows, error: potdErr } = await fetchWhiffCandidates(
+  const { games: yesterdayGames, error: gamesErr } = await fetchGamesInRange(
     supabase,
     yesterdayET,
     yesterdayET,
   );
+  if (gamesErr) {
+    return NextResponse.json(
+      { error: `yesterday game lookup: ${gamesErr}`, stale: true },
+      { status: 500 },
+    );
+  }
+  const scheduledYesterday = yesterdayGames.length;
+
+  const { rows: potdRows, error: potdErr } = await fetchWhiffCandidates(
+    supabase,
+    yesterdayGames,
+  );
+  // How many of yesterday's games actually have pitches cached — the
+  // signal that separates "Savant is late / precache failed" from
+  // "scoring found nothing".
+  const cachedYesterday = new Set(potdRows.map((r) => r.game_pk)).size;
   if (potdErr) {
     return NextResponse.json(
       { error: `potd candidate fetch: ${potdErr}`, stale: true },
@@ -303,9 +343,14 @@ export async function GET(request: Request) {
   let whiffOfWeek: FeaturePick | null = null;
   let wowErr: string | null = null;
   if (isMondayET) {
-    const res = await fetchWhiffCandidates(supabase, cutoffIso, yesterdayET);
-    wowErr = res.error;
-    whiffOfWeek = bestCandidate(res.rows);
+    const week = await fetchGamesInRange(supabase, cutoffIso, yesterdayET);
+    if (week.error) {
+      wowErr = week.error;
+    } else {
+      const res = await fetchWhiffCandidates(supabase, week.games);
+      wowErr = res.error;
+      whiffOfWeek = bestCandidate(res.rows);
+    }
   }
 
   const featureRows: TablesInsert<"pitch_daily_features">[] = [];
@@ -354,9 +399,9 @@ export async function GET(request: Request) {
   // Fail loudly. A silent 200 with no pick is what let an 8/26 at-bat
   // sit on the homepage looking like an 8/27 one. Only games-happened-
   // but-nothing-selected is an error; a genuine off-day is fine.
-  const missedPotd = (scheduledYesterday ?? 0) > 0 && !pitchOfDay;
+  const missedPotd = scheduledYesterday > 0 && !pitchOfDay;
   const incompleteCoverage =
-    (scheduledYesterday ?? 0) > 0 && cachedYesterday < (scheduledYesterday ?? 0);
+    scheduledYesterday > 0 && cachedYesterday < scheduledYesterday;
 
   if (missedPotd) {
     return NextResponse.json(
@@ -364,7 +409,7 @@ export async function GET(request: Request) {
         error: "no pitch_of_the_day selected for a day that had MLB games",
         stale: true,
         game_date: yesterdayET,
-        games_scheduled: scheduledYesterday ?? 0,
+        games_scheduled: scheduledYesterday,
         games_cached: cachedYesterday,
         whiff_candidates: potdRows.length,
         hint:
@@ -536,7 +581,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     game_date: yesterdayET,
-    games_scheduled: scheduledYesterday ?? 0,
+    games_scheduled: scheduledYesterday,
     games_cached: cachedYesterday,
     incomplete_coverage: incompleteCoverage,
     whiff_candidates_scanned: potdRows.length,
