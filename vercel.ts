@@ -61,6 +61,15 @@ export const config: VercelConfig = {
     // pitch_daily_features. Depends on aggregates being up-to-date.
     { path: "/api/cron/refresh-notable-at-bats", schedule: "30 15 * * *" },
 
+    // Retry pass for the daily pick. On 2026-08-28 the 15:30 run hit
+    // its 60s function limit mid-scan and never wrote a Pitch of the
+    // Day; the homepage silently kept serving the previous day's row
+    // for a full 24h. The route is idempotent — pitch_daily_features is
+    // keyed by (feature_kind, game_date), so a second run either fills
+    // the gap or upserts the identical row. Also covers Savant
+    // publishing yesterday's late West Coast games after 15:30 UTC.
+    { path: "/api/cron/refresh-notable-at-bats", schedule: "30 19 * * *" },
+
     // Top-5-per-category leaderboards for the homepage Rankings
     // strip. Reads pitch_pitcher_aggregates (velo / spin) and raw
     // pitch_game_pitches (whiff%, csw%, K, VAA). Depends on

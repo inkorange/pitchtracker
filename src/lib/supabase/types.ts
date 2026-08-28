@@ -446,8 +446,9 @@ export type Database = {
           at_bat_number: number
           batter_id: number | null
           computed_at: string
-          feature_date: string
+          feature_date: string | null
           feature_kind: string
+          game_date: string
           game_pk: number
           pitch_number: number
           pitcher_id: number | null
@@ -457,8 +458,9 @@ export type Database = {
           at_bat_number: number
           batter_id?: number | null
           computed_at?: string
-          feature_date: string
+          feature_date?: string | null
           feature_kind: string
+          game_date: string
           game_pk: number
           pitch_number: number
           pitcher_id?: number | null
@@ -468,8 +470,9 @@ export type Database = {
           at_bat_number?: number
           batter_id?: number | null
           computed_at?: string
-          feature_date?: string
+          feature_date?: string | null
           feature_kind?: string
+          game_date?: string
           game_pk?: number
           pitch_number?: number
           pitcher_id?: number | null

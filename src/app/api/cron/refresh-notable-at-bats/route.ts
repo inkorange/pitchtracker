@@ -4,7 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { categorizeDescription } from "@/lib/viz/colors";
 import type { TablesInsert } from "@/lib/supabase/types";
 
-export const maxDuration = 60;
+// 60s was not enough: on 2026-08-28 this route 504'd partway through the
+// 7-day notable-at-bats rescan and never reached the daily-pick write,
+// silently freezing Pitch of the Day on the previous run's row. The pick
+// phase now runs first and is cheap (see below), but give the notable
+// rescan real headroom so it stops being a coin flip.
+export const maxDuration = 300;
 
 // Display names for the pitch_type abbreviations Statcast uses. The
 // reason string surfaced on the homepage Daily Pick Strip uses the
@@ -29,6 +34,20 @@ const PITCH_TYPE_NAMES: Record<string, string> = {
 // abandoning velo as the obvious-good fallback.
 const HEAT_TYPES = new Set(["FF", "SI"]);
 const BREAKER_TYPES = new Set(["SL", "ST", "CU", "KC", "SV", "CS"]);
+
+// The Statcast `description` values that categorizeDescription() maps to
+// "whiff". scoreCandidate() returns null for anything else, so we push
+// this as an `.in()` filter into Postgres and pull ~250 rows/day instead
+// of ~4,500. Keep in sync with categorizeDescription in @/lib/viz/colors.
+const WHIFF_DESCRIPTIONS = [
+  "swinging_strike",
+  "swinging_strike_blocked",
+  "missed_bunt",
+  "foul_tip",
+];
+
+const PITCH_SELECT =
+  "game_pk, at_bat_number, pitch_number, pitcher_id, batter_id, description, release_speed, pitch_type, strikes, plate_x, plate_z, pfx_x, pfx_z, release_spin_rate";
 
 interface ScoredPitch {
   score: number;
@@ -118,63 +137,255 @@ function scoreCandidate(p: PitchForScoring): ScoredPitch | null {
   return null;
 }
 
-// Score every at-bat in the last N days (default 7) and persist the
-// composite score to pitch_notable_at_bats. Then pick one Pitch of the
-// Day (from the last 24h) and one Whiff of the Week (rolling 7-day) and
-// upsert into pitch_daily_features.
-//
-// Only runs over already-cached pitches — we don't pull anything new
-// from Savant here. Backfilling cached pitches is the job of the
-// per-page lazy fetch and the future cron-driven backfill.
-export async function GET(request: Request) {
-  const authError = verifyCronAuth(request);
-  if (authError) return authError;
+type CandidateRow = PitchForScoring & {
+  game_pk: number;
+  at_bat_number: number;
+  pitch_number: number;
+  pitcher_id: number | null;
+  batter_id: number | null;
+  pitch_games?: { game_date: string } | null;
+};
 
-  const url = new URL(request.url);
-  const lookbackDays = Number(url.searchParams.get("days") ?? "7");
-  const supabase = createAdminClient();
+type FeaturePick = {
+  game_pk: number;
+  game_date: string;
+  at_bat_number: number;
+  pitch_number: number;
+  pitcher_id: number | null;
+  batter_id: number | null;
+  score: number;
+  reason: string;
+};
 
-  const today = new Date();
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() - lookbackDays);
-  const cutoffIso = cutoff.toISOString().slice(0, 10);
-
-  // Compute "yesterday in MLB-local time" — the strict window we use
-  // to pick Pitch of the Day. Doing it in ET means a 7:30am ET cron
-  // run (11:30 UTC) consistently looks back at "last night's games"
-  // regardless of UTC date rollover quirks.
-  //
-  // Also derives day-of-week so we can gate Whiff of the Week to a
-  // single weekly refresh (Mondays). Mid-week WoW updates created
-  // noise — the "best whiff of the week" shouldn't change daily.
-  const etDateFormatter = new Intl.DateTimeFormat("en-CA", {
+// Compute "today"/"yesterday" in MLB-local (ET) terms. Doing it in ET
+// means the run consistently looks back at "last night's games"
+// regardless of UTC date rollover quirks.
+function etDates(now: Date) {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/New_York",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  const todayET = etDateFormatter.format(today); // "YYYY-MM-DD"
-  const [etYear, etMonth, etDay] = todayET.split("-").map(Number);
-  const todayEtUtc = new Date(Date.UTC(etYear, etMonth - 1, etDay));
-  const yesterdayEtUtc = new Date(todayEtUtc);
-  yesterdayEtUtc.setUTCDate(yesterdayEtUtc.getUTCDate() - 1);
-  const yesterdayET = yesterdayEtUtc.toISOString().slice(0, 10);
-  const isMondayET = todayEtUtc.getUTCDay() === 1; // 0=Sun, 1=Mon
-
-  // Source the iteration from pitch_pitcher_games rather than from
-  // pitch_games directly — pitch_games holds the full schedule
-  // (current + future + historical) and gte(game_date, cutoff) can
-  // easily exceed PostgREST's 1000-row cap with thousands of
-  // upcoming-schedule rows. pitch_pitcher_games is bounded to
-  // *actually-cached* games but, at 15 games/day × ~12 pitchers/game
-  // × 7-day window, still pushes ~1,260 rows — above Supabase's hard
-  // 1000-row server-side cap. Paginate by primary-key order so we
-  // catch the most-recent rows that otherwise get dropped (which
-  // would silently mask yesterday's games and freeze the POTD pick).
-  type PpgJoinRow = {
-    game_pk: number;
-    pitch_games: { game_date: string };
+  const todayET = fmt.format(now); // "YYYY-MM-DD"
+  const [y, m, d] = todayET.split("-").map(Number);
+  const todayUtc = new Date(Date.UTC(y, m - 1, d));
+  const yesterdayUtc = new Date(todayUtc);
+  yesterdayUtc.setUTCDate(yesterdayUtc.getUTCDate() - 1);
+  return {
+    todayET,
+    yesterdayET: yesterdayUtc.toISOString().slice(0, 10),
+    // 0=Sun, 1=Mon
+    isMondayET: todayUtc.getUTCDay() === 1,
   };
+}
+
+// Pull every whiff in a game-date range, paging past PostgREST's 1000-row
+// cap. Filtering to whiff descriptions server-side is what makes the pick
+// phase cheap: ~250 rows for a single day and ~1,700 for a 7-day window,
+// versus ~4,500/day if we fetched everything and filtered in JS.
+async function fetchWhiffCandidates(
+  supabase: ReturnType<typeof createAdminClient>,
+  fromDate: string,
+  toDate: string,
+): Promise<{ rows: CandidateRow[]; error: string | null }> {
+  const PAGE = 1000;
+  const MAX_PAGES = 20;
+  const out: CandidateRow[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await supabase
+      .from("pitch_game_pitches")
+      .select(`${PITCH_SELECT}, pitch_games!inner(game_date)`)
+      .gte("pitch_games.game_date", fromDate)
+      .lte("pitch_games.game_date", toDate)
+      .in("description", WHIFF_DESCRIPTIONS)
+      .order("game_pk", { ascending: true })
+      .order("at_bat_number", { ascending: true })
+      .order("pitch_number", { ascending: true })
+      .range(page * PAGE, (page + 1) * PAGE - 1);
+    if (error) return { rows: out, error: error.message };
+    const rows = (data ?? []) as unknown as CandidateRow[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return { rows: out, error: null };
+}
+
+function bestCandidate(rows: CandidateRow[]): FeaturePick | null {
+  let best: FeaturePick | null = null;
+  for (const p of rows) {
+    const scored = scoreCandidate(p);
+    if (!scored) continue;
+    if (best && scored.score <= best.score) continue;
+    best = {
+      game_pk: p.game_pk,
+      game_date: p.pitch_games?.game_date ?? "",
+      at_bat_number: p.at_bat_number,
+      pitch_number: p.pitch_number,
+      pitcher_id: p.pitcher_id,
+      batter_id: p.batter_id,
+      score: scored.score,
+      reason: scored.reason,
+    };
+  }
+  return best;
+}
+
+// Score recent at-bats and pick the daily features.
+//
+// PHASE 1 (cheap, runs first): pick Pitch of the Day from yesterday's
+// games — and, on Mondays, Whiff of the Week from the 7-day window.
+// Both write immediately. This used to run LAST, behind a ~100-query
+// notable-at-bats rescan, which meant any timeout in the expensive
+// bookkeeping cost us the actual headline feature.
+//
+// PHASE 2 (expensive, best-effort): rebuild the rolling
+// pitch_notable_at_bats window. Bounded by a wall-clock budget so it
+// degrades to a partial refresh instead of a 504.
+//
+// Only runs over already-cached pitches — we don't pull anything new
+// from Savant here. That's precache-recent-games' job (15:00 UTC).
+export async function GET(request: Request) {
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
+
+  const startedAt = Date.now();
+  const url = new URL(request.url);
+  const lookbackDays = Number(url.searchParams.get("days") ?? "7");
+  // Leave ~45s of headroom under maxDuration for phase 2 to finish its
+  // current chunk and for the response to serialize.
+  const budgetMs = Number(url.searchParams.get("budget_ms") ?? "240000");
+  const supabase = createAdminClient();
+
+  const now = new Date();
+  const { todayET, yesterdayET, isMondayET } = etDates(now);
+  const cutoff = new Date(`${todayET}T00:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - lookbackDays);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+
+  // ---------------------------------------------------------------
+  // PHASE 1 — daily feature picks
+  // ---------------------------------------------------------------
+
+  // Was there even MLB baseball yesterday? Distinguishes "off-day, so
+  // no pick is correct" from "games happened but we produced nothing",
+  // which is a real failure worth alerting on.
+  const { count: scheduledYesterday } = await supabase
+    .from("pitch_games")
+    .select("game_pk", { count: "exact", head: true })
+    .eq("game_date", yesterdayET);
+
+  const { data: cachedGameRows } = await supabase
+    .from("pitch_game_pitches")
+    .select("game_pk, pitch_games!inner(game_date)")
+    .eq("pitch_games.game_date", yesterdayET)
+    .limit(1000);
+  const cachedYesterday = new Set(
+    (cachedGameRows ?? []).map((r) => r.game_pk),
+  ).size;
+
+  const { rows: potdRows, error: potdErr } = await fetchWhiffCandidates(
+    supabase,
+    yesterdayET,
+    yesterdayET,
+  );
+  if (potdErr) {
+    return NextResponse.json(
+      { error: `potd candidate fetch: ${potdErr}`, stale: true },
+      { status: 500 },
+    );
+  }
+  const pitchOfDay = bestCandidate(potdRows);
+
+  // Whiff of the Week is gated to Mondays. Daily WoW updates produced
+  // noisy week-over-week jitter where a single high-scoring pitch
+  // reshuffled the headline every morning.
+  let whiffOfWeek: FeaturePick | null = null;
+  let wowErr: string | null = null;
+  if (isMondayET) {
+    const res = await fetchWhiffCandidates(supabase, cutoffIso, yesterdayET);
+    wowErr = res.error;
+    whiffOfWeek = bestCandidate(res.rows);
+  }
+
+  const featureRows: TablesInsert<"pitch_daily_features">[] = [];
+  if (pitchOfDay?.game_date) {
+    featureRows.push({
+      feature_kind: "pitch_of_the_day",
+      // Keyed by the date of the GAME, not the date of this run, so a
+      // retry later today completes the same row instead of minting a
+      // new one — and so the UI can show when the pitch was actually
+      // thrown.
+      game_date: pitchOfDay.game_date,
+      feature_date: todayET,
+      game_pk: pitchOfDay.game_pk,
+      at_bat_number: pitchOfDay.at_bat_number,
+      pitch_number: pitchOfDay.pitch_number,
+      pitcher_id: pitchOfDay.pitcher_id,
+      batter_id: pitchOfDay.batter_id,
+      reason: pitchOfDay.reason,
+    });
+  }
+  if (whiffOfWeek?.game_date) {
+    featureRows.push({
+      feature_kind: "whiff_of_the_week",
+      game_date: whiffOfWeek.game_date,
+      feature_date: todayET,
+      game_pk: whiffOfWeek.game_pk,
+      at_bat_number: whiffOfWeek.at_bat_number,
+      pitch_number: whiffOfWeek.pitch_number,
+      pitcher_id: whiffOfWeek.pitcher_id,
+      batter_id: whiffOfWeek.batter_id,
+      reason: whiffOfWeek.reason,
+    });
+  }
+  if (featureRows.length > 0) {
+    const { error: featErr } = await supabase
+      .from("pitch_daily_features")
+      .upsert(featureRows, { onConflict: "feature_kind,game_date" });
+    if (featErr) {
+      return NextResponse.json(
+        { error: `daily feature upsert: ${featErr.message}`, stale: true },
+        { status: 500 },
+      );
+    }
+  }
+
+  // Fail loudly. A silent 200 with no pick is what let an 8/26 at-bat
+  // sit on the homepage looking like an 8/27 one. Only games-happened-
+  // but-nothing-selected is an error; a genuine off-day is fine.
+  const missedPotd = (scheduledYesterday ?? 0) > 0 && !pitchOfDay;
+  const incompleteCoverage =
+    (scheduledYesterday ?? 0) > 0 && cachedYesterday < (scheduledYesterday ?? 0);
+
+  if (missedPotd) {
+    return NextResponse.json(
+      {
+        error: "no pitch_of_the_day selected for a day that had MLB games",
+        stale: true,
+        game_date: yesterdayET,
+        games_scheduled: scheduledYesterday ?? 0,
+        games_cached: cachedYesterday,
+        whiff_candidates: potdRows.length,
+        hint:
+          cachedYesterday === 0
+            ? "no pitches cached for yesterday — precache-recent-games likely failed or Savant is late"
+            : "pitches are cached but none scored above zero — check scoreCandidate calibration",
+      },
+      { status: 500 },
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // PHASE 2 — rolling notable-at-bats window (best effort)
+  // ---------------------------------------------------------------
+
+  // Source iteration from pitch_pitcher_games rather than pitch_games:
+  // pitch_games holds the full schedule (current + future + historical)
+  // and gte(game_date, cutoff) easily exceeds PostgREST's 1000-row cap
+  // with thousands of upcoming-schedule rows. Paginate by primary-key
+  // order so we catch the most-recent rows that otherwise get dropped.
+  type PpgJoinRow = { game_pk: number; pitch_games: { game_date: string } };
   const PPG_PAGE_SIZE = 1000;
   const PPG_MAX_PAGES = 20;
   const gameDateByPk = new Map<number, string>();
@@ -187,7 +398,17 @@ export async function GET(request: Request) {
       .range(page * PPG_PAGE_SIZE, (page + 1) * PPG_PAGE_SIZE - 1);
     if (pageErr) {
       console.error("[refresh-notable-at-bats] ppg page", page, pageErr);
-      return NextResponse.json({ error: pageErr.message }, { status: 500 });
+      // Phase 1 already succeeded and is committed — report the partial
+      // outcome rather than throwing away a good pick.
+      return NextResponse.json(
+        {
+          pitch_of_day: pitchOfDay,
+          whiff_of_week: whiffOfWeek,
+          notable_error: pageErr.message,
+          notable_written: 0,
+        },
+        { status: 500 },
+      );
     }
     const rows = (pageRows ?? []) as unknown as PpgJoinRow[];
     for (const r of rows) {
@@ -197,14 +418,13 @@ export async function GET(request: Request) {
     }
     if (rows.length < PPG_PAGE_SIZE) break;
   }
+  // Most-recent games first so a budget cutoff drops the oldest days,
+  // which are the least interesting on /daily.
   const games = Array.from(gameDateByPk, ([game_pk, game_date]) => ({
     game_pk,
     game_date,
   })).sort((a, b) => b.game_date.localeCompare(a.game_date));
 
-  // For each game, pull every pitch and bucket by at_bat_number.
-  // Per-game queries stay small (~280 pitches per game), well under the
-  // 1500-row limit we use elsewhere.
   type AbAccumulator = {
     pitcher_id: number | null;
     batter_id: number | null;
@@ -212,212 +432,120 @@ export async function GET(request: Request) {
     whiff_count: number;
     is_strikeout: boolean;
     max_abs_delta_run_exp: number;
-    last_event: string | null;
-    // Track the most outcome-defining pitch for daily-feature selection.
-    best_whiff: { pitch_number: number; velocity: number } | null;
   };
 
   const notableRows: TablesInsert<"pitch_notable_at_bats">[] = [];
-  type FeaturePick = {
-    game_pk: number;
-    at_bat_number: number;
-    pitch_number: number;
-    pitcher_id: number | null;
-    batter_id: number | null;
-    score: number;
-    reason: string;
-    feature_date: string;
-  };
-  let pitchOfDay: FeaturePick | null = null;
-  let whiffOfWeek: FeaturePick | null = null;
+  const GAME_CONCURRENCY = 6;
+  let budgetExhausted = false;
 
-  const todayIso = today.toISOString().slice(0, 10);
-  // Pitch of the Day picks STRICTLY from yesterday's MLB games (in ET).
-  // The earlier "most recent cached game date" fallback would happily
-  // re-select the same pitch from a 2-day-old game when yesterday's
-  // ingestion hadn't landed yet, freezing the daily feature for days
-  // at a stretch. Strict yesterday means: if yesterday had no MLB
-  // games (off-day, All-Star break) OR Savant hasn't ingested them
-  // by the 11:30 UTC cron, pitchOfDay stays null and the upsert below
-  // is skipped — DailyPickStrip keeps the previous day's pick visible.
-
-  for (const g of games) {
-    const { data: pitchesRaw } = await supabase
-      .from("pitch_game_pitches")
-      .select(
-        "at_bat_number, pitch_number, pitcher_id, batter_id, description, events, delta_run_exp, release_speed, pitch_type, strikes, plate_x, plate_z, pfx_x, pfx_z, release_spin_rate",
-      )
-      .eq("game_pk", g.game_pk)
-      .range(0, 1499);
-    const pitches = pitchesRaw ?? [];
-    if (pitches.length === 0) continue;
-
-    const byAb = new Map<number, AbAccumulator>();
-    for (const p of pitches) {
-      let ab = byAb.get(p.at_bat_number);
-      if (!ab) {
-        ab = {
-          pitcher_id: p.pitcher_id,
-          batter_id: p.batter_id,
-          pitch_count: 0,
-          whiff_count: 0,
-          is_strikeout: false,
-          max_abs_delta_run_exp: 0,
-          last_event: null,
-          best_whiff: null,
-        };
-        byAb.set(p.at_bat_number, ab);
-      }
-      ab.pitch_count += 1;
-      const cat = categorizeDescription(p.description);
-      if (cat === "whiff") {
-        ab.whiff_count += 1;
-        const vel = Number(p.release_speed ?? 0);
-        if (!ab.best_whiff || vel > ab.best_whiff.velocity) {
-          ab.best_whiff = { pitch_number: p.pitch_number, velocity: vel };
-        }
-      }
-      if (p.events && p.events.length > 0) {
-        ab.last_event = p.events;
-        if (p.events === "strikeout") ab.is_strikeout = true;
-      }
-      const dre = p.delta_run_exp != null ? Math.abs(Number(p.delta_run_exp)) : 0;
-      if (dre > ab.max_abs_delta_run_exp) ab.max_abs_delta_run_exp = dre;
-
-      // Pitch-of-day candidate: highest-scoring swing-and-miss from
-      // yesterday's games, scored across two pools (heat vs breaker)
-      // — see scoreCandidate() above for the calibration. Strict date
-      // filter means each day's pool is non-overlapping with the
-      // previous day's, so the same pitch can't be picked twice across
-      // consecutive runs.
-      if (g.game_date === yesterdayET) {
-        const candidate = scoreCandidate(p);
-        if (candidate && (!pitchOfDay || candidate.score > pitchOfDay.score)) {
-          pitchOfDay = {
-            game_pk: g.game_pk,
-            at_bat_number: p.at_bat_number,
-            pitch_number: p.pitch_number,
-            pitcher_id: p.pitcher_id,
-            batter_id: p.batter_id,
-            score: candidate.score,
-            reason: candidate.reason,
-            feature_date: todayIso,
-          };
-        }
-      }
-
-      // Whiff-of-week candidate: highest-scoring swing-and-miss in the
-      // 7-day lookback, using the same dual-pool scoring as POTD. Only
-      // computed when this cron run is the weekly refresh (Mondays) —
-      // daily WoW updates produce noisy week-over-week jitter where a
-      // single high-scoring pitch reshuffles the headline every morn-
-      // ing. On non-Monday runs the existing WoW row stays in place
-      // (whiffOfWeek stays null → no upsert).
-      if (isMondayET) {
-        const candidate = scoreCandidate(p);
-        if (candidate && (!whiffOfWeek || candidate.score > whiffOfWeek.score)) {
-          whiffOfWeek = {
-            game_pk: g.game_pk,
-            at_bat_number: p.at_bat_number,
-            pitch_number: p.pitch_number,
-            pitcher_id: p.pitcher_id,
-            batter_id: p.batter_id,
-            score: candidate.score,
-            reason: candidate.reason,
-            feature_date: todayIso,
-          };
-        }
-      }
+  for (let i = 0; i < games.length; i += GAME_CONCURRENCY) {
+    if (Date.now() - startedAt > budgetMs) {
+      budgetExhausted = true;
+      break;
     }
+    const batch = games.slice(i, i + GAME_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map((g) =>
+        supabase
+          .from("pitch_game_pitches")
+          .select(
+            "at_bat_number, pitch_number, pitcher_id, batter_id, description, events, delta_run_exp",
+          )
+          .eq("game_pk", g.game_pk)
+          .range(0, 1499)
+          .then((r) => ({ g, pitches: r.data ?? [] })),
+      ),
+    );
 
-    for (const [abNumber, ab] of byAb) {
-      // Composite: one weight per signal so the curated list mixes
-      // long whiff sequences, strikeouts, and high-leverage outcomes.
-      const score =
-        ab.whiff_count * 1.5 +
-        (ab.is_strikeout ? 2 : 0) +
-        ab.max_abs_delta_run_exp * 5;
-      if (score < 1) continue; // skip filler ABs
-      notableRows.push({
-        game_pk: g.game_pk,
-        at_bat_number: abNumber,
-        pitcher_id: ab.pitcher_id,
-        batter_id: ab.batter_id,
-        pitch_count: ab.pitch_count,
-        whiff_count: ab.whiff_count,
-        is_strikeout: ab.is_strikeout,
-        max_abs_delta_run_exp: ab.max_abs_delta_run_exp,
-        score,
-        game_date: gameDateByPk.get(g.game_pk) ?? cutoffIso,
-      });
+    for (const { g, pitches } of results) {
+      if (pitches.length === 0) continue;
+      const byAb = new Map<number, AbAccumulator>();
+      for (const p of pitches) {
+        let ab = byAb.get(p.at_bat_number);
+        if (!ab) {
+          ab = {
+            pitcher_id: p.pitcher_id,
+            batter_id: p.batter_id,
+            pitch_count: 0,
+            whiff_count: 0,
+            is_strikeout: false,
+            max_abs_delta_run_exp: 0,
+          };
+          byAb.set(p.at_bat_number, ab);
+        }
+        ab.pitch_count += 1;
+        if (categorizeDescription(p.description) === "whiff") ab.whiff_count += 1;
+        if (p.events && p.events.length > 0 && p.events === "strikeout") {
+          ab.is_strikeout = true;
+        }
+        const dre =
+          p.delta_run_exp != null ? Math.abs(Number(p.delta_run_exp)) : 0;
+        if (dre > ab.max_abs_delta_run_exp) ab.max_abs_delta_run_exp = dre;
+      }
+
+      for (const [abNumber, ab] of byAb) {
+        // Composite: one weight per signal so the curated list mixes
+        // long whiff sequences, strikeouts, and high-leverage outcomes.
+        const score =
+          ab.whiff_count * 1.5 +
+          (ab.is_strikeout ? 2 : 0) +
+          ab.max_abs_delta_run_exp * 5;
+        if (score < 1) continue; // skip filler ABs
+        notableRows.push({
+          game_pk: g.game_pk,
+          at_bat_number: abNumber,
+          pitcher_id: ab.pitcher_id,
+          batter_id: ab.batter_id,
+          pitch_count: ab.pitch_count,
+          whiff_count: ab.whiff_count,
+          is_strikeout: ab.is_strikeout,
+          max_abs_delta_run_exp: ab.max_abs_delta_run_exp,
+          score,
+          game_date: gameDateByPk.get(g.game_pk) ?? cutoffIso,
+        });
+      }
     }
   }
 
-  // Wipe the rolling window before re-inserting so retired ABs don't
-  // linger. The PK is (game_pk, at_bat_number) so upsert alone wouldn't
-  // remove ABs that fell out of the window.
-  await supabase
-    .from("pitch_notable_at_bats")
-    .delete()
-    .gte("game_date", cutoffIso);
-
+  // Only wipe the window if we actually finished scanning it — a
+  // partial scan followed by a full delete would blank out /daily.
   let written = 0;
+  if (!budgetExhausted) {
+    await supabase
+      .from("pitch_notable_at_bats")
+      .delete()
+      .gte("game_date", cutoffIso);
+  }
+
   for (let i = 0; i < notableRows.length; i += 200) {
     const chunk = notableRows.slice(i, i + 200);
-    const { error } = await supabase
-      .from("pitch_notable_at_bats")
-      .upsert(chunk);
+    const { error } = await supabase.from("pitch_notable_at_bats").upsert(chunk);
     if (error) {
       return NextResponse.json(
-        { error: error.message, written },
+        {
+          pitch_of_day: pitchOfDay,
+          whiff_of_week: whiffOfWeek,
+          notable_error: error.message,
+          notable_written: written,
+        },
         { status: 500 },
       );
     }
     written += chunk.length;
   }
 
-  // Daily feature picks. Upsert keyed by (kind, date) so each calendar
-  // day has at most one of each.
-  const featureRows: TablesInsert<"pitch_daily_features">[] = [];
-  if (pitchOfDay) {
-    featureRows.push({
-      feature_kind: "pitch_of_the_day",
-      feature_date: pitchOfDay.feature_date,
-      game_pk: pitchOfDay.game_pk,
-      at_bat_number: pitchOfDay.at_bat_number,
-      pitch_number: pitchOfDay.pitch_number,
-      pitcher_id: pitchOfDay.pitcher_id,
-      batter_id: pitchOfDay.batter_id,
-      reason: pitchOfDay.reason,
-    });
-  }
-  if (whiffOfWeek) {
-    featureRows.push({
-      feature_kind: "whiff_of_the_week",
-      feature_date: whiffOfWeek.feature_date,
-      game_pk: whiffOfWeek.game_pk,
-      at_bat_number: whiffOfWeek.at_bat_number,
-      pitch_number: whiffOfWeek.pitch_number,
-      pitcher_id: whiffOfWeek.pitcher_id,
-      batter_id: whiffOfWeek.batter_id,
-      reason: whiffOfWeek.reason,
-    });
-  }
-  if (featureRows.length > 0) {
-    const { error: featErr } = await supabase
-      .from("pitch_daily_features")
-      .upsert(featureRows);
-    if (featErr) {
-      return NextResponse.json(
-        { error: featErr.message, written },
-        { status: 500 },
-      );
-    }
-  }
-
   return NextResponse.json({
-    games_scanned: games.length,
+    game_date: yesterdayET,
+    games_scheduled: scheduledYesterday ?? 0,
+    games_cached: cachedYesterday,
+    incomplete_coverage: incompleteCoverage,
+    whiff_candidates_scanned: potdRows.length,
+    whiff_of_week_computed: isMondayET,
+    whiff_of_week_error: wowErr,
+    notable_games_scanned: games.length,
     notable_written: written,
+    notable_partial: budgetExhausted,
+    elapsed_ms: Date.now() - startedAt,
     pitch_of_day: pitchOfDay,
     whiff_of_week: whiffOfWeek,
   });

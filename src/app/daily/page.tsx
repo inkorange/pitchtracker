@@ -23,7 +23,11 @@ export const revalidate = 300;
 
 interface DailyFeatureRow {
   feature_kind: string;
-  feature_date: string;
+  // Date of the GAME the pitch came from — the key, and the only date
+  // safe to display. feature_date below is the cron run date, kept for
+  // audit only.
+  game_date: string;
+  feature_date: string | null;
   game_pk: number;
   at_bat_number: number;
   pitch_number: number;
@@ -51,7 +55,7 @@ export default async function DailyPage() {
     supabase
       .from("pitch_daily_features")
       .select("*")
-      .order("feature_date", { ascending: false })
+      .order("game_date", { ascending: false })
       .limit(20),
     supabase
       .from("pitch_notable_at_bats")
@@ -297,7 +301,12 @@ function FeatureCard({
         ) : null}
         <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
-            {matchup} · {feature.feature_date}
+            {/* game_date, NOT feature_date. feature_date is the cron
+                run date; showing it made a frozen pick look current
+                (an 8/26 at-bat rendered as "2026-08-27" after the
+                2026-08-28 run timed out). The date on this card must
+                be the date the pitch was actually thrown. */}
+            {matchup} · {feature.game_date}
           </div>
           <div className="text-lg font-semibold tracking-tight mt-0.5 truncate">
             {pitcherName}

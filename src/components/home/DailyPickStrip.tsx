@@ -12,7 +12,9 @@ export async function DailyPickStrip() {
   const { data: rows } = await supabase
     .from("pitch_daily_features")
     .select("*")
-    .order("feature_date", { ascending: false })
+    // Order by the GAME date, not the cron run date — the run date can
+    // sit a day ahead of the pitch it points at when a run fails.
+    .order("game_date", { ascending: false })
     .limit(10);
 
   const features = rows ?? [];
@@ -73,7 +75,7 @@ export async function DailyPickStrip() {
             : `/at-bat/${f.game_pk}/${f.at_bat_number}?pitch=${f.pitch_number}`;
           return (
           <Link
-            key={`${f.feature_kind}-${f.feature_date}`}
+            key={`${f.feature_kind}-${f.game_date}`}
             href={href}
             className="group flex items-center gap-3 px-4 py-3 rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 transition-colors"
           >
@@ -90,10 +92,19 @@ export async function DailyPickStrip() {
               </div>
             ) : null}
             <div className="flex-1 min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
-                {f.feature_kind === "pitch_of_the_day"
-                  ? "Pitch of the Day"
-                  : "Whiff of the Week"}
+              {/* Show the game date alongside the label. Without it a
+                  frozen pick is indistinguishable from a fresh one on
+                  the homepage — which is exactly how a stale Pitch of
+                  the Day went unnoticed until it was nearly reposted. */}
+              <div className="flex items-baseline gap-2 text-[10px] uppercase tracking-[0.14em] text-white/45">
+                <span>
+                  {f.feature_kind === "pitch_of_the_day"
+                    ? "Pitch of the Day"
+                    : "Whiff of the Week"}
+                </span>
+                <span className="text-white/30 tabular-nums tracking-normal">
+                  {f.game_date}
+                </span>
               </div>
               <div className="text-sm text-white/95 font-medium truncate">
                 {resolveName(f.pitcher_id)}
