@@ -4,7 +4,7 @@ import { atBatSlug, slugifyPitcherName } from "@/lib/url/pitcher-slug";
 
 // Next.js builds this at request time and serves it at /sitemap.xml.
 // Anchors:
-//   - core surfaces (home, browse, daily, explore, at-bat index, /ai)
+//   - core surfaces (home, browse, daily, explore, at-bat index)
 //   - one URL per active pitcher (last_active_year >= current)
 //   - high-value filter permalinks per pitcher (strikeouts, HRs,
 //     tunneling — the "landing-worthy" views the AI tool also produces)
@@ -37,11 +37,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/browse`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
     { url: `${SITE_URL}/daily`, lastModified: now, changeFrequency: "daily", priority: 0.7 },
-    { url: `${SITE_URL}/ai`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/explore`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
     { url: `${SITE_URL}/at-bat`, lastModified: now, changeFrequency: "daily", priority: 0.6 },
-    { url: `${SITE_URL}/compare`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
   ];
+  // NOTE: a page that sets `robots: { index: false }` must NOT be listed
+  // here. A sitemap entry tells Google "index this"; the page header says
+  // "don't". Search Console reports the contradiction as "Excluded by
+  // 'noindex' tag" against the sitemap. /ai and /compare are deliberately
+  // noindexed (see the comments on their generateMetadata) and were listed
+  // here until 2026-09-16 — that mismatch is what triggered the alert.
+  // /velocity_leaders and /strikeout_leaders are noindexed too and have
+  // correctly never been listed. Before adding a route above, confirm it
+  // does not set noindex.
 
   let pitcherEntries: MetadataRoute.Sitemap = [];
   let teamEntries: MetadataRoute.Sitemap = [];
