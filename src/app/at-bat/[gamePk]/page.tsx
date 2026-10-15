@@ -12,6 +12,7 @@ import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import { teamNickname } from "@/lib/teams/nicknames";
 import { absoluteUrl } from "@/lib/url/site";
+import { lookupVenueLocation } from "@/lib/seo/venue-locations";
 import { TopNav } from "@/components/chrome/TopNav";
 import { ensureGameCache } from "@/lib/cache/backfill";
 import { AtBatGameList, type AtBatDisplay } from "./AtBatGameList";
@@ -162,7 +163,7 @@ export default async function GameAtBatsPage({ params }: PageProps) {
   const [{ data: game }, { data: pitchesRaw }] = await Promise.all([
     supabase
       .from("pitch_games")
-      .select("game_pk, game_date, home_team_id, away_team_id, season")
+      .select("game_pk, game_date, home_team_id, away_team_id, season, status")
       .eq("game_pk", gamePkN)
       .maybeSingle(),
     supabase
@@ -286,23 +287,93 @@ export default async function GameAtBatsPage({ params }: PageProps) {
   // event rich result (date, teams, venue). BreadcrumbList helps the
   // SERP show the back-path. Both are inlined as application/ld+json
   // because we want them in the initial HTML, not appended later.
-  const eventJsonLd = game
-    ? {
-        "@context": "https://schema.org",
-        "@type": "SportsEvent",
-        name: `${awayTeam?.name ?? "Away"} @ ${homeTeam?.name ?? "Home"}`,
-        startDate: game.game_date,
-        eventStatus: "https://schema.org/EventScheduled",
-        sport: "Baseball",
-        homeTeam: homeTeam
-          ? { "@type": "SportsTeam", name: homeTeam.name }
-          : undefined,
-        awayTeam: awayTeam
-          ? { "@type": "SportsTeam", name: awayTeam.name }
-          : undefined,
-        url: absoluteUrl(`/at-bat/${gamePkN}`),
-      }
-    : null;
+  //
+  // Search Console flagged this block for "Missing field location"
+  // (critical) plus missing performer / endDate / organizer /
+  // description. The critical one was literal: no `location` was
+  // emitted at all, and Google rejects an Event whose Place has no
+  // address, so these pages were ineligible for the rich result they
+  // were marked up for in the first place.
+  //
+  // Venue and status both come from the live schedule response rather
+  // than pitch_games, which is not trustworthy for either: the lazy
+  // Savant backfill stub-inserts game rows with status "Scheduled" and
+  // a null venue, and only refresh-games (last 30 days) ever enriches
+  // them — so ~3,000 historical rows still carry both stubs. The
+  // schedule response is authoritative for any game MLB knows about.
+  //
+  // Two fields stay absent on purpose:
+  //   - `offers`: these are archival replay pages for games already
+  //     played. No tickets are on sale, and fabricating an offer to
+  //     satisfy a validator would be false markup.
+  //   - `performer` is filled with the two clubs, which is the honest
+  //     reading for a team sport; there is no individual headliner.
+  //
+  // The whole block is gated on resolving a venue address and both
+  // team names. An Event with an incomplete location is strictly worse
+  // than no Event: it becomes a crawl error rather than simply failing
+  // to earn a rich result.
+  const venueLocation = lookupVenueLocation(gameResult?.venue.id);
+  const venueName = gameResult?.venue.name ?? null;
+  // Prefer the live team names, falling back to our teams table.
+  const homeName = gameResult?.home.teamName ?? homeTeam?.name ?? null;
+  const awayName = gameResult?.away.teamName ?? awayTeam?.name ?? null;
+
+  // schema.org's EventStatusType has no "completed" member — the
+  // enumeration is Scheduled / Cancelled / Postponed / Rescheduled /
+  // MovedOnline. EventScheduled is therefore correct for a game that
+  // was played, and the only real win here is labelling the games that
+  // never happened, which the previous hardcoded value got wrong.
+  const detailedState = gameResult?.status.detailedState ?? game?.status ?? "";
+  const eventStatus = /cancel/i.test(detailedState)
+    ? "https://schema.org/EventCancelled"
+    : /postpone/i.test(detailedState)
+      ? "https://schema.org/EventPostponed"
+      : "https://schema.org/EventScheduled";
+
+  const eventJsonLd =
+    game && venueLocation && venueName && homeName && awayName
+      ? {
+          "@context": "https://schema.org",
+          "@type": "SportsEvent",
+          name: `${awayName} @ ${homeName}`,
+          description:
+            `Pitch-by-pitch 3D replay of every at-bat from ${awayName} at ` +
+            `${homeName} on ${game.game_date}, played at ${venueName}.`,
+          // Date-only precision: pitch_games stores the official
+          // baseball day, not first pitch. endDate matches startDate
+          // because a game resolves within its official date.
+          startDate: game.game_date,
+          endDate: game.game_date,
+          eventStatus,
+          eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+          sport: "Baseball",
+          location: {
+            "@type": "Place",
+            name: venueName,
+            address: {
+              "@type": "PostalAddress",
+              addressLocality: venueLocation.city,
+              ...(venueLocation.region
+                ? { addressRegion: venueLocation.region }
+                : {}),
+              addressCountry: venueLocation.country,
+            },
+          },
+          organizer: {
+            "@type": "SportsOrganization",
+            name: "Major League Baseball",
+            url: "https://www.mlb.com",
+          },
+          performer: [
+            { "@type": "SportsTeam", name: awayName },
+            { "@type": "SportsTeam", name: homeName },
+          ],
+          homeTeam: { "@type": "SportsTeam", name: homeName },
+          awayTeam: { "@type": "SportsTeam", name: awayName },
+          url: absoluteUrl(`/at-bat/${gamePkN}`),
+        }
+      : null;
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",

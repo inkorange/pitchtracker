@@ -338,6 +338,12 @@ export interface MlbGameResult {
   officialDate: string;
   gameType: string;
   status: { abstractGameState: string; detailedState: string };
+  /**
+   * Where the game was played. `id` is MLB's stable numeric venue id —
+   * prefer it over `name` for lookups, since names change with
+   * sponsors. Null when the schedule response omits the venue.
+   */
+  venue: { id: number | null; name: string | null };
   home: MlbTeamLine;
   away: MlbTeamLine;
   decisions: {
@@ -355,6 +361,10 @@ interface RawHydratedScheduleResponse {
       officialDate?: string;
       gameType?: string;
       status: { abstractGameState: string; detailedState: string };
+      // The schedule endpoint returns this unhydrated; we were simply
+      // discarding it. Carried through for the SportsEvent `location`
+      // on game pages.
+      venue?: { id?: number; name?: string };
       teams: {
         home: { team: { id: number; name: string }; score?: number };
         away: { team: { id: number; name: string }; score?: number };
@@ -420,6 +430,10 @@ function parseHydratedGame(g: RawHydratedGame, fallbackDate: string): MlbGameRes
     officialDate: g.officialDate ?? fallbackDate,
     gameType: g.gameType ?? "R",
     status: g.status,
+    venue: {
+      id: typeof g.venue?.id === "number" ? g.venue.id : null,
+      name: g.venue?.name ?? null,
+    },
     home: {
       teamId: g.teams.home.team.id,
       teamName: g.teams.home.team.name,
