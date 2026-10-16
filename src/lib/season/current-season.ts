@@ -194,6 +194,43 @@ export async function isOffseason(
 }
 
 /**
+ * Whether the regular season has stopped producing games, while
+ * baseball is still being played.
+ *
+ * The leaderboards are deliberately regular-season-only (postseason
+ * innings are unevenly distributed and played against stronger
+ * lineups, so blending them would make the comparison meaningless).
+ * The consequence is that a rolling-window board like
+ * pitch_top_velocity_7d is legitimately empty for the three weeks of
+ * October between the last regular-season game and the last out of the
+ * World Series — with nothing to distinguish that from a fault.
+ *
+ * True when no regular-season game has been played in `days`, which
+ * covers both the postseason and the offseason; pair it with
+ * {@link isOffseason} to tell those two apart.
+ */
+export async function isRegularSeasonOver(
+  supabase: SupabaseClient<Database>,
+  now: Date = new Date(),
+  days = 7,
+): Promise<boolean> {
+  const since = new Date(now.getTime() - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const { data, error } = await supabase
+    .from("pitch_games")
+    .select("game_pk")
+    .eq("game_type", "R")
+    .gte("game_date", since)
+    .lte("game_date", now.toISOString().slice(0, 10))
+    .limit(1);
+  // On error, claim the season is live so we don't mislabel a blank
+  // board as "season complete" because of a transient failure.
+  if (error) return false;
+  return (data ?? []).length === 0;
+}
+
+/**
  * The season the UI should show, preferring real data over the
  * calendar. Falls back to the date heuristic when we hold no data at
  * all, so a brand-new or fully-evicted database still renders.

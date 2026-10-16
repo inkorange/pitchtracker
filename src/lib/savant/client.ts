@@ -7,6 +7,8 @@
 import Papa from "papaparse";
 import type { StatcastRow } from "@/lib/pitch/Pitch";
 
+import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
+
 const SEARCH_BASE = "https://baseballsavant.mlb.com/statcast_search/csv";
 
 // Subset of Savant's CSV columns we keep. The CSV has ~80 columns; we only
@@ -115,11 +117,20 @@ export async function fetchGamePitches(gamePk: number): Promise<SavantPitchRow[]
 // Fetch all of a pitcher's pitches for a given season. Used by the
 // on-demand backfill when a pitcher × season has no cached data yet.
 //
-// hfGT=R%7C restricts to regular-season games only (pipe-separated
-// list of game-type codes; R is "Regular Season"). This drops spring
-// training and exhibition pitches at the source so we don't ingest
-// data the UI doesn't surface anyway. Add PO%7C to include
-// postseason if/when we want it.
+// hfGT is a pipe-separated list of game-type codes. We request the
+// regular season plus all four postseason rounds, so a pitcher's page
+// shows his October work alongside the season — verified against
+// pitcher 605483 in 2026, where R-only returns 742 pitches and the
+// widened list returns 933 (742 R + 90 D + 101 L).
+//
+// Spring training ("S"), exhibition ("E") and all-star ("A") stay out:
+// they aren't comparable and spring alone would roughly double the
+// volume we fetch.
+//
+// Note this deliberately differs from the leaderboards and rankings,
+// which remain regular-season-only — see the comment on
+// pitch_recompute_aggregates in
+// supabase/migrations/20261015140000_regular_season_scoping.sql.
 export async function fetchPitcherSeasonPitches(
   pitcherId: number,
   season: number,
@@ -127,7 +138,8 @@ export async function fetchPitcherSeasonPitches(
   // pitchers_lookup[] needs the literal brackets, which URLSearchParams
   // would percent-encode as %5B%5D — Savant accepts both, but we build
   // the URL manually here to keep it readable.
-  const url = `${SEARCH_BASE}?all=true&type=details&hfSea=${season}%7C&hfGT=R%7C&player_type=pitcher&pitchers_lookup%5B%5D=${pitcherId}`;
+  const hfGT = COMPETITIVE_GAME_TYPES.map((t) => `${t}%7C`).join("");
+  const url = `${SEARCH_BASE}?all=true&type=details&hfSea=${season}%7C&hfGT=${hfGT}&player_type=pitcher&pitchers_lookup%5B%5D=${pitcherId}`;
   return fetchSavantCsv(url, `pitcher ${pitcherId} season ${season}`);
 }
 

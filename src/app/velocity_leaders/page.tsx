@@ -3,6 +3,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import {
   isOffseason,
+  isRegularSeasonOver,
   resolveDisplaySeason,
 } from "@/lib/season/current-season";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
@@ -128,6 +129,13 @@ export default async function VelocityLeadersPage() {
   // offseason. The 7-day window genuinely contains no games between
   // the last out of the World Series and Opening Day.
   const offseason = await isOffseason(supabase, now);
+  // Three distinct reasons this board can be empty, and the copy has to
+  // tell them apart: the offseason, the postseason (these leaderboards
+  // are regular-season-only, so the 7-day window is empty through
+  // October), and an actual gap in the data.
+  const regularSeasonOver = offseason
+    ? true
+    : await isRegularSeasonOver(supabase, now);
   // The 7-day window is anchored to current_date inside the RPC, but
   // the header label uses ET so the displayed range matches the MLB
   // calendar day boundary the SQL is querying against.
@@ -206,7 +214,9 @@ export default async function VelocityLeadersPage() {
             <li className="text-[24px] text-white/40 italic text-center mt-12">
               {offseason
                 ? `The ${season} season is complete. Velocity leaders return with Opening Day.`
-                : "No fastball data in the last 7 days."}
+                : regularSeasonOver
+                  ? `The ${season} regular season is complete. These leaderboards cover regular-season games; postseason pitches appear on each pitcher's page.`
+                  : "No fastball data in the last 7 days."}
             </li>
           ) : (
             rows.map((row) => (

@@ -4,6 +4,7 @@ import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { botIdGuard } from "@/lib/botid-guard";
 import { resolveDisplaySeason } from "@/lib/season/current-season";
+import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 
 // Typeahead + team-filter feed for the "Find at-bats" picker on
 // /pitcher/[id]. Scoped to batters/teams this pitcher actually faced
@@ -135,7 +136,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     )
     .eq("pitcher_id", pitcherId)
     .eq("pitch_games.season", season)
-    .eq("pitch_games.game_type", "R")
+    .in("pitch_games.game_type", [...COMPETITIVE_GAME_TYPES])
     .not("batter_id", "is", null);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
