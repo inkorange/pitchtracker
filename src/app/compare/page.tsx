@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
@@ -125,7 +126,7 @@ export default async function ComparePage({ searchParams }: PageProps) {
   }
 
   const supabase = await createClient();
-  const currentYear = new Date().getFullYear();
+  const currentYear = await resolveDisplaySeason(supabase);
 
   const [{ data: aPitcher }, { data: bPitcher }] = await Promise.all([
     supabase.from("pitch_pitchers").select("*").eq("mlb_id", aId).maybeSingle(),

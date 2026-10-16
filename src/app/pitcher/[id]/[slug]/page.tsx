@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
 import { absoluteUrl } from "@/lib/url/site";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
@@ -109,7 +110,10 @@ export async function generateMetadata({
   // Season computed early so the arsenal lookup below can target the
   // right pitch_pitcher_aggregates rows. The filter parsing further
   // down also consumes this same value.
-  const currentYear = new Date().getFullYear();
+  // Default season is the newest one we hold data for. Using the
+  // calendar year meant that from Jan 1 the page defaulted to a season
+  // with no rows and rendered "No arsenal data for <year>".
+  const currentYear = await resolveDisplaySeason(supabase);
   const season =
     sp.season && !Number.isNaN(Number(sp.season))
       ? Number(sp.season)
@@ -385,7 +389,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     );
   }
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = await resolveDisplaySeason(supabase);
   const season = sp.season ? Number(sp.season) : currentYear;
 
   // Season picker offers a fixed window: from current year back to the

@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isOffseason,
+  resolveDisplaySeason,
+} from "@/lib/season/current-season";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 
 // Screenshot-target page captured by the external X.com weekly
@@ -50,8 +54,8 @@ interface LeaderboardRow {
 }
 
 async function loadStrikeoutLeaders(): Promise<LeaderboardRow[]> {
-  const season = new Date().getFullYear();
   const supabase = await createClient();
+  const season = await resolveDisplaySeason(supabase);
   const { data: rankRows, error: rankErr } = await supabase.rpc(
     "pitch_top_strikeouts",
     { p_season: season, p_limit: 10 },
@@ -108,7 +112,10 @@ function handLabel(throws: string | null): string {
 
 export default async function StrikeoutLeadersPage() {
   const now = new Date();
-  const season = now.getFullYear();
+  // Header label must name the same season the rows came from.
+  const supabase = await createClient();
+  const season = await resolveDisplaySeason(supabase, now);
+  const offseason = await isOffseason(supabase, now);
   // "Through {date}" framing reads like a stats cutoff. Anchored in ET
   // so the cache regeneration time matches the MLB calendar day the
   // numbers were computed against.
@@ -183,7 +190,9 @@ export default async function StrikeoutLeadersPage() {
         <ol className="relative z-10 flex-1 px-12 py-6 flex flex-col gap-3">
           {rows.length === 0 ? (
             <li className="text-[24px] text-white/40 italic text-center mt-12">
-              No strikeout data for {season} yet.
+              {offseason
+                ? `The ${season} season is complete.`
+                : `No strikeout data for ${season} yet.`}
             </li>
           ) : (
             rows.map((row) => (

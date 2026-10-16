@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { atBatSlug, slugifyPitcherName } from "@/lib/url/pitcher-slug";
+import {
+  fallbackDisplaySeason,
+  resolveDataSeason,
+} from "@/lib/season/current-season";
 
 // Next.js builds this at request time and serves it at /sitemap.xml.
 // Anchors:
@@ -32,7 +36,6 @@ const PITCHER_FILTER_VARIANTS: Array<{ query: string; priority: number }> = [
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const season = now.getFullYear();
   const staticEntries: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/browse`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
@@ -55,6 +58,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let notableEntries: MetadataRoute.Sitemap = [];
   try {
     const supabase = await createClient();
+    // Season floor for "active pitcher" must track the data we hold,
+    // not the calendar. last_active_year is written by refresh-pitchers
+    // from MLB's roster endpoint, and that endpoint returns zero
+    // players for a season which hasn't started — so on Jan 1 nothing
+    // would carry the new year, `>= calendarYear` would match no
+    // pitcher at all, and this sitemap would collapse from ~4,900 URLs
+    // to its handful of static entries until opening day.
+    const season =
+      (await resolveDataSeason(supabase)) ?? fallbackDisplaySeason(now);
     const [pitchersRes, teamsRes, notableRes] = await Promise.all([
       supabase
         .from("pitch_pitchers")
