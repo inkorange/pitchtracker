@@ -13,6 +13,14 @@ export async function GET(request: Request) {
   if (authError) return authError;
 
   const url = new URL(request.url);
+  // Season here is deliberately the CALENDAR year, not the data season.
+  // These crons read MLB's roster endpoint, which returns an empty roster
+  // for a season that hasn't started — so during the offseason this is a
+  // harmless no-op (the writes are upsert-only, nothing is deleted), and
+  // it starts populating the new season's metadata as soon as MLB does.
+  // Switching it to the data season would just rewrite last season's rows
+  // daily and delay picking up the new year. The sitemap no longer
+  // depends on this advancing; see src/app/sitemap.ts.
   const season = Number(url.searchParams.get("season")) || new Date().getFullYear();
 
   const supabase = createAdminClient();

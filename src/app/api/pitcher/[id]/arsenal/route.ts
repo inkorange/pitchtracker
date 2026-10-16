@@ -6,6 +6,14 @@ import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import {
+  isRetainedSeason,
+  resolveDisplaySeason,
+} from "@/lib/season/current-season";
+import {
+  filterArchivePitches,
+  loadArchiveSeason,
+} from "@/lib/cache/archive-season";
+import {
   buildSequencingMatrix,
   type SequencingMatrix,
 } from "@/lib/pitch/sequencingMatrix";
@@ -43,7 +51,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   }
   const url = new URL(request.url);
   const sp = url.searchParams;
-  const season = Number(sp.get("season")) || new Date().getFullYear();
+  const seasonParam = Number(sp.get("season"));
   const hand = sp.get("hand");
   const game = sp.get("game");
   const pitchTypesParam = sp.get("pitch") ?? "";
@@ -62,6 +70,9 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       : null;
 
   const supabase = await createClient();
+  // Falls back to the newest season with data, not the calendar
+  // year — see lib/season/current-season.ts.
+  const season = seasonParam || (await resolveDisplaySeason(supabase));
 
   // Same lazy backfill as page.tsx: first visit per pitcher × season
   // pulls from Savant before the SELECT below sees an empty cache.
@@ -113,15 +124,32 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     Awaited<ReturnType<typeof buildPitchPageQuery>>["data"]
   >[number];
 
+  // Archived season: served from the cached Savant read-through rather
+  // than Postgres, which holds no rows for it. vsBatter is deliberately
+  // not applied here for the same reason as the SQL path above — the 3D
+  // scene needs the full season and filters downstream.
+  const archive = (await isRetainedSeason(supabase, season))
+    ? null
+    : await loadArchiveSeason(pitcherId, season);
+
   const pitchesRaw: PitchRow[] = [];
-  for (let page = 0; page < PITCH_MAX_PAGES; page++) {
-    const { data, error } = await buildPitchPageQuery(page);
-    if (error || !data) {
-      console.error("[arsenal] pitch page", page, error);
-      break;
+  if (archive) {
+    pitchesRaw.push(
+      ...(filterArchivePitches(archive.pitches, {
+        hand,
+        gamePk: game ? Number(game) : null,
+      }) as unknown as PitchRow[]),
+    );
+  } else {
+    for (let page = 0; page < PITCH_MAX_PAGES; page++) {
+      const { data, error } = await buildPitchPageQuery(page);
+      if (error || !data) {
+        console.error("[arsenal] pitch page", page, error);
+        break;
+      }
+      pitchesRaw.push(...(data as PitchRow[]));
+      if (data.length < PITCH_PAGE_SIZE) break;
     }
-    pitchesRaw.push(...(data as PitchRow[]));
-    if (data.length < PITCH_PAGE_SIZE) break;
   }
 
   const { data: pitcher } = await pitcherPromise;

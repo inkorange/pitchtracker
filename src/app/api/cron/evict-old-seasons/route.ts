@@ -6,9 +6,18 @@ import { resolveDataSeason } from "@/lib/season/current-season";
 export const maxDuration = 120;
 
 // Daily eviction pass to keep pitch_game_pitches lean. We hot-cache
-// ONLY the current season by default; older data is lazily re-fetched
-// from Savant on demand via ensurePitcherSeasonCache when a user
-// navigates to that season's pitcher page.
+// ONLY the newest season with data by default.
+//
+// NOTE: this comment used to claim older seasons were "lazily
+// re-fetched from Savant on demand via ensurePitcherSeasonCache when a
+// user navigates to that season's pitcher page". That is NOT true and
+// has not been since the retention guard landed in backfill.ts: that
+// guard skips on-demand writes for any season outside the retention
+// window, precisely so an old-season pageview doesn't write ~3K rows
+// for this cron to delete hours later. The visible result is that
+// /pitcher/{id}/{slug}?season=<old> renders "No arsenal data", even
+// though Savant still serves the data. Restoring that access needs a
+// read-through path that doesn't persist — tracked separately.
 //
 // Vercel schedule: late in the daily chain (after rankings refresh)
 // so we never delete data that today's analytics depend on.

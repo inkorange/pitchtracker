@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { fallbackDisplaySeason } from "@/lib/season/current-season";
 import { teamLogoUrl, pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
@@ -73,7 +74,10 @@ export default async function TeamRosterPage({ params, searchParams }: PageProps
   ).sort((a, b) => b - a);
   const season = seasonParam
     ? Number(seasonParam)
-    : (availableSeasons[0] ?? new Date().getFullYear());
+    // availableSeasons comes from our own rows so it normally wins;
+    // the fallback only fires for a team with no cached seasons, and
+    // must not be the calendar year (see current-season.ts).
+    : (availableSeasons[0] ?? fallbackDisplaySeason());
 
   // Roster for this team × season.
   const { data: rosterRows } = await supabase

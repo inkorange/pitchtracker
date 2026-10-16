@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isOffseason,
+  resolveDisplaySeason,
+} from "@/lib/season/current-season";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 
 // Screenshot-target page captured by the external X.com weekly
@@ -116,7 +120,14 @@ function handLabel(throws: string | null): string {
 
 export default async function VelocityLeadersPage() {
   const now = new Date();
-  const season = now.getFullYear();
+  const supabase = await createClient();
+  const season = await resolveDisplaySeason(supabase, now);
+  // This page is a 1080x1350 screenshot target for social posting, so
+  // the empty state matters more than usual — "no data in the last 7
+  // days" posted in January reads as a broken site rather than as the
+  // offseason. The 7-day window genuinely contains no games between
+  // the last out of the World Series and Opening Day.
+  const offseason = await isOffseason(supabase, now);
   // The 7-day window is anchored to current_date inside the RPC, but
   // the header label uses ET so the displayed range matches the MLB
   // calendar day boundary the SQL is querying against.
@@ -193,7 +204,9 @@ export default async function VelocityLeadersPage() {
         <ol className="relative z-10 flex-1 px-12 py-4 flex flex-col gap-3">
           {rows.length === 0 ? (
             <li className="text-[24px] text-white/40 italic text-center mt-12">
-              No fastball data in the last 7 days.
+              {offseason
+                ? `The ${season} season is complete. Velocity leaders return with Opening Day.`
+                : "No fastball data in the last 7 days."}
             </li>
           ) : (
             rows.map((row) => (

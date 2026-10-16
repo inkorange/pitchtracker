@@ -120,6 +120,80 @@ export function __resetDataSeasonMemo(): void {
 }
 
 /**
+ * Extra seasons of history kept on top of the newest season with data.
+ * 0 (the default) means "newest season only".
+ */
+export const RETENTION_KEEP_YEARS = Number(
+  process.env.PITCH_DATA_KEEP_YEARS ?? "0",
+);
+
+/**
+ * Whether we keep cached pitch rows for a season.
+ *
+ * One definition, three consumers that must agree:
+ *   - the write guard in lib/cache/backfill.ts (what we persist)
+ *   - /api/cron/evict-old-seasons (what gets deleted)
+ *   - the archive read-through (which seasons are served live from
+ *     Savant instead of Postgres)
+ *
+ * Resolution failure returns true — the permissive answer. A stray
+ * write is cheap and the cron trims it; wrongly declaring a season
+ * unretained would route the current season through the archive path.
+ */
+export async function isRetainedSeason(
+  supabase: SupabaseClient<Database>,
+  season: number,
+): Promise<boolean> {
+  const dataSeason = await resolveDataSeasonCached(supabase);
+  if (dataSeason === null) return true;
+  return season >= dataSeason - Math.max(0, RETENTION_KEEP_YEARS);
+}
+
+/**
+ * How far ahead to look for a scheduled game before calling it the
+ * offseason. MLB plays near-daily, so 10 days comfortably spans the
+ * All-Star break and any off-day stretch without false positives.
+ */
+const OFFSEASON_LOOKAHEAD_DAYS = 10;
+
+/**
+ * Whether there is baseball coming up.
+ *
+ * Defined as "no game on the schedule in the next
+ * OFFSEASON_LOOKAHEAD_DAYS", which is both cheap (pitch_games is a few
+ * thousand rows and indexed on game_date) and self-maintaining:
+ * refresh-games only loads the last 30 / next 7 days, so once the
+ * postseason ends the table simply has no future rows until the next
+ * season's schedule starts landing.
+ *
+ * Used to tell "the window is empty because the season is over" apart
+ * from "the window is empty because something is broken" — a
+ * distinction the UI could not previously make, so both rendered the
+ * same blank panel.
+ */
+export async function isOffseason(
+  supabase: SupabaseClient<Database>,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const today = now.toISOString().slice(0, 10);
+  const horizon = new Date(
+    now.getTime() + OFFSEASON_LOOKAHEAD_DAYS * 86_400_000,
+  )
+    .toISOString()
+    .slice(0, 10);
+  const { data, error } = await supabase
+    .from("pitch_games")
+    .select("game_pk")
+    .gte("game_date", today)
+    .lte("game_date", horizon)
+    .limit(1);
+  // On error, claim in-season: a transient query failure should not
+  // relabel the whole site as offseason.
+  if (error) return false;
+  return (data ?? []).length === 0;
+}
+
+/**
  * The season the UI should show, preferring real data over the
  * calendar. Falls back to the date heuristic when we hold no data at
  * all, so a brand-new or fully-evicted database still renders.

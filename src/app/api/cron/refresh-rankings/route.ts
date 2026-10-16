@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 
 export const maxDuration = 120;
 
@@ -18,10 +19,15 @@ export async function GET(request: Request) {
   if (authError) return authError;
 
   const url = new URL(request.url);
-  const season =
-    Number(url.searchParams.get("season")) || new Date().getFullYear();
-
   const supabase = createAdminClient();
+  // Recompute for the season we actually hold data for. On the
+  // calendar year this would spend every offseason day computing
+  // rankings for a season with no pitches, while the rankings for the
+  // season just finished went stale and the homepage strip — which
+  // reads the same season — found nothing.
+  const season =
+    Number(url.searchParams.get("season")) ||
+    (await resolveDisplaySeason(supabase));
   const { error } = await supabase.rpc("pitch_recompute_rankings", {
     p_season: season,
   });

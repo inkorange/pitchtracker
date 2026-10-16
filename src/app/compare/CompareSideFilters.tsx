@@ -8,6 +8,7 @@ import {
   getPitchLabel,
   type CompareSide,
 } from "@/lib/viz/colors";
+import { fallbackDisplaySeason } from "@/lib/season/current-season";
 
 interface ArsenalEntry {
   pitch_type: string;
@@ -58,7 +59,13 @@ export function CompareSideFilters({
     [params, pathname, router],
   );
 
-  const currentSeason = Number(params.get(seasonKey)) || availableSeasons[0] || new Date().getFullYear();
+  const currentSeason =
+    Number(params.get(seasonKey)) ||
+    availableSeasons[0] ||
+    // Last resort only; availableSeasons is server-provided and
+    // normally wins. Client component, so this is the date
+    // heuristic rather than a data lookup.
+    fallbackDisplaySeason();
   const activePitchTypes = (params.get(pitchKey) ?? "").split(",").filter(Boolean);
   const activeGame = params.get(gameKey) ?? "";
 

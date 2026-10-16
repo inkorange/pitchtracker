@@ -3,6 +3,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
@@ -30,7 +31,9 @@ const VELO_POOL_SIZE = 12; // pull more velo leaders than slots so dedup vs elit
 async function getFeaturedPitcherIds(
   supabase: SupabaseClient<Database>,
 ): Promise<number[]> {
-  const season = new Date().getFullYear();
+  // The season we hold data for, not the calendar year — this strip
+  // reads season-scoped RPCs and would go quiet every January.
+  const season = await resolveDisplaySeason(supabase);
 
   // Track 1 — elite. Top season K leaders, stable week-over-week.
   // Calls the same RPC the /strikeout_leaders page uses, so the strip
