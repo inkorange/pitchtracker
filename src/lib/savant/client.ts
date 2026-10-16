@@ -32,6 +32,12 @@ export interface SavantPitchRow extends StatcastRow {
   delta_run_exp: number | null;
   home_team: string | null;
   away_team: string | null;
+  /**
+   * Batter handedness ("L" / "R"). Present in Savant's CSV but was
+   * previously read through a cast at each use site; declared here so
+   * the archive read-through can filter on it type-safely.
+   */
+  stand: string | null;
 }
 
 const NUMERIC_FIELDS = [

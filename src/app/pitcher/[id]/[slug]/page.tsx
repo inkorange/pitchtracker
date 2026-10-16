@@ -5,7 +5,14 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
 import { absoluteUrl } from "@/lib/url/site";
-import { resolveDisplaySeason } from "@/lib/season/current-season";
+import {
+  isRetainedSeason,
+  resolveDisplaySeason,
+} from "@/lib/season/current-season";
+import {
+  filterArchivePitches,
+  loadArchiveSeason,
+} from "@/lib/cache/archive-season";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
@@ -149,7 +156,18 @@ export async function generateMetadata({
       .limit(4),
   ]);
   const teamName: string | null = teamRes.data?.name ?? null;
-  const topPitches = aggregatesRes.data ?? [];
+  // An archived season has no aggregates rows, so the arsenal phrase —
+  // the part that makes each pitcher's description unique rather than
+  // boilerplate — would silently drop out of the metadata. Fall back to
+  // the cached Savant read, which is the same data the page body uses.
+  let topPitches = aggregatesRes.data ?? [];
+  if (
+    topPitches.length === 0 &&
+    !(await isRetainedSeason(supabase, aggregatesSeason))
+  ) {
+    const archived = await loadArchiveSeason(pitcherId, aggregatesSeason);
+    topPitches = archived.arsenal.slice(0, 4);
+  }
   // Lead the first pitch with its average velocity (rounded to whole
   // mph for the snippet — descriptions don't need 0.1 precision and
   // round numbers read cleaner). Subsequent pitches are name-only so
@@ -406,9 +424,33 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     availableSeasons.push(y);
   }
 
+  // Which source serves this season?
+  //
+  // Retention keeps only the newest season in Postgres, and the write
+  // guard in backfill.ts refuses to persist anything older (otherwise
+  // every old-season pageview would write ~3K rows for the nightly
+  // eviction cron to delete). That left prior seasons unreachable even
+  // though the season picker above still offered them — this page
+  // rendered "No arsenal data for 2025" while Savant served 2,996 rows
+  // for it.
+  //
+  // So out-of-window seasons now read straight from Savant through a
+  // cached read-through that writes nothing. Persistence stays bounded
+  // by retention; availability no longer is.
+  const isArchived = !(await isRetainedSeason(supabase, season));
+
   // First-visit lazy backfill: if no pitches are cached for this pitcher
-  // × season yet, pull from Savant on demand. No-op once cached.
-  await ensurePitcherSeasonCache(pitcherId, season);
+  // × season yet, pull from Savant on demand. No-op once cached, and
+  // skipped entirely for archived seasons — the guard inside would
+  // refuse the write anyway, so calling it would only cost a query.
+  if (!isArchived) {
+    await ensurePitcherSeasonCache(pitcherId, season);
+  }
+
+  // Loaded lazily below, and only for an archived season.
+  const archive = isArchived
+    ? await loadArchiveSeason(pitcherId, season)
+    : null;
 
   // Pitches scoped to the active season via a Postgrest inner-join
   // filter on pitch_games.season. Per-game metadata is embedded so the
@@ -467,11 +509,28 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   >[number];
 
   const cachedPitchesAcc: PitchPageRow[] = [];
-  for (let page = 0; page < PITCH_MAX_PAGES; page++) {
-    const { data, error } = await buildPitchPageQuery(page);
-    if (error || !data) break;
-    cachedPitchesAcc.push(...(data as PitchPageRow[]));
-    if (data.length < PITCH_PAGE_SIZE) break;
+  if (archive) {
+    // Archived season: the whole season is already in hand, so the
+    // filters the query builder above pushes into Postgres are applied
+    // in memory instead. filterArchivePitches is the single definition
+    // of what ?hand=, ?game= and ?vsBatter= mean, so the two sources
+    // can't drift.
+    const filtered = filterArchivePitches(archive.pitches, {
+      hand: sp.hand ?? null,
+      gamePk: sp.game ? Number(sp.game) : null,
+      vsBatterId:
+        sp.vsBatter && !Number.isNaN(Number(sp.vsBatter))
+          ? Number(sp.vsBatter)
+          : null,
+    });
+    cachedPitchesAcc.push(...(filtered as unknown as PitchPageRow[]));
+  } else {
+    for (let page = 0; page < PITCH_MAX_PAGES; page++) {
+      const { data, error } = await buildPitchPageQuery(page);
+      if (error || !data) break;
+      cachedPitchesAcc.push(...(data as PitchPageRow[]));
+      if (data.length < PITCH_PAGE_SIZE) break;
+    }
   }
   const cachedPitches = cachedPitchesAcc as
     | (PitchPageRow & { pitch_games?: EmbeddedGame })[]
@@ -572,26 +631,33 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       game_type: string | null;
     } | null;
   };
-  const { data: pitcherGameRowsRaw } = await supabase
-    .from("pitch_pitcher_games")
-    .select(
-      "game_pk, pitch_games!inner(game_date, home_team_id, away_team_id, season, game_type)",
-    )
-    .eq("pitcher_id", pitcherId)
-    .eq("pitch_games.season", season)
-    .eq("pitch_games.game_type", "R");
-  const pitcherGameRows = (pitcherGameRowsRaw ?? []) as unknown as PitcherGameJoinRow[];
   const gameByPk = new Map<number, GameMeta>();
-  for (const r of pitcherGameRows) {
-    if (gameByPk.has(r.game_pk)) continue;
-    const meta = r.pitch_games;
-    if (!meta) continue;
-    gameByPk.set(r.game_pk, {
-      game_pk: r.game_pk,
-      game_date: meta.game_date,
-      home_team_id: meta.home_team_id,
-      away_team_id: meta.away_team_id,
-    });
+  if (archive) {
+    // pitch_pitcher_games is evicted alongside the pitches, so the game
+    // list for an archived season comes from the same Savant read.
+    for (const g of archive.games) gameByPk.set(g.game_pk, g);
+  } else {
+    const { data: pitcherGameRowsRaw } = await supabase
+      .from("pitch_pitcher_games")
+      .select(
+        "game_pk, pitch_games!inner(game_date, home_team_id, away_team_id, season, game_type)",
+      )
+      .eq("pitcher_id", pitcherId)
+      .eq("pitch_games.season", season)
+      .eq("pitch_games.game_type", "R");
+    const pitcherGameRows = (pitcherGameRowsRaw ??
+      []) as unknown as PitcherGameJoinRow[];
+    for (const r of pitcherGameRows) {
+      if (gameByPk.has(r.game_pk)) continue;
+      const meta = r.pitch_games;
+      if (!meta) continue;
+      gameByPk.set(r.game_pk, {
+        game_pk: r.game_pk,
+        game_date: meta.game_date,
+        home_team_id: meta.home_team_id,
+        away_team_id: meta.away_team_id,
+      });
+    }
   }
   const gameMetaRows = Array.from(gameByPk.values());
   const teamIds = new Set<number>();
