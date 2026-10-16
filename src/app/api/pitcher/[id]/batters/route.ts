@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { botIdGuard } from "@/lib/botid-guard";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 
 // Typeahead + team-filter feed for the "Find at-bats" picker on
 // /pitcher/[id]. Scoped to batters/teams this pitcher actually faced
@@ -92,7 +93,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid pitcher id" }, { status: 400 });
   }
   const url = new URL(request.url);
-  const season = Number(url.searchParams.get("season")) || new Date().getFullYear();
+  const seasonParam = Number(url.searchParams.get("season"));
   const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
   const teamIdParam = url.searchParams.get("teamId");
   const filterTeamId = teamIdParam ? Number(teamIdParam) : null;
@@ -104,6 +105,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   const supabase = await createClient();
+  const season = seasonParam || (await resolveDisplaySeason(supabase));
   // First-visit lazy backfill so the batter universe is complete.
   await ensurePitcherSeasonCache(pitcherId, season);
 

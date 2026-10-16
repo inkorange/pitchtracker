@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { MetricInfo } from "./MetricInfo";
@@ -75,7 +76,10 @@ interface RankingRow {
 
 export async function RankingsStrip() {
   const supabase = await createClient();
-  const season = new Date().getFullYear();
+  // Track the season we hold rankings for, not the calendar year —
+  // otherwise this strip queries an empty season every January and
+  // silently renders nothing until opening day.
+  const season = await resolveDisplaySeason(supabase);
   const { data: rows } = await supabase
     .from("pitch_rankings")
     .select("category, rank, pitcher_id, value")

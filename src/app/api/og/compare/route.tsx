@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { createClient } from "@/lib/supabase/server";
 import { getPitchColor, getPitchColorForSide } from "@/lib/viz/colors";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 
 export const runtime = "nodejs";
 
@@ -15,15 +16,19 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const aId = Number(url.searchParams.get("a"));
   const bId = Number(url.searchParams.get("b"));
-  const currentYear = new Date().getFullYear();
-  const aSeason = Number(url.searchParams.get("aSeason")) || currentYear;
-  const bSeason = Number(url.searchParams.get("bSeason")) || currentYear;
+  const aSeasonParam = Number(url.searchParams.get("aSeason"));
+  const bSeasonParam = Number(url.searchParams.get("bSeason"));
 
   if (!Number.isFinite(aId) || !Number.isFinite(bId)) {
     return new ImageResponse(<Fallback />, { width: 1200, height: 630 });
   }
 
   const supabase = await createClient();
+  // Newest season with data, not the calendar year — an OG card for
+  // the offseason should show last season's arsenals, not an empty one.
+  const currentYear = await resolveDisplaySeason(supabase);
+  const aSeason = aSeasonParam || currentYear;
+  const bSeason = bSeasonParam || currentYear;
   const [{ data: aPitcher }, { data: bPitcher }] = await Promise.all([
     supabase
       .from("pitch_pitchers")

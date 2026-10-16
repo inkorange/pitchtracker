@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generateText, stepCountIs, tool } from "ai";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 import { AI_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import { checkAiRateLimit, clientIpFromRequest } from "@/lib/ai/rate-limit";
 import { getPitchLabel } from "@/lib/viz/colors";
@@ -148,10 +149,12 @@ export async function POST(request: Request) {
               .number()
               .int()
               .optional()
-              .describe("Defaults to the current MLB season."),
+              .describe(
+              "Defaults to the most recent season with data (the season just finished, during the offseason).",
+            ),
           }),
           execute: async ({ pitcher_id, season }) => {
-            const s = season ?? new Date().getFullYear();
+            const s = season ?? (await resolveDisplaySeason(supabase));
             const { data, error } = await supabase
               .from("pitch_pitcher_aggregates")
               .select(
@@ -238,10 +241,12 @@ export async function POST(request: Request) {
               .number()
               .int()
               .optional()
-              .describe("Defaults to the current MLB season."),
+              .describe(
+              "Defaults to the most recent season with data (the season just finished, during the offseason).",
+            ),
           }),
           execute: async ({ pitcher_id, batter_id, season }) => {
-            const s = season ?? new Date().getFullYear();
+            const s = season ?? (await resolveDisplaySeason(supabase));
             let q = supabase
               .from("pitch_game_pitches")
               .select(
@@ -315,10 +320,12 @@ export async function POST(request: Request) {
               .number()
               .int()
               .optional()
-              .describe("Defaults to the current MLB season."),
+              .describe(
+              "Defaults to the most recent season with data (the season just finished, during the offseason).",
+            ),
           }),
           execute: async ({ pitcher_id, season }) => {
-            const s = season ?? new Date().getFullYear();
+            const s = season ?? (await resolveDisplaySeason(supabase));
             const { data, error } = await supabase
               .from("pitch_game_pitches")
               .select(
@@ -379,10 +386,12 @@ export async function POST(request: Request) {
               .number()
               .int()
               .optional()
-              .describe("Defaults to the current MLB season."),
+              .describe(
+              "Defaults to the most recent season with data (the season just finished, during the offseason).",
+            ),
           }),
           execute: async ({ pitcher_id, season }) => {
-            const s = season ?? new Date().getFullYear();
+            const s = season ?? (await resolveDisplaySeason(supabase));
             const [{ data: pitcher }, { data, error }] = await Promise.all([
               supabase
                 .from("pitch_pitchers")

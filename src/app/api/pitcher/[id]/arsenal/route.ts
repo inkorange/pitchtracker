@@ -5,6 +5,7 @@ import { botIdGuard } from "@/lib/botid-guard";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 import {
   buildSequencingMatrix,
   type SequencingMatrix,
@@ -43,7 +44,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   }
   const url = new URL(request.url);
   const sp = url.searchParams;
-  const season = Number(sp.get("season")) || new Date().getFullYear();
+  const seasonParam = Number(sp.get("season"));
   const hand = sp.get("hand");
   const game = sp.get("game");
   const pitchTypesParam = sp.get("pitch") ?? "";
@@ -62,6 +63,9 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       : null;
 
   const supabase = await createClient();
+  // Falls back to the newest season with data, not the calendar
+  // year — see lib/season/current-season.ts.
+  const season = seasonParam || (await resolveDisplaySeason(supabase));
 
   // Same lazy backfill as page.tsx: first visit per pitcher × season
   // pulls from Savant before the SELECT below sees an empty cache.

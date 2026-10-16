@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { botIdGuard } from "@/lib/botid-guard";
+import { resolveDisplaySeason } from "@/lib/season/current-season";
 
 // Returns every at-bat the given pitcher faced this batter in across
 // the selected season. Drives the matchups list on /pitcher/[id]
@@ -64,7 +65,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   const pitcherId = Number(id);
   const url = new URL(request.url);
   const batterId = Number(url.searchParams.get("batterId"));
-  const season = Number(url.searchParams.get("season")) || new Date().getFullYear();
+  const seasonParam = Number(url.searchParams.get("season"));
 
   if (!Number.isFinite(pitcherId) || !Number.isFinite(batterId)) {
     return NextResponse.json(
@@ -74,6 +75,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   const supabase = await createClient();
+  const season = seasonParam || (await resolveDisplaySeason(supabase));
   await ensurePitcherSeasonCache(pitcherId, season);
 
   const { data, error } = await supabase

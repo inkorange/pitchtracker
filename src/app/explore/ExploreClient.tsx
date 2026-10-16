@@ -25,6 +25,7 @@ import { VisualizationPanel } from "./VisualizationPanel";
 import type { SearchQuery } from "@/lib/savant/search";
 import type { SearchAggregates } from "@/lib/savant/aggregates";
 import type { SavantPitchRow } from "@/lib/savant/client";
+import { fallbackDisplaySeason } from "@/lib/season/current-season";
 
 // URL state schema. Short keys keep the share URL readable.
 const HAND = parseAsStringLiteral(["L", "R"] as const);
@@ -49,7 +50,11 @@ const filterParsers = {
   z: parseAsArrayOf(parseAsInteger).withDefault([]),
 };
 
-const CURRENT_YEAR = new Date().getFullYear();
+// Date heuristic rather than the calendar year: this is a client
+// component so it cannot await the data-season lookup, but it still
+// must not default the filter UI to a season with no data every
+// January. See lib/season/current-season.ts.
+const CURRENT_YEAR = fallbackDisplaySeason();
 const SEASON_OPTIONS = Array.from({ length: 6 }, (_, i) => ({
   value: CURRENT_YEAR - i,
   label: String(CURRENT_YEAR - i),
