@@ -5,7 +5,14 @@ import { botIdGuard } from "@/lib/botid-guard";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
-import { resolveDisplaySeason } from "@/lib/season/current-season";
+import {
+  isRetainedSeason,
+  resolveDisplaySeason,
+} from "@/lib/season/current-season";
+import {
+  filterArchivePitches,
+  loadArchiveSeason,
+} from "@/lib/cache/archive-season";
 import {
   buildSequencingMatrix,
   type SequencingMatrix,
@@ -117,15 +124,32 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     Awaited<ReturnType<typeof buildPitchPageQuery>>["data"]
   >[number];
 
+  // Archived season: served from the cached Savant read-through rather
+  // than Postgres, which holds no rows for it. vsBatter is deliberately
+  // not applied here for the same reason as the SQL path above — the 3D
+  // scene needs the full season and filters downstream.
+  const archive = (await isRetainedSeason(supabase, season))
+    ? null
+    : await loadArchiveSeason(pitcherId, season);
+
   const pitchesRaw: PitchRow[] = [];
-  for (let page = 0; page < PITCH_MAX_PAGES; page++) {
-    const { data, error } = await buildPitchPageQuery(page);
-    if (error || !data) {
-      console.error("[arsenal] pitch page", page, error);
-      break;
+  if (archive) {
+    pitchesRaw.push(
+      ...(filterArchivePitches(archive.pitches, {
+        hand,
+        gamePk: game ? Number(game) : null,
+      }) as unknown as PitchRow[]),
+    );
+  } else {
+    for (let page = 0; page < PITCH_MAX_PAGES; page++) {
+      const { data, error } = await buildPitchPageQuery(page);
+      if (error || !data) {
+        console.error("[arsenal] pitch page", page, error);
+        break;
+      }
+      pitchesRaw.push(...(data as PitchRow[]));
+      if (data.length < PITCH_PAGE_SIZE) break;
     }
-    pitchesRaw.push(...(data as PitchRow[]));
-    if (data.length < PITCH_PAGE_SIZE) break;
   }
 
   const { data: pitcher } = await pitcherPromise;

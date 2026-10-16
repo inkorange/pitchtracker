@@ -120,6 +120,36 @@ export function __resetDataSeasonMemo(): void {
 }
 
 /**
+ * Extra seasons of history kept on top of the newest season with data.
+ * 0 (the default) means "newest season only".
+ */
+export const RETENTION_KEEP_YEARS = Number(
+  process.env.PITCH_DATA_KEEP_YEARS ?? "0",
+);
+
+/**
+ * Whether we keep cached pitch rows for a season.
+ *
+ * One definition, three consumers that must agree:
+ *   - the write guard in lib/cache/backfill.ts (what we persist)
+ *   - /api/cron/evict-old-seasons (what gets deleted)
+ *   - the archive read-through (which seasons are served live from
+ *     Savant instead of Postgres)
+ *
+ * Resolution failure returns true — the permissive answer. A stray
+ * write is cheap and the cron trims it; wrongly declaring a season
+ * unretained would route the current season through the archive path.
+ */
+export async function isRetainedSeason(
+  supabase: SupabaseClient<Database>,
+  season: number,
+): Promise<boolean> {
+  const dataSeason = await resolveDataSeasonCached(supabase);
+  if (dataSeason === null) return true;
+  return season >= dataSeason - Math.max(0, RETENTION_KEEP_YEARS);
+}
+
+/**
  * How far ahead to look for a scheduled game before calling it the
  * offseason. MLB plays near-daily, so 10 days comfortably spans the
  * All-Star break and any off-day stretch without false positives.
