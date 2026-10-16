@@ -120,6 +120,50 @@ export function __resetDataSeasonMemo(): void {
 }
 
 /**
+ * How far ahead to look for a scheduled game before calling it the
+ * offseason. MLB plays near-daily, so 10 days comfortably spans the
+ * All-Star break and any off-day stretch without false positives.
+ */
+const OFFSEASON_LOOKAHEAD_DAYS = 10;
+
+/**
+ * Whether there is baseball coming up.
+ *
+ * Defined as "no game on the schedule in the next
+ * OFFSEASON_LOOKAHEAD_DAYS", which is both cheap (pitch_games is a few
+ * thousand rows and indexed on game_date) and self-maintaining:
+ * refresh-games only loads the last 30 / next 7 days, so once the
+ * postseason ends the table simply has no future rows until the next
+ * season's schedule starts landing.
+ *
+ * Used to tell "the window is empty because the season is over" apart
+ * from "the window is empty because something is broken" — a
+ * distinction the UI could not previously make, so both rendered the
+ * same blank panel.
+ */
+export async function isOffseason(
+  supabase: SupabaseClient<Database>,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const today = now.toISOString().slice(0, 10);
+  const horizon = new Date(
+    now.getTime() + OFFSEASON_LOOKAHEAD_DAYS * 86_400_000,
+  )
+    .toISOString()
+    .slice(0, 10);
+  const { data, error } = await supabase
+    .from("pitch_games")
+    .select("game_pk")
+    .gte("game_date", today)
+    .lte("game_date", horizon)
+    .limit(1);
+  // On error, claim in-season: a transient query failure should not
+  // relabel the whole site as offseason.
+  if (error) return false;
+  return (data ?? []).length === 0;
+}
+
+/**
  * The season the UI should show, preferring real data over the
  * calendar. Falls back to the date heuristic when we hold no data at
  * all, so a brand-new or fully-evicted database still renders.

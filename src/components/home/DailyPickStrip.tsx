@@ -5,6 +5,39 @@ import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { atBatPath } from "@/lib/url/pitcher-slug";
 
+// Staleness framing for the picks.
+//
+// The query below takes the newest row with no recency bound, which is
+// right — a pick should never vanish because the cron ran late — but it
+// meant the heading "Today" sat above a pick that was weeks old. Once
+// the postseason ends there is nothing newer to find until Opening Day,
+// so the honest move is to relabel rather than hide: the content is
+// still worth showing, it just isn't "today".
+//
+// The clock read lives here rather than in the component body to keep
+// the render pure (see the react-hooks/purity rule).
+const STALE_AFTER_DAYS = 4;
+
+function framePicks(gameDates: Array<string | null>): {
+  isStale: boolean;
+  heading: string;
+} {
+  const newest = gameDates
+    .filter((d): d is string => typeof d === "string" && d.length > 0)
+    .sort()
+    .pop();
+  if (!newest) return { isStale: false, heading: "Today" };
+  // Midday UTC so a date-only value doesn't land on the wrong side of
+  // a timezone boundary.
+  const ageDays =
+    (Date.now() - Date.parse(`${newest}T12:00:00Z`)) / 86_400_000;
+  const isStale = ageDays > STALE_AFTER_DAYS;
+  return {
+    isStale,
+    heading: isStale ? `${newest.slice(0, 4)} season` : "Today",
+  };
+}
+
 // Compact strip of the latest two daily picks. Renders nothing (without
 // breaking the page) when the cron hasn't been run yet.
 export async function DailyPickStrip() {
@@ -49,11 +82,13 @@ export async function DailyPickStrip() {
     );
   };
 
+  const { isStale, heading } = framePicks(items.map((f) => f.game_date));
+
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between">
         <h2 className="text-[10px] uppercase tracking-[0.18em] text-white/55">
-          Today
+          {heading}
         </h2>
         <Link
           href="/daily"
@@ -99,8 +134,12 @@ export async function DailyPickStrip() {
               <div className="flex items-baseline gap-2 text-[10px] uppercase tracking-[0.14em] text-white/45">
                 <span>
                   {f.feature_kind === "pitch_of_the_day"
-                    ? "Pitch of the Day"
-                    : "Whiff of the Week"}
+                    ? isStale
+                      ? "Final pitch of the season"
+                      : "Pitch of the Day"
+                    : isStale
+                      ? "Final whiff of the season"
+                      : "Whiff of the Week"}
                 </span>
                 <span className="text-white/30 tabular-nums tracking-normal">
                   {f.game_date}
