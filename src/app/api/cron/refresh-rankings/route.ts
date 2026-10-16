@@ -57,9 +57,27 @@ export async function GET(request: Request) {
   for (const r of counts ?? []) {
     byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
   }
-  return NextResponse.json({
+  // Surface a failed MV refresh as a non-2xx so Vercel's cron failure
+  // alerting fires. The rankings work above has already been committed
+  // and is unaffected — the status code exists purely to make this
+  // visible.
+  //
+  // It needs to be: this refresh failed on every run from 2026-08-11
+  // (when it shipped) to 2026-10-15, because the RPC inherited
+  // PostgREST's 8s statement_timeout and could not finish. The only
+  // signal was a console.error nobody was reading, so the leaderboards
+  // quietly served a two-month-old snapshot. Logging alone was not
+  // enough to catch it; a failing status is.
+  const body = {
     season,
     counts: byCategory,
     leaderboards_refreshed: mvErr == null,
-  });
+    ...(mvErr
+      ? {
+          leaderboard_error: mvErr.message,
+          note: "Rankings were written successfully; only the leaderboard MV refresh failed.",
+        }
+      : {}),
+  };
+  return NextResponse.json(body, { status: mvErr ? 500 : 200 });
 }

@@ -3,7 +3,10 @@
 // it through. Triggered server-side from the page render so the user
 // just waits a beat on first visit instead of seeing an empty state.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { Database } from "@/lib/supabase/types";
+import { resolveDataSeasonCached } from "@/lib/season/current-season";
 import {
   fetchGamePitches,
   fetchPitcherSeasonPitches,
@@ -26,9 +29,26 @@ const inFlight = new Map<string, Promise<void>>();
 const RETENTION_KEEP_YEARS = Number(
   process.env.PITCH_DATA_KEEP_YEARS ?? "0",
 );
-function isRetainedSeason(season: number): boolean {
-  const currentYear = new Date().getFullYear();
-  return season >= currentYear - Math.max(0, RETENTION_KEEP_YEARS);
+
+// Anchored to the newest season we hold data for, matching
+// evict-old-seasons exactly. These two MUST agree: this guard decides
+// what we are willing to write, the cron decides what it deletes, and
+// if the guard's window is narrower than the cron's then on-demand
+// backfill refuses to fetch a season the cron is perfectly happy to
+// keep. Both used `new Date().getFullYear()` and so both would have
+// shifted on Jan 1 — the cron deleting the season just finished, and
+// this guard then declining to re-fetch it.
+//
+// Resolution failure means "retain", the permissive answer: a stray
+// write is cheap and the cron will trim it, whereas wrongly refusing
+// leaves pages blank.
+async function isRetainedSeason(
+  supabase: SupabaseClient<Database>,
+  season: number,
+): Promise<boolean> {
+  const dataSeason = await resolveDataSeasonCached(supabase);
+  if (dataSeason === null) return true;
+  return season >= dataSeason - Math.max(0, RETENTION_KEEP_YEARS);
 }
 
 export async function ensurePitcherSeasonCache(
@@ -60,9 +80,8 @@ async function doEnsure(
   // pitcher-season page views would thrash the nightly eviction cron.
   // The page shows the empty state instead — same behavior as when
   // Savant is unreachable.
-  if (!isRetainedSeason(season)) return;
-
   const supabase = createAdminClient();
+  if (!(await isRetainedSeason(supabase, season))) return;
 
   // "Already cached?" check via the pitch_pitcher_games mapping table.
   // This is the small per-pitcher mapping (~30-80 rows/season), so the
@@ -300,7 +319,12 @@ async function doEnsureGame(
   // nightly eviction cron just deleted. Old-game landings will show
   // the empty state — same behavior as when Savant is unreachable.
   const gameSeason = Number(fresh[0].game_date.slice(0, 4));
-  if (Number.isFinite(gameSeason) && !isRetainedSeason(gameSeason)) return;
+  if (
+    Number.isFinite(gameSeason) &&
+    !(await isRetainedSeason(supabase, gameSeason))
+  ) {
+    return;
+  }
 
   // Make sure the game row exists (FK requirement). The schedule
   // refresh cron usually populates pitch_games, but be defensive: if

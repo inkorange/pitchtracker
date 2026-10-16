@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureGameCache } from "@/lib/cache/backfill";
+import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 
 // 800s is the Vercel Pro ceiling. The daily run finishes in 30-60s
 // because the lazy short-circuit skips already-cached games — the
@@ -75,10 +76,18 @@ export async function GET(request: Request) {
   // FULL season schedule (refreshed daily by refresh-games), so
   // without it we'd iterate the rest of the season's unplayed games
   // and waste time on empty Savant responses.
+  // Game types: regular season plus all four postseason rounds. This
+  // was `.eq("game_type", "R")` until 2026-10-15, which meant the
+  // precache stopped finding anything the day the regular season
+  // ended — all 46 of the 2026 postseason games sat with zero cached
+  // pitches, and because Pitch of the Day / Whiff of the Week scan
+  // pitch_game_pitches for recent at-bats, both silently froze on the
+  // last regular-season day. Savant publishes postseason Statcast
+  // normally; nothing but this filter was missing.
   const { data: games, error } = await supabase
     .from("pitch_games")
     .select("game_pk, game_date")
-    .eq("game_type", "R")
+    .in("game_type", [...COMPETITIVE_GAME_TYPES])
     .gte("game_date", cutoff)
     .lte("game_date", today)
     .order("game_date", { ascending: false });
