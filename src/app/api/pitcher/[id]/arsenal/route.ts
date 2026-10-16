@@ -9,6 +9,7 @@ import {
   isRetainedSeason,
   resolveDisplaySeason,
 } from "@/lib/season/current-season";
+import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 import {
   filterArchivePitches,
   loadArchiveSeason,
@@ -104,7 +105,7 @@ export async function GET(request: Request, { params }: ArsenalParams) {
       .select(PITCH_SELECT)
       .eq("pitcher_id", pitcherId)
       .eq("pitch_games.season", season)
-      .eq("pitch_games.game_type", "R")
+      .in("pitch_games.game_type", [...COMPETITIVE_GAME_TYPES])
       .order("game_pk", { ascending: true })
       .order("at_bat_number", { ascending: true })
       .order("pitch_number", { ascending: true })
