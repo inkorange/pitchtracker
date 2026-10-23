@@ -103,6 +103,39 @@ export function castRow(raw: Record<string, string>): SavantPitchRow {
   return cast as unknown as SavantPitchRow;
 }
 
+/**
+ * Fetch every pitch of the given types across the whole league for a
+ * date window.
+ *
+ * Deliberately does NOT go through searchPitches: that path caps at
+ * MAX_RESULTS (5,000) to protect the explore UI, and a league-wide
+ * week is larger than that — a measured 7-day FF/SI window is ~13,000
+ * rows. Truncating would silently skew the averages computed from it.
+ *
+ * This exists so the velocity leaderboard can be derived from Savant
+ * instead of from our own pitch table. One cached request replaces a
+ * nightly materialized-view refresh that scanned a 305 MB heap.
+ */
+export async function fetchLeagueWindowPitches(opts: {
+  season: number;
+  /** Statcast pitch-type codes, e.g. ["FF", "SI"]. */
+  pitchTypes: string[];
+  /** Inclusive-ish bounds, YYYY-MM-DD. Savant treats these as gt/lt. */
+  dateFrom: string;
+  dateTo: string;
+  /** Game-type codes; defaults to regular season only. */
+  gameTypes?: string[];
+}): Promise<SavantPitchRow[]> {
+  const pipe = (xs: string[]) => xs.map((x) => `${x}%7C`).join("");
+  const url =
+    `${SEARCH_BASE}?all=true&type=details` +
+    `&hfSea=${opts.season}%7C` +
+    `&hfGT=${pipe(opts.gameTypes ?? ["R"])}` +
+    `&hfPT=${pipe(opts.pitchTypes)}` +
+    `&game_date_gt=${opts.dateFrom}&game_date_lt=${opts.dateTo}`;
+  return fetchSavantCsv(url, `league window ${opts.dateFrom}..${opts.dateTo}`);
+}
+
 // Fetch all pitches for a single game.
 export async function fetchGamePitches(gamePk: number): Promise<SavantPitchRow[]> {
   const params = new URLSearchParams({

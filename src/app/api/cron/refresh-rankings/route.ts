@@ -35,22 +35,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Refresh the leaderboard materialized views (pitch_top_velocity_7d,
-  // pitch_top_strikeouts_current) that back the homepage FeaturedStrip,
-  // /velocity_leaders, and /strikeout_leaders. Before this hook the two
-  // pitch_top_* RPCs full-scanned the 377 MB pitch_game_pitches heap on
-  // every pageview — ~7,500 scans/day and the top Disk IO consumers on
-  // the Supabase Portfolio project. With the MVs in place, the RPCs
-  // are thin readers of a few thousand rows and the refresh below is
-  // the ONLY heavy scan per day. REFRESH CONCURRENTLY takes ACCESS
-  // SHARE (not EXCLUSIVE) so leaderboard reads keep serving during
-  // the rebuild. Best-effort: a failure here doesn't fail the whole
-  // rankings cron, since the MV keeps yesterday's snapshot until the
-  // next successful refresh.
-  const { error: mvErr } = await supabase.rpc("pitch_refresh_leaderboards");
-  if (mvErr) {
-    console.error("[refresh-rankings] leaderboard MV refresh failed:", mvErr);
-  }
+  // The leaderboard materialized views used to be refreshed here. They
+  // are no longer read by anything: /velocity_leaders,
+  // /strikeout_leaders and the homepage FeaturedStrip now derive their
+  // boards from MLB's leaders endpoint and a cached Savant query (see
+  // lib/leaderboards/external.ts), so refreshing them was two full
+  // sequential scans of a 305 MB heap every night for data nobody read.
+  //
+  // pitch_top_velocity_7d, pitch_top_strikeouts_current and their
+  // reader RPCs are now unreferenced and can be dropped; left in place
+  // for one release so this is trivially revertible.
 
   // Sanity-check: count rows by category so the response is useful
   // for monitoring (each category should have 5 rows once the season
@@ -63,27 +57,8 @@ export async function GET(request: Request) {
   for (const r of counts ?? []) {
     byCategory[r.category] = (byCategory[r.category] ?? 0) + 1;
   }
-  // Surface a failed MV refresh as a non-2xx so Vercel's cron failure
-  // alerting fires. The rankings work above has already been committed
-  // and is unaffected — the status code exists purely to make this
-  // visible.
-  //
-  // It needs to be: this refresh failed on every run from 2026-08-11
-  // (when it shipped) to 2026-10-15, because the RPC inherited
-  // PostgREST's 8s statement_timeout and could not finish. The only
-  // signal was a console.error nobody was reading, so the leaderboards
-  // quietly served a two-month-old snapshot. Logging alone was not
-  // enough to catch it; a failing status is.
-  const body = {
+  return NextResponse.json({
     season,
     counts: byCategory,
-    leaderboards_refreshed: mvErr == null,
-    ...(mvErr
-      ? {
-          leaderboard_error: mvErr.message,
-          note: "Rankings were written successfully; only the leaderboard MV refresh failed.",
-        }
-      : {}),
-  };
-  return NextResponse.json(body, { status: mvErr ? 500 : 200 });
+  });
 }
