@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { resolveDisplaySeason } from "@/lib/season/current-season";
+import {
+  fetchStrikeoutLeaders,
+  fetchVelocityLeaders,
+} from "@/lib/leaderboards/external";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
@@ -38,11 +42,11 @@ async function getFeaturedPitcherIds(
   // Track 1 — elite. Top season K leaders, stable week-over-week.
   // Calls the same RPC the /strikeout_leaders page uses, so the strip
   // and the leaderboard agree on who the top arms are.
-  const { data: kRows } = await supabase.rpc("pitch_top_strikeouts", {
-    p_season: season,
-    p_limit: ELITE_COUNT,
+  const kRows = await fetchStrikeoutLeaders({
+    season,
+    limit: ELITE_COUNT,
   });
-  const elite: number[] = (kRows ?? []).map((r) => r.pitcher_id);
+  const elite: number[] = kRows.map((r) => r.pitcher_id);
 
   // Track 2 — trending. Two feeds, in priority order:
   //   2a. Pitchers featured in POTD or WoW in the last 14 days (highest
@@ -53,16 +57,17 @@ async function getFeaturedPitcherIds(
   const cutoffIso = new Date(Date.now() - FEATURE_LOOKBACK_DAYS * 86_400_000)
     .toISOString()
     .slice(0, 10);
-  const [{ data: featureRows }, { data: veloRows }] = await Promise.all([
+  const [{ data: featureRows }, veloRows] = await Promise.all([
     supabase
       .from("pitch_daily_features")
       .select("pitcher_id, feature_date")
       .gte("feature_date", cutoffIso)
       .order("feature_date", { ascending: false }),
-    supabase.rpc("pitch_top_velocity", {
-      p_days: VELO_LOOKBACK_DAYS,
-      p_limit: VELO_POOL_SIZE,
-      p_min_pitches: 20,
+    fetchVelocityLeaders({
+      season,
+      days: VELO_LOOKBACK_DAYS,
+      limit: VELO_POOL_SIZE,
+      minPitches: 20,
     }),
   ]);
 
@@ -70,7 +75,7 @@ async function getFeaturedPitcherIds(
   for (const r of featureRows ?? []) {
     if (r.pitcher_id != null) trendingFeed.push(r.pitcher_id);
   }
-  for (const r of veloRows ?? []) {
+  for (const r of veloRows) {
     trendingFeed.push(r.pitcher_id);
   }
 

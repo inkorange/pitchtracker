@@ -6,6 +6,7 @@ import {
   isRegularSeasonOver,
   resolveDisplaySeason,
 } from "@/lib/season/current-season";
+import { fetchVelocityLeaders } from "@/lib/leaderboards/external";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 
 // Screenshot-target page captured by the external X.com weekly
@@ -42,12 +43,16 @@ export const metadata: Metadata = {
 };
 
 // ISR revalidate: hold the pre-rendered HTML for 1 hour before the
-// next background regeneration. The underlying pitch_top_velocity_7d
-// materialized view is refreshed once per day by refresh-rankings
-// (see /api/cron/refresh-rankings), so hourly is far more than fresh
-// enough for the visible list. Every additional CDN cache hit here
-// is one fewer Supabase RPC call — combined with the MV migration
-// this is the multiplier that gets the Disk IO cost down to near-zero.
+// next background regeneration.
+//
+// The board is now derived from Savant rather than from our own pitch
+// table (see lib/leaderboards/external.ts), which also caches the
+// aggregated result for 6h — so the upstream request happens at most
+// a few times a day no matter how often this page is crawled. The
+// materialized view that used to back it, and the nightly pair of
+// full sequential scans over a 305 MB heap that kept it current, are
+// both gone.
+
 export const revalidate = 3600;
 
 interface LeaderboardRow {
@@ -62,13 +67,18 @@ interface LeaderboardRow {
   fb_pitches: number;
 }
 
-async function loadVelocityLeaders(): Promise<LeaderboardRow[]> {
+async function loadVelocityLeaders(season: number): Promise<LeaderboardRow[]> {
   const supabase = await createClient();
-  const { data: rankRows, error: rankErr } = await supabase.rpc(
-    "pitch_top_velocity",
-    { p_days: 7, p_limit: 10, p_min_pitches: 20 },
-  );
-  if (rankErr || !rankRows || rankRows.length === 0) return [];
+  // Derived from Savant rather than our own pitch table. The
+  // materialized view this replaces cost two full sequential scans of a
+  // 305 MB heap every night, run whether or not anyone visited.
+  const rankRows = await fetchVelocityLeaders({
+    season,
+    days: 7,
+    limit: 10,
+    minPitches: 20,
+  });
+  if (rankRows.length === 0) return [];
 
   const pitcherIds = rankRows.map((r) => r.pitcher_id);
   const { data: pitcherRows } = await supabase
@@ -147,7 +157,7 @@ export default async function VelocityLeadersPage() {
     });
   const sevenDaysAgo = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
   const dateRangeLabel = `${fmt(sevenDaysAgo)} – ${fmt(now)}`;
-  const rows = await loadVelocityLeaders();
+  const rows = await loadVelocityLeaders(season);
 
   return (
     <main className="min-h-screen w-full bg-[#040a14] flex items-center justify-center">

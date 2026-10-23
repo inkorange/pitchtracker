@@ -5,6 +5,7 @@ import {
   isOffseason,
   resolveDisplaySeason,
 } from "@/lib/season/current-season";
+import { fetchStrikeoutLeaders } from "@/lib/leaderboards/external";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 
 // Screenshot-target page captured by the external X.com weekly
@@ -34,12 +35,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// ISR revalidate: same 1-hour cadence as /velocity_leaders. The
-// backing pitch_top_strikeouts_current materialized view is refreshed
-// once per day by refresh-rankings, so hourly is far more than fresh
-// enough. Combined with the MV migration this collapses the daily
-// leaderboard read cost from thousands of full-table scans to a
-// handful of CDN cache misses.
+// ISR revalidate: same 1-hour cadence as /velocity_leaders.
+//
+// The board now comes straight from MLB's leaders endpoint — a 2 KB
+// response, cached 6h (see lib/leaderboards/external.ts) — instead of
+// a materialized view over our 305 MB pitch table. Verified to agree
+// exactly with what that view computed before the switch.
+
 export const revalidate = 3600;
 
 interface LeaderboardRow {
@@ -56,11 +58,11 @@ interface LeaderboardRow {
 async function loadStrikeoutLeaders(): Promise<LeaderboardRow[]> {
   const supabase = await createClient();
   const season = await resolveDisplaySeason(supabase);
-  const { data: rankRows, error: rankErr } = await supabase.rpc(
-    "pitch_top_strikeouts",
-    { p_season: season, p_limit: 10 },
-  );
-  if (rankErr || !rankRows || rankRows.length === 0) return [];
+  // Straight from MLB's leaders endpoint — a 2 KB response that was
+  // verified to agree exactly with the materialized view it replaces,
+  // which cost a full scan of a 305 MB heap per refresh.
+  const rankRows = await fetchStrikeoutLeaders({ season, limit: 10 });
+  if (rankRows.length === 0) return [];
 
   const pitcherIds = rankRows.map((r) => r.pitcher_id);
   const { data: pitcherRows } = await supabase
