@@ -3,7 +3,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { resolveDisplaySeason } from "@/lib/season/current-season";
-import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
+import {
+  filterSeasonPitches,
+  loadSavantSeason,
+} from "@/lib/cache/savant-season";
 import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import {
@@ -140,11 +143,8 @@ export default async function ComparePage({ searchParams }: PageProps) {
   const aSeason = Number(sp.aSeason) || currentYear;
   const bSeason = Number(sp.bSeason) || currentYear;
 
-  // Lazy backfill: pull from Savant on first visit per side × season.
-  await Promise.all([
-    ensurePitcherSeasonCache(aId, aSeason),
-    ensurePitcherSeasonCache(bId, bSeason),
-  ]);
+  // No lazy backfill: both sides now read from the cached Savant
+  // season directly, so there is nothing to write through first.
 
   const sharedHand = parseHand(sp.hand);
   const sharedOutcomes = parseOutcomes(sp.outcome);
@@ -286,18 +286,10 @@ async function loadSideContext(
   // pitch_game_pitches in contrast holds thousands of rows per pitcher
   // per season and silently truncates at PostgREST's 1000-row default.
   //
-  // game_type=R restricts to regular-season games — spring training and
-  // exhibitions get filtered both at ingest (Savant URL) and at query
-  // time (defensive).
-  const { data: pitcherGameRows } = await supabase
-    .from("pitch_pitcher_games")
-    .select(
-      "game_pk, pitch_games!inner(game_date, season, home_team_id, away_team_id, game_type)",
-    )
-    .eq("pitcher_id", pitcherId)
-    .eq("pitch_games.game_type", "R");
-
-  type PitcherGameRow = {
+  // Game list comes from the cached Savant season read rather than
+  // pitch_pitcher_games. Game-type scoping now lives in the Savant
+  // request itself (COMPETITIVE_GAME_TYPES in lib/savant/client.ts).
+  interface PitcherGameRow {
     game_pk: number;
     pitch_games: {
       game_date: string;
@@ -305,8 +297,17 @@ async function loadSideContext(
       home_team_id: number | null;
       away_team_id: number | null;
     };
-  };
-  const pitcherGames = (pitcherGameRows ?? []) as unknown as PitcherGameRow[];
+  }
+  const season_data = await loadSavantSeason(pitcherId, season);
+  const pitcherGames: PitcherGameRow[] = season_data.games.map((g) => ({
+    game_pk: g.game_pk,
+    pitch_games: {
+      game_date: g.game_date,
+      season,
+      home_team_id: g.home_team_id,
+      away_team_id: g.away_team_id,
+    },
+  }));
 
   const seasonsWithData = new Set<number>();
   for (const r of aggSeasonRows ?? []) seasonsWithData.add(r.season);
@@ -322,22 +323,17 @@ async function loadSideContext(
   // Pitch-type filtering is now done in JS so the arsenal display can
   // ignore it (the type chips are how the user toggles types — they
   // can't disappear from the arsenal when one is selected).
-  let pitchQuery = supabase
-    .from("pitch_game_pitches")
-    .select(
-      "game_pk, pitch_type, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, stand, description, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
-    )
-    .eq("pitcher_id", pitcherId)
-    .limit(1500);
-  if (seasonGamePks.size > 0) {
-    pitchQuery = pitchQuery.in("game_pk", Array.from(seasonGamePks));
-  } else {
-    pitchQuery = pitchQuery.eq("game_pk", -1); // empty
-  }
-  if (hand) pitchQuery = pitchQuery.eq("stand", hand);
-  if (gamePk) pitchQuery = pitchQuery.eq("game_pk", gamePk);
+  // Pitches come from the same cached Savant season read as the game
+  // list, filtered in memory. The 1,500-row cap the query carried is
+  // kept so the compare charts stay bounded for a heavy starter.
+  const COMPARE_PITCH_CAP = 1500;
+  const pitchesRaw = filterSeasonPitches(season_data.pitches, {
+    hand,
+    gamePk: gamePk ?? null,
+  })
+    .filter((p) => seasonGamePks.size === 0 ? false : seasonGamePks.has(p.game_pk))
+    .slice(0, COMPARE_PITCH_CAP);
 
-  const { data: pitchesRaw } = await pitchQuery;
 
   // Outcome and pitch-type filtering happen in JS. Outcomes because
   // Statcast description strings don't map cleanly onto our 5-bucket

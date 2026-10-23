@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
 import { botIdGuard } from "@/lib/botid-guard";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import {
-  isRetainedSeason,
   resolveDisplaySeason,
 } from "@/lib/season/current-season";
-import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 import {
-  filterArchivePitches,
-  loadArchiveSeason,
-} from "@/lib/cache/archive-season";
+  filterSeasonPitches,
+  loadSavantSeason,
+  type SavantSeasonPitchRow,
+} from "@/lib/cache/savant-season";
 import {
   buildSequencingMatrix,
   type SequencingMatrix,
@@ -77,7 +75,6 @@ export async function GET(request: Request, { params }: ArsenalParams) {
 
   // Same lazy backfill as page.tsx: first visit per pitcher × season
   // pulls from Savant before the SELECT below sees an empty cache.
-  await ensurePitcherSeasonCache(pitcherId, season);
 
   // Fire the pitcher metadata fetch in parallel with page 1 of the
   // pitch pagination loop. We await pitcher after the loop finishes.
@@ -93,65 +90,20 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // same pattern is required here so the Stats view doesn't silently
   // undercount above 1000 pitches.
   //
-  // Ordered on the primary key so pages are stable across requests.
-  const PITCH_SELECT =
-    "game_pk, at_bat_number, pitch_number, pitch_type, stand, description, events, batter_id, delta_run_exp, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension, pitch_games!inner(season, game_type, game_date)";
-  const PITCH_PAGE_SIZE = 1000;
-  const PITCH_MAX_PAGES = 20;
-
-  function buildPitchPageQuery(page: number) {
-    let q = supabase
-      .from("pitch_game_pitches")
-      .select(PITCH_SELECT)
-      .eq("pitcher_id", pitcherId)
-      .eq("pitch_games.season", season)
-      .in("pitch_games.game_type", [...COMPETITIVE_GAME_TYPES])
-      .order("game_pk", { ascending: true })
-      .order("at_bat_number", { ascending: true })
-      .order("pitch_number", { ascending: true })
-      .range(page * PITCH_PAGE_SIZE, (page + 1) * PITCH_PAGE_SIZE - 1);
-    if (hand === "L" || hand === "R") q = q.eq("stand", hand);
-    if (game) q = q.eq("game_pk", Number(game));
-    // vsBatter is intentionally NOT filtered here. The 3D scene shell
-    // consumes this endpoint and needs the full season's pitches for
-    // its canvas. vsBatter is applied JS-side downstream (search this
-    // file for `p.batter_id !== vsBatter`) so the same response can
-    // serve both the batter-agnostic 3D scene and the batter-scoped
-    // stats view.
-    return q;
-  }
-
-  type PitchRow = NonNullable<
-    Awaited<ReturnType<typeof buildPitchPageQuery>>["data"]
-  >[number];
-
-  // Archived season: served from the cached Savant read-through rather
-  // than Postgres, which holds no rows for it. vsBatter is deliberately
-  // not applied here for the same reason as the SQL path above — the 3D
-  // scene needs the full season and filters downstream.
-  const archive = (await isRetainedSeason(supabase, season))
-    ? null
-    : await loadArchiveSeason(pitcherId, season);
-
-  const pitchesRaw: PitchRow[] = [];
-  if (archive) {
-    pitchesRaw.push(
-      ...(filterArchivePitches(archive.pitches, {
-        hand,
-        gamePk: game ? Number(game) : null,
-      }) as unknown as PitchRow[]),
-    );
-  } else {
-    for (let page = 0; page < PITCH_MAX_PAGES; page++) {
-      const { data, error } = await buildPitchPageQuery(page);
-      if (error || !data) {
-        console.error("[arsenal] pitch page", page, error);
-        break;
-      }
-      pitchesRaw.push(...(data as PitchRow[]));
-      if (data.length < PITCH_PAGE_SIZE) break;
-    }
-  }
+  // Every season is read from Savant on demand and cached — this route
+  // no longer touches pitch_game_pitches.
+  //
+  // vsBatter is deliberately NOT applied here: the 3D scene shell
+  // consumes this endpoint and needs the full season for its canvas,
+  // so vsBatter is applied JS-side downstream (search this file for
+  // `p.batter_id !== vsBatter`). That lets one response serve both the
+  // batter-agnostic scene and the batter-scoped stats view.
+  type PitchRow = SavantSeasonPitchRow;
+  const season_data = await loadSavantSeason(pitcherId, season);
+  const pitchesRaw: PitchRow[] = filterSeasonPitches(season_data.pitches, {
+    hand,
+    gamePk: game ? Number(game) : null,
+  });
 
   const { data: pitcher } = await pitcherPromise;
 

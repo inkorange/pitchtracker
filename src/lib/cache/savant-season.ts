@@ -5,32 +5,32 @@ import {
   type SavantPitchRow,
 } from "@/lib/savant/client";
 
-// Archive read-through for seasons we no longer cache.
+// A pitcher's season, read from Savant on demand rather than from our
+// own tables.
 //
-// Retention keeps only the newest season's pitch rows in Postgres (see
-// lib/season/current-season.ts), and the write guard in backfill.ts
-// deliberately refuses to persist anything older so that on-demand
-// backfills don't write rows the nightly eviction cron deletes hours
-// later. The side effect was that prior seasons became unreachable:
-// /pitcher/694973/paul-skenes?season=2025 rendered "No arsenal data for
-// 2025" even though Savant still serves 2,996 rows for it, and the
-// season picker on that page went on offering 2025 and 2024.
+// This began as a read-through for ARCHIVED seasons only: retention
+// kept just the newest season in Postgres, so older ones were
+// unreachable even though Savant still served them. It now backs EVERY
+// season, which is the point — for a site with little traffic,
+// maintaining a 305 MB pitch table plus the nightly jobs over it was
+// almost entirely wasted work. Per-pitcher detail is read live and
+// cached; nothing is written.
 //
-// This module restores the access without reintroducing the thrash, by
-// not persisting at all: fetch from Savant, shape it in memory, and let
-// Next's data cache absorb the repeat views. Storage cost is zero and
-// there is nothing for the eviction cron to fight over.
+// What this does NOT replace: anything that needs cross-pitcher data in
+// a single query — the leaderboards (now upstream APIs, see
+// lib/leaderboards/external.ts), the daily picks, and the ranking
+// categories. Savant cannot answer those per request.
 //
-// Same approach as api/search/route.ts, which already does a cached
-// Savant read-through for the explore page.
+// Same approach as api/search/route.ts, which has done a cached Savant
+// read-through for the explore page all along.
 
 // Statcast occasionally publishes retroactive corrections, but a
 // finished season is otherwise immutable, so this can be cached hard.
 // Matches the 6h used by the search read-through.
-const ARCHIVE_REVALIDATE_S = 60 * 60 * 6;
+const SEASON_REVALIDATE_S = 60 * 60 * 6;
 
 /** Game metadata the pitcher page expects embedded on each pitch row. */
-export interface ArchiveEmbeddedGame {
+export interface SavantSeasonGameMeta {
   season: number;
   game_date: string;
   home_team_id: number | null;
@@ -43,7 +43,7 @@ export interface ArchiveEmbeddedGame {
  * the archive path and the Postgres path are interchangeable
  * downstream.
  */
-export interface ArchivePitchRow {
+export interface SavantSeasonPitchRow {
   game_pk: number;
   at_bat_number: number;
   pitch_number: number;
@@ -54,6 +54,9 @@ export interface ArchivePitchRow {
   events: string | null;
   /** Run-expectancy delta; the stats view's run-value columns use it. */
   delta_run_exp: number | null;
+  inning: number | null;
+  /** "Top" / "Bot" — the matchups and batters views group on it. */
+  inning_topbot: string | null;
   release_pos_x: number | null;
   release_pos_y: number | null;
   release_pos_z: number | null;
@@ -71,26 +74,26 @@ export interface ArchivePitchRow {
   pfx_x: number | null;
   pfx_z: number | null;
   release_extension: number | null;
-  pitch_games: ArchiveEmbeddedGame;
+  pitch_games: SavantSeasonGameMeta;
 }
 
-export interface ArchiveArsenalRow {
+export interface SavantSeasonArsenalRow {
   pitch_type: string;
   pitch_count: number;
   avg_velocity: number | null;
 }
 
-export interface ArchiveGameMeta {
+export interface SavantSeasonGame {
   game_pk: number;
   game_date: string;
   home_team_id: number | null;
   away_team_id: number | null;
 }
 
-export interface ArchiveSeason {
-  pitches: ArchivePitchRow[];
-  arsenal: ArchiveArsenalRow[];
-  games: ArchiveGameMeta[];
+export interface SavantSeason {
+  pitches: SavantSeasonPitchRow[];
+  arsenal: SavantSeasonArsenalRow[];
+  games: SavantSeasonGame[];
 }
 
 /** Narrow a Savant value to a finite number, or null. */
@@ -120,12 +123,12 @@ async function loadTeamIdByAbbrev(): Promise<Map<string, number>> {
   return map;
 }
 
-function shapeArchiveSeason(
+function shapeSavantSeason(
   rows: SavantPitchRow[],
   season: number,
   teamIdByAbbrev: Map<string, number>,
-): ArchiveSeason {
-  const pitches: ArchivePitchRow[] = rows.map((p) => {
+): SavantSeason {
+  const pitches: SavantSeasonPitchRow[] = rows.map((p) => {
     const home = p.home_team ? teamIdByAbbrev.get(p.home_team) ?? null : null;
     const away = p.away_team ? teamIdByAbbrev.get(p.away_team) ?? null : null;
     return {
@@ -138,6 +141,8 @@ function shapeArchiveSeason(
       description: str(p.description),
       events: str(p.events),
       delta_run_exp: num(p.delta_run_exp),
+      inning: num(p.inning),
+      inning_topbot: str(p.inning_topbot),
       release_pos_x: num(p.release_pos_x),
       release_pos_y: num(p.release_pos_y),
       release_pos_z: num(p.release_pos_z),
@@ -188,7 +193,7 @@ function shapeArchiveSeason(
     }
     byType.set(p.pitch_type, e);
   }
-  const arsenal: ArchiveArsenalRow[] = Array.from(byType.entries())
+  const arsenal: SavantSeasonArsenalRow[] = Array.from(byType.entries())
     .map(([pitch_type, e]) => ({
       pitch_type,
       pitch_count: e.count,
@@ -198,7 +203,7 @@ function shapeArchiveSeason(
 
   // Game list, deduped by game_pk, newest first to match how the
   // page's game picker presents them.
-  const gameByPk = new Map<number, ArchiveGameMeta>();
+  const gameByPk = new Map<number, SavantSeasonGame>();
   for (const p of pitches) {
     if (gameByPk.has(p.game_pk)) continue;
     gameByPk.set(p.game_pk, {
@@ -215,35 +220,35 @@ function shapeArchiveSeason(
   return { pitches, arsenal, games };
 }
 
-const cachedArchiveSeason = unstable_cache(
-  async (pitcherId: number, season: number): Promise<ArchiveSeason> => {
+const cachedSavantSeason = unstable_cache(
+  async (pitcherId: number, season: number): Promise<SavantSeason> => {
     const [rows, teamIdByAbbrev] = await Promise.all([
       fetchPitcherSeasonPitches(pitcherId, season),
       loadTeamIdByAbbrev(),
     ]);
-    return shapeArchiveSeason(rows, season, teamIdByAbbrev);
+    return shapeSavantSeason(rows, season, teamIdByAbbrev);
   },
-  ["archive-season"],
-  { revalidate: ARCHIVE_REVALIDATE_S, tags: ["archive-season"] },
+  ["savant-season"],
+  { revalidate: SEASON_REVALIDATE_S, tags: ["savant-season"] },
 );
 
 /**
  * Load a pitcher's season straight from Savant, shaped like the
  * Postgres reads it replaces. Nothing is written to the database.
  *
- * Returns an empty ArchiveSeason rather than throwing when Savant is
+ * Returns an empty SavantSeason rather than throwing when Savant is
  * unreachable, so a failed upstream degrades to the same empty state
  * the page showed before instead of a 500.
  */
-export async function loadArchiveSeason(
+export async function loadSavantSeason(
   pitcherId: number,
   season: number,
-): Promise<ArchiveSeason> {
+): Promise<SavantSeason> {
   try {
-    return await cachedArchiveSeason(pitcherId, season);
+    return await cachedSavantSeason(pitcherId, season);
   } catch (err) {
     console.error(
-      `[archive-season] Savant read-through failed for pitcher ${pitcherId} season ${season}:`,
+      `[savant-season] Savant read-through failed for pitcher ${pitcherId} season ${season}:`,
       err,
     );
     return { pitches: [], arsenal: [], games: [] };
@@ -258,14 +263,14 @@ export async function loadArchiveSeason(
  * the two paths can't drift on what `?hand=`, `?game=` and `?vsBatter=`
  * mean.
  */
-export function filterArchivePitches(
-  pitches: ArchivePitchRow[],
+export function filterSeasonPitches(
+  pitches: SavantSeasonPitchRow[],
   filters: {
     hand?: string | null;
     gamePk?: number | null;
     vsBatterId?: number | null;
   },
-): ArchivePitchRow[] {
+): SavantSeasonPitchRow[] {
   const { hand, gamePk, vsBatterId } = filters;
   return pitches.filter((p) => {
     if ((hand === "L" || hand === "R") && p.stand !== hand) return false;
@@ -278,4 +283,4 @@ export function filterArchivePitches(
 }
 
 /** Exported for tests — shaping is pure given its inputs. */
-export const __testables = { shapeArchiveSeason };
+export const __testables = { shapeSavantSeason };

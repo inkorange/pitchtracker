@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
+import { loadSavantSeason } from "@/lib/cache/savant-season";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { botIdGuard } from "@/lib/botid-guard";
 import { resolveDisplaySeason } from "@/lib/season/current-season";
-import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 
 // Typeahead + team-filter feed for the "Find at-bats" picker on
 // /pitcher/[id]. Scoped to batters/teams this pitcher actually faced
@@ -108,7 +107,6 @@ export async function GET(request: Request, { params }: RouteParams) {
   const supabase = await createClient();
   const season = seasonParam || (await resolveDisplaySeason(supabase));
   // First-visit lazy backfill so the batter universe is complete.
-  await ensurePitcherSeasonCache(pitcherId, season);
 
   // All pitches this pitcher threw in this season's regular-season
   // games. We need every row (not distinct) so we can rank batters
@@ -129,19 +127,13 @@ export async function GET(request: Request, { params }: RouteParams) {
       away_team_id: number | null;
     } | null;
   }
-  const { data, error } = await supabase
-    .from("pitch_game_pitches")
-    .select(
-      "batter_id, inning_topbot, at_bat_number, events, pitch_games!inner(season, game_type, game_date, game_pk, home_team_id, away_team_id)",
-    )
-    .eq("pitcher_id", pitcherId)
-    .eq("pitch_games.season", season)
-    .in("pitch_games.game_type", [...COMPETITIVE_GAME_TYPES])
-    .not("batter_id", "is", null);
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  const rows = (data ?? []) as unknown as PitchRow[];
+  // Read from the cached Savant season rather than pitch_game_pitches.
+  // Rows without a batter are dropped here, matching the
+  // `.not("batter_id", "is", null)` the query used.
+  const season_data = await loadSavantSeason(pitcherId, season);
+  const rows = season_data.pitches.filter(
+    (p) => p.batter_id != null,
+  ) as unknown as PitchRow[];
 
   // Per-batter aggregate: pitches-faced count, the most-recent
   // (game_date, team_id) we saw them on, and the full set of teams
