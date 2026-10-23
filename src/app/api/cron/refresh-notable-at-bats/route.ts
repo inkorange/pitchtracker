@@ -3,6 +3,8 @@ import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { categorizeDescription } from "@/lib/viz/colors";
 import type { TablesInsert } from "@/lib/supabase/types";
+import { loadGamePitches } from "@/lib/cache/savant-game";
+import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 
 // 60s was not enough: on 2026-08-28 this route 504'd partway through the
 // 7-day notable-at-bats rescan and never reached the daily-pick write,
@@ -430,39 +432,35 @@ export async function GET(request: Request) {
   // and gte(game_date, cutoff) easily exceeds PostgREST's 1000-row cap
   // with thousands of upcoming-schedule rows. Paginate by primary-key
   // order so we catch the most-recent rows that otherwise get dropped.
-  type PpgJoinRow = { game_pk: number; pitch_games: { game_date: string } };
-  const PPG_PAGE_SIZE = 1000;
-  const PPG_MAX_PAGES = 20;
+  // Which games happened since the cutoff. This used to page through
+  // pitch_pitcher_games joined to pitch_games; the schedule table alone
+  // answers it, and pitch_games is 2 MB and stays in Postgres.
   const gameDateByPk = new Map<number, string>();
-  for (let page = 0; page < PPG_MAX_PAGES; page++) {
-    const { data: pageRows, error: pageErr } = await supabase
-      .from("pitch_pitcher_games")
-      .select("game_pk, pitch_games!inner(game_date)")
-      .gte("pitch_games.game_date", cutoffIso)
-      .order("game_pk", { ascending: true })
-      .range(page * PPG_PAGE_SIZE, (page + 1) * PPG_PAGE_SIZE - 1);
-    if (pageErr) {
-      console.error("[refresh-notable-at-bats] ppg page", page, pageErr);
-      // Phase 1 already succeeded and is committed — report the partial
-      // outcome rather than throwing away a good pick.
-      return NextResponse.json(
-        {
-          pitch_of_day: pitchOfDay,
-          whiff_of_week: whiffOfWeek,
-          notable_error: pageErr.message,
-          notable_written: 0,
-        },
-        { status: 500 },
-      );
-    }
-    const rows = (pageRows ?? []) as unknown as PpgJoinRow[];
-    for (const r of rows) {
-      if (!gameDateByPk.has(r.game_pk)) {
-        gameDateByPk.set(r.game_pk, r.pitch_games.game_date);
-      }
-    }
-    if (rows.length < PPG_PAGE_SIZE) break;
+  const { data: scheduleRows, error: scheduleErr } = await supabase
+    .from("pitch_games")
+    .select("game_pk, game_date")
+    .gte("game_date", cutoffIso)
+    .lte("game_date", new Date().toISOString().slice(0, 10))
+    .in("game_type", [...COMPETITIVE_GAME_TYPES]);
+  if (scheduleErr) {
+    console.error("[refresh-notable-at-bats] schedule read", scheduleErr);
+    // Phase 1 already succeeded and is committed — report the partial
+    // outcome rather than throwing away a good pick.
+    return NextResponse.json(
+      {
+        ok: false,
+        stage: "notable-at-bats",
+        error: scheduleErr.message,
+      },
+      { status: 500 },
+    );
   }
+  for (const r of scheduleRows ?? []) {
+    if (!gameDateByPk.has(r.game_pk)) {
+      gameDateByPk.set(r.game_pk, r.game_date);
+    }
+  }
+
   // Most-recent games first so a budget cutoff drops the oldest days,
   // which are the least interesting on /daily.
   const games = Array.from(gameDateByPk, ([game_pk, game_date]) => ({
@@ -489,16 +487,12 @@ export async function GET(request: Request) {
       break;
     }
     const batch = games.slice(i, i + GAME_CONCURRENCY);
+    // Cached per-game Savant reads rather than scans of
+    // pitch_game_pitches. A day of MLB is ~15 games, so this is a
+    // handful of upstream requests that the data cache then serves.
     const results = await Promise.all(
       batch.map((g) =>
-        supabase
-          .from("pitch_game_pitches")
-          .select(
-            "at_bat_number, pitch_number, pitcher_id, batter_id, description, events, delta_run_exp",
-          )
-          .eq("game_pk", g.game_pk)
-          .range(0, 1499)
-          .then((r) => ({ g, pitches: r.data ?? [] })),
+        loadGamePitches(g.game_pk).then((pitches) => ({ g, pitches })),
       ),
     );
 

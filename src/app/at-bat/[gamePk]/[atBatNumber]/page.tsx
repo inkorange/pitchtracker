@@ -1,6 +1,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { atBatSlug } from "@/lib/url/pitcher-slug";
+import { loadAtBatPitches } from "@/lib/cache/savant-game";
 
 // Id-only at-bat URL `/at-bat/{gamePk}/{atBatNumber}`. The canonical
 // URL is the slugged form `/at-bat/{gamePk}/{atBatNumber}/{slug}`
@@ -29,14 +30,8 @@ export default async function AtBatIdRedirect({
   // both names. One pitch row is enough — pitcher/batter are stable
   // across an at-bat. Falls back to "player" slug only if the AB
   // doesn't exist or has no pitcher_id.
-  const { data: pitch } = await supabase
-    .from("pitch_game_pitches")
-    .select("pitcher_id, batter_id")
-    .eq("game_pk", gamePkN)
-    .eq("at_bat_number", atBatN)
-    .order("pitch_number", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  const abPitches = await loadAtBatPitches(gamePkN, atBatN);
+  const pitch = abPitches[0] ?? null;
   if (!pitch) notFound();
 
   const [pitcherRes, batterRes] = await Promise.all([

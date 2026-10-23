@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { ensureGameCache } from "@/lib/cache/backfill";
 import { checkRateLimit, clientIpFromRequest } from "@/lib/rate-limit";
 import { botIdGuard } from "@/lib/botid-guard";
+import { loadAtBatPitches } from "@/lib/cache/savant-game";
 
 // Returns every pitch in a single at-bat, ordered by pitch_number,
 // shaped to match the ReplayPitch type the at-bat replay machinery
@@ -73,30 +72,12 @@ export async function GET(request: Request, { params }: RouteParams) {
     );
   }
 
-  const supabase = await createClient();
-  // Lazy backfill: same pattern the at-bat replay page uses. The
-  // 30-day age guard in ensureGameCache means old-game enumeration
-  // by bots no longer triggers Savant fetches — the guard short-
-  // circuits before the CSV download.
-  await ensureGameCache(gamePkN);
+  // Cached per-game Savant read. The lazy backfill that used to run
+  // here is gone with the table it populated.
+  const data = await loadAtBatPitches(gamePkN, atBatN);
 
-  const { data, error } = await supabase
-    .from("pitch_game_pitches")
-    .select(
-      "game_pk, at_bat_number, pitch_number, pitcher_id, batter_id, pitch_type, description, events, balls, strikes, outs_when_up, inning, inning_topbot, stand, on_1b, on_2b, on_3b, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
-    )
-    .eq("game_pk", gamePkN)
-    .eq("at_bat_number", atBatN)
-    .order("pitch_number", { ascending: true });
-
-  if (error) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500, headers: NOINDEX_HEADERS },
-    );
-  }
   return NextResponse.json(
-    { pitches: data ?? [] },
+    { pitches: data },
     { headers: NOINDEX_HEADERS },
   );
 }
