@@ -15,10 +15,13 @@ import {
   pitcherPagePath,
 } from "@/lib/url/pitcher-slug";
 import { TopNav } from "@/components/chrome/TopNav";
-import { ensureGameCache } from "@/lib/cache/backfill";
 import { eventPillColor } from "@/lib/viz/colors";
 import type { ReplayPitch } from "../AtBatReplayScene";
 import { AtBatOutcomeLegend } from "../AtBatOutcomeLegend";
+import {
+  loadAtBatPitches,
+  loadGamePitches,
+} from "@/lib/cache/savant-game";
 import {
   PitcherMatchupsSidebar,
   type PitcherAbDisplay,
@@ -45,14 +48,9 @@ async function loadAtBatPlayers(
   gamePk: number,
   atBatNumber: number,
 ): Promise<{ pitcherName: string | null; batterName: string | null } | null> {
-  const { data: pitch } = await supabase
-    .from("pitch_game_pitches")
-    .select("pitcher_id, batter_id")
-    .eq("game_pk", gamePk)
-    .eq("at_bat_number", atBatNumber)
-    .order("pitch_number", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  // From the cached per-game Savant read rather than pitch_game_pitches.
+  const abPitches = await loadAtBatPitches(gamePk, atBatNumber);
+  const pitch = abPitches[0] ?? null;
   if (!pitch) return null;
   const [pitcherRes, batterRes] = await Promise.all([
     pitch.pitcher_id
@@ -135,8 +133,10 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
 
   const supabase = await createClient();
 
-  // Lazy-fetch from Savant if the game's pitches aren't cached yet.
-  await ensureGameCache(gamePkN);
+  // No lazy backfill: this page reads from the cached per-game Savant
+  // read-through and never touches pitch_game_pitches, so there is
+  // nothing to populate first. The write-through this replaced was part
+  // of the pitch upsert that accounts for 48% of the database's WAL.
 
   // Slug normalization: if the request's slug doesn't match the
   // canonical {pitcher-slug}-vs-{batter-slug} for this at-bat, 308 to
@@ -157,16 +157,11 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
     }
   }
 
-  const { data: pitchesRaw } = await supabase
-    .from("pitch_game_pitches")
-    .select(
-      "game_pk, at_bat_number, pitch_number, pitcher_id, batter_id, pitch_type, description, events, balls, strikes, outs_when_up, inning, inning_topbot, stand, on_1b, on_2b, on_3b, release_pos_x, release_pos_y, release_pos_z, vx0, vy0, vz0, ax, ay, az, plate_x, plate_z, release_speed, release_spin_rate, spin_axis, pfx_x, pfx_z, release_extension",
-    )
-    .eq("game_pk", gamePkN)
-    .eq("at_bat_number", atBatN)
-    .order("pitch_number", { ascending: true });
-
-  const pitches = (pitchesRaw ?? []) as ReplayPitch[];
+  // Cached per-game Savant read; no Postgres pitch rows involved.
+  const pitches = (await loadAtBatPitches(
+    gamePkN,
+    atBatN,
+  )) as unknown as ReplayPitch[];
 
   // Pull game + pitcher metadata before deciding whether to bail out, so
   // we can show a graceful empty state with the game header still intact.
@@ -242,17 +237,14 @@ export default async function AtBatPage({ params, searchParams }: PageProps) {
     final_events: string | null;
     final_description: string | null;
   }
-  const { data: pitcherAbRowsRaw } = pitcherId
-    ? await supabase
-        .from("pitch_game_pitches")
-        .select(
-          "at_bat_number, batter_id, inning, inning_topbot, pitch_number, events, description",
-        )
-        .eq("game_pk", gamePkN)
-        .eq("pitcher_id", pitcherId)
-        .order("at_bat_number", { ascending: true })
-        .order("pitch_number", { ascending: true })
-    : { data: [] };
+  // This pitcher's other at-bats in the same game, for the sidebar.
+  // One cached per-game Savant read serves it; already ordered by
+  // (at_bat_number, pitch_number) by the shaper.
+  const pitcherAbRowsRaw = pitcherId
+    ? (await loadGamePitches(gamePkN)).filter(
+        (p) => p.pitcher_id === pitcherId,
+      )
+    : [];
   const pitcherAbMap = new Map<number, PitcherAB>();
   for (const r of pitcherAbRowsRaw ?? []) {
     let bucket = pitcherAbMap.get(r.at_bat_number);

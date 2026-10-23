@@ -14,8 +14,8 @@ import { teamNickname } from "@/lib/teams/nicknames";
 import { absoluteUrl } from "@/lib/url/site";
 import { lookupVenueLocation } from "@/lib/seo/venue-locations";
 import { TopNav } from "@/components/chrome/TopNav";
-import { ensureGameCache } from "@/lib/cache/backfill";
 import { AtBatGameList, type AtBatDisplay } from "./AtBatGameList";
+import { loadGamePitches } from "@/lib/cache/savant-game";
 
 interface PageProps {
   params: Promise<{ gamePk: string }>;
@@ -144,11 +144,10 @@ export default async function GameAtBatsPage({ params }: PageProps) {
 
   const supabase = await createClient();
 
-  // Lazy-fetch from Savant if we haven't cached this game yet. The
-  // team+date lookup can route here for any scheduled game; we want
-  // every such landing to "just work" rather than dead-end on an
-  // empty stub. ensureGameCache no-ops once data is present.
-  await ensureGameCache(gamePkN);
+  // No lazy backfill: this page reads from the cached per-game Savant
+  // read-through and never touches pitch_game_pitches, so there is
+  // nothing to populate first. The write-through this replaced was part
+  // of the pitch upsert that accounts for 48% of the database's WAL.
 
   // Box score lookup from MLB Stats. Best-effort — if the API is
   // down we just skip rendering the box-score panel. The hydrated
@@ -160,24 +159,18 @@ export default async function GameAtBatsPage({ params }: PageProps) {
     gameResult = null;
   }
 
-  const [{ data: game }, { data: pitchesRaw }] = await Promise.all([
+  // Schedule metadata stays in Postgres (pitch_games is 2 MB); the
+  // pitches come from the cached per-game Savant read.
+  const [{ data: game }, gamePitches] = await Promise.all([
     supabase
       .from("pitch_games")
       .select("game_pk, game_date, home_team_id, away_team_id, season, status")
       .eq("game_pk", gamePkN)
       .maybeSingle(),
-    supabase
-      .from("pitch_game_pitches")
-      .select(
-        "game_pk, at_bat_number, pitch_number, pitcher_id, batter_id, inning, inning_topbot, outs_when_up, balls, strikes, description, events, pitch_type",
-      )
-      .eq("game_pk", gamePkN)
-      .order("at_bat_number", { ascending: true })
-      .order("pitch_number", { ascending: true })
-      .range(0, 4999),
+    loadGamePitches(gamePkN),
   ]);
 
-  const pitches = (pitchesRaw ?? []) as PitchSummaryRow[];
+  const pitches = gamePitches as unknown as PitchSummaryRow[];
 
   if (pitches.length === 0) {
     return <NotCachedState gamePk={gamePkN} />;

@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { getPitchColor, categorizeDescription, OUTCOME_COLORS } from "@/lib/viz/colors";
+import { loadAtBatPitches } from "@/lib/cache/savant-game";
 
 export const runtime = "nodejs";
 
@@ -52,16 +53,8 @@ async function renderAtBatOg(request: Request) {
   }
 
   const supabase = await createClient();
-  const { data: pitchesRaw } = await supabase
-    .from("pitch_game_pitches")
-    .select(
-      "pitch_number, pitch_type, description, events, balls, strikes, pitcher_id, batter_id, release_speed",
-    )
-    .eq("game_pk", gamePk)
-    .eq("at_bat_number", atBatNumber)
-    .order("pitch_number", { ascending: true });
-
-  const pitches = pitchesRaw ?? [];
+  // Cached per-game Savant read rather than pitch_game_pitches.
+  const pitches = await loadAtBatPitches(gamePk, atBatNumber);
   if (pitches.length === 0) {
     return new ImageResponse(<Fallback />, {
       ...OG_SIZE,

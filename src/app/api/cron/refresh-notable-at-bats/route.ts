@@ -3,6 +3,11 @@ import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { categorizeDescription } from "@/lib/viz/colors";
 import type { TablesInsert } from "@/lib/supabase/types";
+import {
+  loadGamePitches,
+  loadGamesPitches,
+} from "@/lib/cache/savant-game";
+import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 
 // 60s was not enough: on 2026-08-28 this route 504'd partway through the
 // 7-day notable-at-bats rescan and never reached the daily-pick write,
@@ -45,9 +50,6 @@ const WHIFF_DESCRIPTIONS = [
   "missed_bunt",
   "foul_tip",
 ];
-
-const PITCH_SELECT =
-  "game_pk, at_bat_number, pitch_number, pitcher_id, batter_id, description, release_speed, pitch_type, strikes, plate_x, plate_z, pfx_x, pfx_z, release_spin_rate";
 
 interface ScoredPitch {
   score: number;
@@ -218,34 +220,25 @@ async function fetchWhiffCandidates(
 ): Promise<{ rows: CandidateRow[]; error: string | null }> {
   const dateByPk = new Map(games.map((g) => [g.game_pk, g.game_date]));
   const pks = games.map((g) => g.game_pk);
-  const PK_CHUNK = 40; // keeps the IN list (and each response) modest
-  const PAGE = 1000;
-  const MAX_PAGES = 20;
-  const out: CandidateRow[] = [];
+  const dateByPkLocal = dateByPk;
 
-  for (let i = 0; i < pks.length; i += PK_CHUNK) {
-    const chunk = pks.slice(i, i + PK_CHUNK);
-    for (let page = 0; page < MAX_PAGES; page++) {
-      const { data, error } = await supabase
-        .from("pitch_game_pitches")
-        .select(PITCH_SELECT)
-        .in("game_pk", chunk)
-        .in("description", WHIFF_DESCRIPTIONS)
-        .order("game_pk", { ascending: true })
-        .order("at_bat_number", { ascending: true })
-        .order("pitch_number", { ascending: true })
-        .range(page * PAGE, (page + 1) * PAGE - 1);
-      if (error) return { rows: out, error: error.message };
-      const rows = (data ?? []) as unknown as CandidateRow[];
-      for (const r of rows) {
-        // game_date isn't on the pitch row; attach it from the game map so
-        // bestCandidate() can key the feature by the date of the game.
-        r.game_date_resolved = dateByPk.get(r.game_pk) ?? null;
-      }
-      out.push(...rows);
-      if (rows.length < PAGE) break;
-    }
-  }
+  // Whiff candidates, from the cached per-game Savant reads rather than
+  // paginated scans of pitch_game_pitches. The description filter that
+  // was pushed into SQL is applied here instead, over the same set.
+  const allPitches = await loadGamesPitches(pks);
+  const out = allPitches
+    .filter(
+      (p) =>
+        p.description != null && WHIFF_DESCRIPTIONS.includes(p.description),
+    )
+    .map((p) => {
+      const row = p as unknown as CandidateRow;
+      // game_date isn't on the pitch row; attach it from the game map so
+      // bestCandidate() can key the feature by the date of the game.
+      row.game_date_resolved = dateByPkLocal.get(p.game_pk) ?? null;
+      return row;
+    });
+
   return { rows: out, error: null };
 }
 
@@ -430,39 +423,35 @@ export async function GET(request: Request) {
   // and gte(game_date, cutoff) easily exceeds PostgREST's 1000-row cap
   // with thousands of upcoming-schedule rows. Paginate by primary-key
   // order so we catch the most-recent rows that otherwise get dropped.
-  type PpgJoinRow = { game_pk: number; pitch_games: { game_date: string } };
-  const PPG_PAGE_SIZE = 1000;
-  const PPG_MAX_PAGES = 20;
+  // Which games happened since the cutoff. This used to page through
+  // pitch_pitcher_games joined to pitch_games; the schedule table alone
+  // answers it, and pitch_games is 2 MB and stays in Postgres.
   const gameDateByPk = new Map<number, string>();
-  for (let page = 0; page < PPG_MAX_PAGES; page++) {
-    const { data: pageRows, error: pageErr } = await supabase
-      .from("pitch_pitcher_games")
-      .select("game_pk, pitch_games!inner(game_date)")
-      .gte("pitch_games.game_date", cutoffIso)
-      .order("game_pk", { ascending: true })
-      .range(page * PPG_PAGE_SIZE, (page + 1) * PPG_PAGE_SIZE - 1);
-    if (pageErr) {
-      console.error("[refresh-notable-at-bats] ppg page", page, pageErr);
-      // Phase 1 already succeeded and is committed — report the partial
-      // outcome rather than throwing away a good pick.
-      return NextResponse.json(
-        {
-          pitch_of_day: pitchOfDay,
-          whiff_of_week: whiffOfWeek,
-          notable_error: pageErr.message,
-          notable_written: 0,
-        },
-        { status: 500 },
-      );
-    }
-    const rows = (pageRows ?? []) as unknown as PpgJoinRow[];
-    for (const r of rows) {
-      if (!gameDateByPk.has(r.game_pk)) {
-        gameDateByPk.set(r.game_pk, r.pitch_games.game_date);
-      }
-    }
-    if (rows.length < PPG_PAGE_SIZE) break;
+  const { data: scheduleRows, error: scheduleErr } = await supabase
+    .from("pitch_games")
+    .select("game_pk, game_date")
+    .gte("game_date", cutoffIso)
+    .lte("game_date", new Date().toISOString().slice(0, 10))
+    .in("game_type", [...COMPETITIVE_GAME_TYPES]);
+  if (scheduleErr) {
+    console.error("[refresh-notable-at-bats] schedule read", scheduleErr);
+    // Phase 1 already succeeded and is committed — report the partial
+    // outcome rather than throwing away a good pick.
+    return NextResponse.json(
+      {
+        ok: false,
+        stage: "notable-at-bats",
+        error: scheduleErr.message,
+      },
+      { status: 500 },
+    );
   }
+  for (const r of scheduleRows ?? []) {
+    if (!gameDateByPk.has(r.game_pk)) {
+      gameDateByPk.set(r.game_pk, r.game_date);
+    }
+  }
+
   // Most-recent games first so a budget cutoff drops the oldest days,
   // which are the least interesting on /daily.
   const games = Array.from(gameDateByPk, ([game_pk, game_date]) => ({
@@ -489,16 +478,12 @@ export async function GET(request: Request) {
       break;
     }
     const batch = games.slice(i, i + GAME_CONCURRENCY);
+    // Cached per-game Savant reads rather than scans of
+    // pitch_game_pitches. A day of MLB is ~15 games, so this is a
+    // handful of upstream requests that the data cache then serves.
     const results = await Promise.all(
       batch.map((g) =>
-        supabase
-          .from("pitch_game_pitches")
-          .select(
-            "at_bat_number, pitch_number, pitcher_id, batter_id, description, events, delta_run_exp",
-          )
-          .eq("game_pk", g.game_pk)
-          .range(0, 1499)
-          .then((r) => ({ g, pitches: r.data ?? [] })),
+        loadGamePitches(g.game_pk).then((pitches) => ({ g, pitches })),
       ),
     );
 

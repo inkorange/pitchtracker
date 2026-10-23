@@ -8,6 +8,14 @@ import { checkAiRateLimit, clientIpFromRequest } from "@/lib/ai/rate-limit";
 import { getPitchLabel } from "@/lib/viz/colors";
 import { buildSequencingMatrix } from "@/lib/pitch/sequencingMatrix";
 import {
+  filterSeasonPitches,
+  loadSavantSeason,
+} from "@/lib/cache/savant-season";
+import {
+  loadAtBatPitches,
+  loadGamePitches,
+} from "@/lib/cache/savant-game";
+import {
   buildSequencingDrift,
   type DriftPitch,
 } from "@/lib/pitch/sequencingDrift";
@@ -183,16 +191,14 @@ export async function POST(request: Request) {
           execute: async ({ game_pk }) => {
             // Terminating pitches only — `events` is non-null only on
             // the last pitch of each AB. One row per at-bat.
-            const { data, error } = await supabase
-              .from("pitch_game_pitches")
-              .select(
-                "at_bat_number, events, batter_id, pitcher_id, inning, inning_topbot",
-              )
-              .eq("game_pk", game_pk)
-              .not("events", "is", null)
-              .order("at_bat_number", { ascending: true });
-            if (error) return { at_bats: [], error: error.message };
-            return { at_bats: data ?? [] };
+            // Cached per-game Savant read rather than
+            // pitch_game_pitches.
+            const data = (await loadGamePitches(game_pk)).filter(
+              (p) => p.events != null,
+            );
+            // loadGamePitches degrades to [] rather than throwing, so
+            // there is no error branch to forward to the model.
+            return { at_bats: data };
           },
         }),
         get_pitcher_recent_games: tool({
@@ -206,12 +212,12 @@ export async function POST(request: Request) {
             // Use pitch_pitcher_games to filter for games this pitcher
             // actually pitched in (vs every game his team played), then
             // join pitch_games for date + opponent metadata.
-            const { data: mappings, error: mErr } = await supabase
-              .from("pitch_pitcher_games")
-              .select("game_pk")
-              .eq("pitcher_id", pitcher_id);
-            if (mErr) return { games: [], error: mErr.message };
-            const gamePks = (mappings ?? []).map((m) => m.game_pk);
+            // Game list from the cached Savant season read; the
+            // pitch_pitcher_games mapping table is no longer consulted.
+            const seasonForGames = await resolveDisplaySeason(supabase);
+            const gamePks = (
+              await loadSavantSeason(pitcher_id, seasonForGames)
+            ).games.map((g) => g.game_pk);
             if (gamePks.length === 0) return { games: [] };
             const { data, error } = await supabase
               .from("pitch_games")
@@ -247,19 +253,14 @@ export async function POST(request: Request) {
           }),
           execute: async ({ pitcher_id, batter_id, season }) => {
             const s = season ?? (await resolveDisplaySeason(supabase));
-            let q = supabase
-              .from("pitch_game_pitches")
-              .select(
-                "game_pk, at_bat_number, pitch_number, pitch_type, pitch_games!inner(season, game_type)",
-              )
-              .eq("pitcher_id", pitcher_id)
-              .eq("pitch_games.season", s)
-              .eq("pitch_games.game_type", "R")
-              .range(0, 4999);
-            if (batter_id != null) q = q.eq("batter_id", batter_id);
-            const { data, error } = await q;
-            if (error) return { error: error.message };
-            const matrix = buildSequencingMatrix(data ?? []);
+            // Cached Savant season read rather than
+            // pitch_game_pitches.
+            const seasonPitches = (await loadSavantSeason(pitcher_id, s))
+              .pitches;
+            const data = filterSeasonPitches(seasonPitches, {
+              vsBatterId: batter_id ?? null,
+            });
+            const matrix = buildSequencingMatrix(data);
             // Flatten to a model-friendly shape: percent + raw count
             // per cell, pitch labels included so the model doesn't
             // have to translate Statcast codes.
@@ -326,16 +327,11 @@ export async function POST(request: Request) {
           }),
           execute: async ({ pitcher_id, season }) => {
             const s = season ?? (await resolveDisplaySeason(supabase));
-            const { data, error } = await supabase
-              .from("pitch_game_pitches")
-              .select(
-                "game_pk, at_bat_number, pitch_number, pitch_type, pitch_games!inner(season, game_type, game_date)",
-              )
-              .eq("pitcher_id", pitcher_id)
-              .eq("pitch_games.season", s)
-              .eq("pitch_games.game_type", "R")
-              .range(0, 4999);
-            if (error) return { error: error.message };
+            // Cached Savant season read rather than
+            // pitch_game_pitches.
+            const seasonPitches = (await loadSavantSeason(pitcher_id, s))
+              .pitches;
+            const data = seasonPitches;
             type Row = {
               game_pk: number;
               at_bat_number: number;
@@ -392,24 +388,17 @@ export async function POST(request: Request) {
           }),
           execute: async ({ pitcher_id, season }) => {
             const s = season ?? (await resolveDisplaySeason(supabase));
-            const [{ data: pitcher }, { data, error }] = await Promise.all([
+            // Handedness still comes from pitch_pitchers (10 MB,
+            // stays); the pitches come from the cached Savant season.
+            const [{ data: pitcher }, shapeSeason] = await Promise.all([
               supabase
                 .from("pitch_pitchers")
                 .select("throws")
                 .eq("mlb_id", pitcher_id)
                 .maybeSingle(),
-              supabase
-                .from("pitch_game_pitches")
-                .select(
-                  "pitch_type, release_pos_x, release_pos_z, plate_x, plate_z, vy0, vz0, az, pitch_games!inner(season, game_type)",
-                )
-                .eq("pitcher_id", pitcher_id)
-                .eq("pitch_games.season", s)
-                .eq("pitch_games.game_type", "R")
-                .range(0, 4999),
+              loadSavantSeason(pitcher_id, s),
             ]);
-            if (error) return { error: error.message };
-            const rows = (data ?? []) as ShapePitch[];
+            const rows = shapeSeason.pitches as unknown as ShapePitch[];
             const throws =
               pitcher?.throws === "L" || pitcher?.throws === "R"
                 ? pitcher.throws
@@ -537,13 +526,8 @@ async function derivePageContext(
   if (atBatMatch) {
     const gamePk = Number(atBatMatch[1]);
     const atBatNumber = Number(atBatMatch[2]);
-    const { data: pitch } = await supabase
-      .from("pitch_game_pitches")
-      .select("pitcher_id, batter_id")
-      .eq("game_pk", gamePk)
-      .eq("at_bat_number", atBatNumber)
-      .limit(1)
-      .maybeSingle();
+    const pitch =
+      (await loadAtBatPitches(gamePk, atBatNumber))[0] ?? null;
     if (pitch?.pitcher_id) {
       const { data: p } = await supabase
         .from("pitch_pitchers")
