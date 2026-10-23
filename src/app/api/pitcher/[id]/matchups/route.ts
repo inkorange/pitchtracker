@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ensurePitcherSeasonCache } from "@/lib/cache/backfill";
+import {
+  filterSeasonPitches,
+  loadSavantSeason,
+} from "@/lib/cache/savant-season";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
 import { botIdGuard } from "@/lib/botid-guard";
 import { resolveDisplaySeason } from "@/lib/season/current-season";
-import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 
 // Returns every at-bat the given pitcher faced this batter in across
 // the selected season. Drives the matchups list on /pitcher/[id]
@@ -77,26 +79,14 @@ export async function GET(request: Request, { params }: RouteParams) {
 
   const supabase = await createClient();
   const season = seasonParam || (await resolveDisplaySeason(supabase));
-  await ensurePitcherSeasonCache(pitcherId, season);
 
-  const { data, error } = await supabase
-    .from("pitch_game_pitches")
-    .select(
-      "game_pk, at_bat_number, pitch_number, description, events, inning, inning_topbot, pitch_games!inner(season, game_type, game_date, home_team_id, away_team_id)",
-    )
-    .eq("pitcher_id", pitcherId)
-    .eq("batter_id", batterId)
-    .eq("pitch_games.season", season)
-    .in("pitch_games.game_type", [...COMPETITIVE_GAME_TYPES])
-    .order("game_pk", { ascending: true })
-    .order("at_bat_number", { ascending: true })
-    .order("pitch_number", { ascending: true });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  const rows = (data ?? []) as unknown as PitchRow[];
+  // Read from the cached Savant season rather than pitch_game_pitches,
+  // then narrow to this batter in memory. filterSeasonPitches owns what
+  // ?vsBatter= means, so this route and the pitcher page cannot drift.
+  const season_data = await loadSavantSeason(pitcherId, season);
+  const rows = filterSeasonPitches(season_data.pitches, {
+    vsBatterId: batterId,
+  }) as unknown as PitchRow[];
 
   // Group by (game_pk, at_bat_number); track last-pitch outcome.
   type Bucket = {

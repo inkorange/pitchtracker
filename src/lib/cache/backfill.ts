@@ -25,7 +25,7 @@ const inFlight = new Map<string, Promise<void>>();
 // cron deletes them again → thrash. So out-of-window seasons are never
 // persisted here.
 //
-// They are still READABLE: lib/cache/archive-season.ts serves them
+// They are still READABLE: lib/cache/savant-season.ts serves them
 // straight from Savant through a cached read-through that writes
 // nothing. This split is the point — persistence is bounded by
 // retention, availability is not.

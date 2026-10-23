@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  filterArchivePitches,
+  filterSeasonPitches,
   __testables,
-  type ArchivePitchRow,
-} from "../archive-season";
+  type SavantSeasonPitchRow,
+} from "../savant-season";
 import type { SavantPitchRow } from "@/lib/savant/client";
 
-const { shapeArchiveSeason } = __testables;
+const { shapeSavantSeason } = __testables;
 
 const TEAMS = new Map<string, number>([
   ["NYY", 147],
@@ -59,16 +59,16 @@ function row(over: Partial<SavantPitchRow> = {}): SavantPitchRow {
   } as SavantPitchRow;
 }
 
-describe("shapeArchiveSeason", () => {
+describe("shapeSavantSeason", () => {
   it("resolves Savant team abbreviations to MLB team ids", () => {
     // Savant gives "NYY"; every consumer downstream wants 147.
-    const { pitches } = shapeArchiveSeason([row()], 2025, TEAMS);
+    const { pitches } = shapeSavantSeason([row()], 2025, TEAMS);
     expect(pitches[0].pitch_games.home_team_id).toBe(147);
     expect(pitches[0].pitch_games.away_team_id).toBe(111);
   });
 
   it("leaves team ids null for an unknown abbreviation rather than guessing", () => {
-    const { pitches } = shapeArchiveSeason(
+    const { pitches } = shapeSavantSeason(
       [row({ home_team: "ZZZ" })],
       2025,
       TEAMS,
@@ -77,7 +77,7 @@ describe("shapeArchiveSeason", () => {
   });
 
   it("stamps the requested season and truncates the game date", () => {
-    const { pitches } = shapeArchiveSeason(
+    const { pitches } = shapeSavantSeason(
       [row({ game_date: "2025-07-04T00:00:00" })],
       2025,
       TEAMS,
@@ -89,7 +89,7 @@ describe("shapeArchiveSeason", () => {
   it("orders pitches by game, then at-bat, then pitch — matching the SQL path", () => {
     // Indices into this array are used by ?pitch= and the 3D scene, so
     // the two sources must agree on order.
-    const { pitches } = shapeArchiveSeason(
+    const { pitches } = shapeSavantSeason(
       [
         row({ game_pk: 2, at_bat_number: 1, pitch_number: 1 }),
         row({ game_pk: 1, at_bat_number: 2, pitch_number: 2 }),
@@ -110,7 +110,7 @@ describe("shapeArchiveSeason", () => {
   });
 
   it("derives arsenal counts and mean velocity, heaviest pitch first", () => {
-    const { arsenal } = shapeArchiveSeason(
+    const { arsenal } = shapeSavantSeason(
       [
         row({ pitch_type: "SL", release_speed: 86 }),
         row({ pitch_type: "FF", release_speed: 98 }),
@@ -126,7 +126,7 @@ describe("shapeArchiveSeason", () => {
 
   it("reports null velocity rather than 0 when no pitch has a reading", () => {
     // A 0 here would render as "0.0 mph" in the arsenal card.
-    const { arsenal } = shapeArchiveSeason(
+    const { arsenal } = shapeSavantSeason(
       [row({ pitch_type: "FF", release_speed: undefined })],
       2025,
       TEAMS,
@@ -136,7 +136,7 @@ describe("shapeArchiveSeason", () => {
   });
 
   it("skips rows with no pitch type instead of bucketing them together", () => {
-    const { arsenal } = shapeArchiveSeason(
+    const { arsenal } = shapeSavantSeason(
       [row({ pitch_type: "" }), row({ pitch_type: "FF" })],
       2025,
       TEAMS,
@@ -146,7 +146,7 @@ describe("shapeArchiveSeason", () => {
   });
 
   it("dedupes games by game_pk, newest first", () => {
-    const { games } = shapeArchiveSeason(
+    const { games } = shapeSavantSeason(
       [
         row({ game_pk: 10, game_date: "2025-04-01" }),
         row({ game_pk: 10, game_date: "2025-04-01", pitch_number: 2 }),
@@ -159,13 +159,13 @@ describe("shapeArchiveSeason", () => {
   });
 
   it("returns empty collections for no rows, not undefined", () => {
-    const out = shapeArchiveSeason([], 2025, TEAMS);
+    const out = shapeSavantSeason([], 2025, TEAMS);
     expect(out).toEqual({ pitches: [], arsenal: [], games: [] });
   });
 });
 
-describe("filterArchivePitches", () => {
-  const base = shapeArchiveSeason(
+describe("filterSeasonPitches", () => {
+  const base = shapeSavantSeason(
     [
       row({ game_pk: 1, pitch_number: 1, stand: "L", batter: 100 }),
       row({ game_pk: 1, pitch_number: 2, stand: "R", batter: 200 }),
@@ -175,11 +175,11 @@ describe("filterArchivePitches", () => {
     TEAMS,
   ).pitches;
 
-  const ids = (rows: ArchivePitchRow[]) =>
+  const ids = (rows: SavantSeasonPitchRow[]) =>
     rows.map((p) => `${p.game_pk}-${p.pitch_number}`);
 
   it("passes everything through when no filter is set", () => {
-    expect(ids(filterArchivePitches(base, {}))).toEqual([
+    expect(ids(filterSeasonPitches(base, {}))).toEqual([
       "1-1",
       "1-2",
       "2-1",
@@ -187,20 +187,20 @@ describe("filterArchivePitches", () => {
   });
 
   it("filters by batter handedness", () => {
-    expect(ids(filterArchivePitches(base, { hand: "L" }))).toEqual(["1-1"]);
+    expect(ids(filterSeasonPitches(base, { hand: "L" }))).toEqual(["1-1"]);
   });
 
   it("ignores a handedness value that isn't L or R", () => {
     // ?hand=both and junk values mean "no filter", same as the SQL path.
-    expect(filterArchivePitches(base, { hand: "both" })).toHaveLength(3);
+    expect(filterSeasonPitches(base, { hand: "both" })).toHaveLength(3);
   });
 
   it("filters by game", () => {
-    expect(ids(filterArchivePitches(base, { gamePk: 2 }))).toEqual(["2-1"]);
+    expect(ids(filterSeasonPitches(base, { gamePk: 2 }))).toEqual(["2-1"]);
   });
 
   it("filters by opposing batter", () => {
-    expect(ids(filterArchivePitches(base, { vsBatterId: 100 }))).toEqual([
+    expect(ids(filterSeasonPitches(base, { vsBatterId: 100 }))).toEqual([
       "1-1",
       "2-1",
     ]);
@@ -208,13 +208,13 @@ describe("filterArchivePitches", () => {
 
   it("applies filters together", () => {
     expect(
-      ids(filterArchivePitches(base, { hand: "R", vsBatterId: 100 })),
+      ids(filterSeasonPitches(base, { hand: "R", vsBatterId: 100 })),
     ).toEqual(["2-1"]);
   });
 
   it("treats null and undefined filters as absent", () => {
     expect(
-      filterArchivePitches(base, {
+      filterSeasonPitches(base, {
         hand: null,
         gamePk: null,
         vsBatterId: null,
