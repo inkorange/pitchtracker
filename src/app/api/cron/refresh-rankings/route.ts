@@ -5,14 +5,21 @@ import { resolveDisplaySeason } from "@/lib/season/current-season";
 
 export const maxDuration = 120;
 
+// UNSCHEDULED 2026-10-27 — this route no longer runs on a cron; see
+// the comment block in vercel.ts. It is kept as a manual tool and is
+// still correct if invoked by hand. Nothing writes pitch_game_pitches
+// any more, so its inputs are frozen and a run reproduces identical
+// output. Do not put it back on a schedule without reading the
+// "SPRING 2027 DECISION" note in vercel.ts.
+//
 // Recomputes the homepage rankings (top 5 per category) for the
 // active season. The aggregation work happens in the
 // pitch_recompute_rankings(p_season int) Postgres function — keeps
 // this route a thin pass-through and ensures the rebuild runs in a
 // single transaction.
 //
-// Vercel cron schedule: should be fired AFTER refresh-aggregates so
-// pitch_pitcher_aggregates is up-to-date for the velo / spin
+// Ordering still matters when invoked by hand: run refresh-aggregates
+// FIRST so pitch_pitcher_aggregates is up-to-date for the velo / spin
 // categories that read from it.
 export async function GET(request: Request) {
   const authError = verifyCronAuth(request);
