@@ -5,8 +5,17 @@ import { resolveDataSeason } from "@/lib/season/current-season";
 
 export const maxDuration = 120;
 
-// Daily eviction pass to keep pitch_game_pitches lean. We hot-cache
-// ONLY the newest season with data by default.
+// UNSCHEDULED 2026-10-27 — this route no longer runs on a cron; see
+// the comment block in vercel.ts. It is kept as a manual tool and is
+// still correct if invoked by hand. Nothing writes pitch_game_pitches
+// any more, so its inputs are frozen and a run reproduces identical
+// output. Do not put it back on a schedule without reading the
+// "SPRING 2027 DECISION" note in vercel.ts.
+//
+// Eviction pass to keep pitch_game_pitches lean. We hot-cache
+// ONLY the newest season with data by default. (Was a daily cron
+// until 2026-10-27; with no writer left, nothing accumulates for it
+// to bound, so it only matters if ingestion is ever turned back on.)
 //
 // NOTE: this comment used to claim older seasons were "lazily
 // re-fetched from Savant on demand via ensurePitcherSeasonCache when a

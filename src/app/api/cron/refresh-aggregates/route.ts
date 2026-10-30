@@ -4,6 +4,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const maxDuration = 180;
 
+// UNSCHEDULED 2026-10-27 — this route no longer runs on a cron; see
+// the comment block in vercel.ts. It is kept as a manual tool and is
+// still correct if invoked by hand. Nothing writes pitch_game_pitches
+// any more, so its inputs are frozen and a run reproduces identical
+// output. Do not put it back on a schedule without reading the
+// "SPRING 2027 DECISION" note in vercel.ts.
+//
 // Recomputes pitch_pitcher_aggregates from whatever is currently cached in
 // pitch_game_pitches by calling the pitch_recompute_aggregates() Postgres
 // function. The function body lives in supabase/migrations.

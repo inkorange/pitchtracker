@@ -130,15 +130,16 @@ export const RETENTION_KEEP_YEARS = Number(
 /**
  * Whether we keep cached pitch rows for a season.
  *
- * One definition, three consumers that must agree:
- *   - the write guard in lib/cache/backfill.ts (what we persist)
- *   - /api/cron/evict-old-seasons (what gets deleted)
- *   - the archive read-through (which seasons are served live from
- *     Savant instead of Postgres)
+ * Now that nothing writes pitch rows, this has a single live
+ * consumer: the archive read-through, which uses it to decide whether
+ * a season is served from Postgres or live from Savant. The other two
+ * are gone or dormant — lib/cache/backfill.ts (the write guard) was
+ * deleted with the precache cron, and /api/cron/evict-old-seasons is
+ * unscheduled and manual-only.
  *
- * Resolution failure returns true — the permissive answer. A stray
- * write is cheap and the cron trims it; wrongly declaring a season
- * unretained would route the current season through the archive path.
+ * Resolution failure returns true — the permissive answer. Wrongly
+ * declaring a season unretained would route the current season through
+ * the archive path.
  */
 export async function isRetainedSeason(
   supabase: SupabaseClient<Database>,

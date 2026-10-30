@@ -274,8 +274,11 @@ function bestCandidate(rows: CandidateRow[]): FeaturePick | null {
 // pitch_notable_at_bats window. Bounded by a wall-clock budget so it
 // degrades to a partial refresh instead of a 504.
 //
-// Only runs over already-cached pitches — we don't pull anything new
-// from Savant here. That's precache-recent-games' job (15:00 UTC).
+// Pulls the pitches it needs from Savant on demand via
+// loadGamesPitches — a day of MLB is ~15 cached requests. This used to
+// scan already-cached rows in pitch_game_pitches and relied on the
+// precache-recent-games cron having filled them first; that cron is
+// retired, so this route is now self-sufficient.
 export async function GET(request: Request) {
   const authError = verifyCronAuth(request);
   if (authError) return authError;
@@ -407,7 +410,7 @@ export async function GET(request: Request) {
         whiff_candidates: potdRows.length,
         hint:
           cachedYesterday === 0
-            ? "no pitches cached for yesterday — precache-recent-games likely failed or Savant is late"
+            ? "Savant returned no pitches for yesterday — likely still publishing, or the upstream fetch failed"
             : "pitches are cached but none scored above zero — check scoreCandidate calibration",
       },
       { status: 500 },
@@ -418,11 +421,6 @@ export async function GET(request: Request) {
   // PHASE 2 — rolling notable-at-bats window (best effort)
   // ---------------------------------------------------------------
 
-  // Source iteration from pitch_pitcher_games rather than pitch_games:
-  // pitch_games holds the full schedule (current + future + historical)
-  // and gte(game_date, cutoff) easily exceeds PostgREST's 1000-row cap
-  // with thousands of upcoming-schedule rows. Paginate by primary-key
-  // order so we catch the most-recent rows that otherwise get dropped.
   // Which games happened since the cutoff. This used to page through
   // pitch_pitcher_games joined to pitch_games; the schedule table alone
   // answers it, and pitch_games is 2 MB and stays in Postgres.
