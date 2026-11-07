@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTeamBatters, fetchPerson } from "@/lib/statsapi/client";
+import { pickChangedRows, fetchAllPaged } from "@/lib/cron/changed-rows";
 
 export const maxDuration = 300;
 
@@ -78,9 +79,42 @@ export async function GET(request: Request) {
     });
   }
 
+  // Same diff-before-write as refresh-pitchers; see
+  // lib/cron/changed-rows.ts.
+  const COMPARED = [
+    "full_name",
+    "first_name",
+    "last_name",
+    "bats",
+    "current_team_id",
+    "debut_year",
+    "last_active_year",
+  ] as const;
+  let stored;
+  try {
+    stored = new Map(
+      (
+        await fetchAllPaged((f, t) =>
+          supabase
+            .from("pitch_batters")
+            .select(
+              "mlb_id, full_name, first_name, last_name, bats, current_team_id, debut_year, last_active_year",
+            )
+            .range(f, t),
+        )
+      ).map((r) => [r.mlb_id, r]),
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+  const changed = pickChangedRows(rows, stored, (r) => r.mlb_id, COMPARED);
+
   let written = 0;
-  for (let i = 0; i < rows.length; i += 200) {
-    const chunk = rows.slice(i, i + 200);
+  for (let i = 0; i < changed.length; i += 200) {
+    const chunk = changed.slice(i, i + 200);
     const { error } = await supabase.from("pitch_batters").upsert(chunk);
     if (error) {
       return NextResponse.json(
@@ -91,5 +125,5 @@ export async function GET(request: Request) {
     written += chunk.length;
   }
 
-  return NextResponse.json({ season, refreshed: written });
+  return NextResponse.json({ season, seen: rows.length, refreshed: written });
 }
