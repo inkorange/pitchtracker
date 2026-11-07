@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTeamPitchers } from "@/lib/statsapi/client";
+import { pickChangedRows, fetchAllPaged } from "@/lib/cron/changed-rows";
 
 export const maxDuration = 300;
 
@@ -83,8 +84,38 @@ export async function GET(request: Request) {
       seen.add(key);
       return true;
     });
-    for (let i = 0; i < deduped.length; i += 200) {
-      const chunk = deduped.slice(i, i + 200);
+    // Write only the roster entries that actually moved. A roster row
+    // carries no mutable payload beyond its own composite key, so in
+    // the steady state every one of these was a rewrite that stored
+    // identical values. See lib/cron/changed-rows.ts.
+    let storedRoster;
+    try {
+      storedRoster = new Map(
+        (
+          await fetchAllPaged((f, t) =>
+            supabase
+              .from("pitch_team_rosters")
+              .select("team_id, season, pitcher_id, innings_pitched")
+              .eq("season", season)
+              .range(f, t),
+          )
+        ).map((r) => [`${r.team_id}-${r.season}-${r.pitcher_id}`, r]),
+      );
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : String(err), written },
+        { status: 500 },
+      );
+    }
+    const changedRoster = pickChangedRows(
+      deduped,
+      storedRoster,
+      (r) => `${r.team_id}-${r.season}-${r.pitcher_id}`,
+      ["innings_pitched"],
+    );
+
+    for (let i = 0; i < changedRoster.length; i += 200) {
+      const chunk = changedRoster.slice(i, i + 200);
       const { error } = await supabase.from("pitch_team_rosters").upsert(chunk);
       if (error) {
         return NextResponse.json(

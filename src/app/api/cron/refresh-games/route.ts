@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchSchedule } from "@/lib/statsapi/client";
+import { pickChangedRows, fetchAllPaged } from "@/lib/cron/changed-rows";
 
 export const maxDuration = 60;
 
@@ -54,9 +55,49 @@ export async function GET(request: Request) {
     updated_at: new Date().toISOString(),
   }));
 
+  // Write only the games whose schedule row actually moved. This was
+  // the largest of the metadata rewrites — the window is 37 days wide,
+  // so ~1,500 rows were rewritten daily although a finished game never
+  // changes again. Status is the only field that moves in practice, and
+  // only for today's games. See lib/cron/changed-rows.ts.
+  const COMPARED = [
+    "game_date",
+    "season",
+    "home_team_id",
+    "away_team_id",
+    "status",
+    "game_type",
+    "venue_name",
+  ] as const;
+  // Scoped to the same date window, and paged: in season this select
+  // exceeds PostgREST's 1000-row ceiling, which .range() does not lift.
+  let stored;
+  try {
+    stored = new Map(
+      (
+        await fetchAllPaged((f, t) =>
+          supabase
+            .from("pitch_games")
+            .select(
+              "game_pk, game_date, season, home_team_id, away_team_id, status, game_type, venue_name",
+            )
+            .gte("game_date", from)
+            .lte("game_date", to)
+            .range(f, t),
+        )
+      ).map((r) => [r.game_pk, r]),
+    );
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+  const changed = pickChangedRows(rows, stored, (r) => r.game_pk, COMPARED);
+
   let written = 0;
-  for (let i = 0; i < rows.length; i += 200) {
-    const chunk = rows.slice(i, i + 200);
+  for (let i = 0; i < changed.length; i += 200) {
+    const chunk = changed.slice(i, i + 200);
     const { error } = await supabase.from("pitch_games").upsert(chunk);
     if (error) {
       return NextResponse.json(
@@ -67,7 +108,7 @@ export async function GET(request: Request) {
     written += chunk.length;
   }
 
-  return NextResponse.json({ from, to, refreshed: written });
+  return NextResponse.json({ from, to, seen: rows.length, refreshed: written });
 }
 
 function addDays(d: Date, n: number): Date {
