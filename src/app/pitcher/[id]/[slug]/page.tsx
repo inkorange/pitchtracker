@@ -5,10 +5,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
 import { absoluteUrl } from "@/lib/url/site";
+import { isRetainedSeason } from "@/lib/season/current-season";
 import {
-  isRetainedSeason,
-  resolveDisplaySeason,
-} from "@/lib/season/current-season";
+  getCachedDisplaySeason,
+  getCachedPitcher,
+  getCachedTeamMap,
+  getCachedTopArsenal,
+} from "@/lib/pitcher/cached-reads";
 import {
   filterSeasonPitches,
   loadSavantSeason,
@@ -105,11 +108,8 @@ export async function generateMetadata({
     return { title: "Pitcher" };
   }
   const supabase = await createClient();
-  const { data: pitcher } = await supabase
-    .from("pitch_pitchers")
-    .select("full_name, throws, current_team_id, debut_year, last_active_year")
-    .eq("mlb_id", pitcherId)
-    .maybeSingle();
+  // Cached per pitcher, not per URL — see lib/pitcher/cached-reads.ts.
+  const pitcher = await getCachedPitcher(pitcherId).catch(() => null);
   if (!pitcher) {
     return { title: "Pitcher" };
   }
@@ -120,7 +120,7 @@ export async function generateMetadata({
   // Default season is the newest one we hold data for. Using the
   // calendar year meant that from Jan 1 the page defaulted to a season
   // with no rows and rendered "No arsenal data for <year>".
-  const currentYear = await resolveDisplaySeason(supabase);
+  const currentYear = await getCachedDisplaySeason();
   const season =
     sp.season && !Number.isNaN(Number(sp.season))
       ? Number(sp.season)
@@ -138,29 +138,18 @@ export async function generateMetadata({
     pitcher.last_active_year && pitcher.last_active_year < currentYear
       ? pitcher.last_active_year
       : season;
-  const [teamRes, aggregatesRes] = await Promise.all([
-    pitcher.current_team_id
-      ? supabase
-          .from("pitch_teams")
-          .select("name")
-          .eq("mlb_id", pitcher.current_team_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase
-      .from("pitch_pitcher_aggregates")
-      .select("pitch_type, pitch_count, avg_velocity")
-      .eq("pitcher_id", pitcherId)
-      .eq("season", aggregatesSeason)
-      .eq("batter_hand", "*")
-      .order("pitch_count", { ascending: false })
-      .limit(4),
+  const [teamMap, cachedArsenal] = await Promise.all([
+    getCachedTeamMap().catch(() => new Map()),
+    getCachedTopArsenal(pitcherId, aggregatesSeason).catch(() => []),
   ]);
-  const teamName: string | null = teamRes.data?.name ?? null;
+  const teamName: string | null = pitcher.current_team_id
+    ? (teamMap.get(pitcher.current_team_id)?.name ?? null)
+    : null;
   // An archived season has no aggregates rows, so the arsenal phrase —
   // the part that makes each pitcher's description unique rather than
   // boilerplate — would silently drop out of the metadata. Fall back to
   // the cached Savant read, which is the same data the page body uses.
-  let topPitches = aggregatesRes.data ?? [];
+  let topPitches = cachedArsenal;
   if (
     topPitches.length === 0 &&
     !(await isRetainedSeason(supabase, aggregatesSeason))
@@ -382,13 +371,9 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   const pitcherId = Number(id);
   if (!Number.isFinite(pitcherId)) notFound();
 
-  const supabase = await createClient();
-
-  const { data: pitcher } = await supabase
-    .from("pitch_pitchers")
-    .select("*")
-    .eq("mlb_id", pitcherId)
-    .maybeSingle();
+  // Cached per pitcher, not per URL — see lib/pitcher/cached-reads.ts.
+  // Errors propagate (500) rather than 404ing a real pitcher.
+  const pitcher = await getCachedPitcher(pitcherId);
   if (!pitcher) notFound();
 
   // Slug normalization: if the request's slug doesn't match the
@@ -407,7 +392,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     );
   }
 
-  const currentYear = await resolveDisplaySeason(supabase);
+  const currentYear = await getCachedDisplaySeason();
   const season = sp.season ? Number(sp.season) : currentYear;
 
   // Season picker offers a fixed window: from current year back to the
@@ -551,13 +536,12 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     if (g.home_team_id) teamIds.add(g.home_team_id);
     if (g.away_team_id) teamIds.add(g.away_team_id);
   }
-  const { data: teamRows } =
-    teamIds.size > 0
-      ? await supabase
-          .from("pitch_teams")
-          .select("mlb_id, abbreviation, name")
-          .in("mlb_id", Array.from(teamIds))
-      : { data: [] };
+  // One cached read of all 30 teams replaces the per-render `.in` and
+  // `.eq` lookups that used to run on every filter permutation.
+  const teamMap = await getCachedTeamMap();
+  const teamRows = Array.from(teamIds)
+    .map((id) => teamMap.get(id))
+    .filter((t): t is NonNullable<typeof t> => t != null);
   const teamAbbr = new Map<number, string>(
     (teamRows ?? []).map((t) => [t.mlb_id, t.abbreviation]),
   );
@@ -576,12 +560,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     .sort((a, b) => b.game_date.localeCompare(a.game_date));
 
   const team = pitcher.current_team_id
-    ? await supabase
-        .from("pitch_teams")
-        .select("mlb_id, name, abbreviation")
-        .eq("mlb_id", pitcher.current_team_id)
-        .maybeSingle()
-        .then((r) => r.data)
+    ? (teamMap.get(pitcher.current_team_id) ?? null)
     : null;
 
   // Templated "About" bio for the pitcher card. Rendered inside a
