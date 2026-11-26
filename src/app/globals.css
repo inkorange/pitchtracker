@@ -55,11 +55,11 @@
   --radius-panel: 6px;
   --radius-drawer: 16px;
 
-  /* Handoff says 1240px; widened to 1400px per Chris's review (2026-11-26). */
-  --container-page: 1400px;
+  /* Handoff says 1240px; set to 1280px per Chris's review (2026-11-26). */
+  --container-page: 1280px;
 }
 
-/* Page container: 1400 max, 32px sides desktop / 20px mobile. */
+/* Page container: 1280 max, 32px sides desktop / 20px mobile. */
 @utility container-page {
   max-width: var(--container-page);
   margin-inline: auto;
