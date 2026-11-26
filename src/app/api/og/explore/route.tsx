@@ -66,7 +66,7 @@ export async function GET(request: Request) {
   const dotColors =
     pitchTypes.length > 0
       ? pitchTypes.slice(0, 5).map((t) => getPitchColor(t))
-      : ["#ff4655", "#9b6bff", "#33d4aa", "#5588ff", "#ffaa44"];
+      : ["#f0505a", "#b392f0", "#2dd4bf", "#4c8df6", "#f5a524"];
 
   return new ImageResponse(
     (

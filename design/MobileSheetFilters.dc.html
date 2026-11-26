@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pitcher mobile — sheet expanded, filters</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif">
+
+<header style="position: absolute; top: 0; left: 0; right: 0; height: 56px; display: flex; align-items: center; gap: 4px; padding: 0 4px; background: #0A101C; border-bottom: 1px solid #1B2438; z-index: 3">
+<a href="#" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<div style="flex-grow: 1; display: flex; flex-direction: column">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 22px; line-height: 1">J. MISIOROWSKI</span>
+<span style="font-size: 12px; color: #9AA6BD">RHP · MIL · 2026</span>
+</div>
+<button aria-label="Search" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg></button>
+</header>
+
+<div style="position: absolute; top: 56px; left: 0; right: 0; height: 170px; overflow: hidden">
+<img src="/_blob/6232af7d81a694a91e21900a4a3e99a4" alt="3D pitch scene, catcher view, dimmed while filtering" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 58%; filter: brightness(0.6)">
+</div>
+
+<section aria-label="Pitcher panel" style="position: absolute; left: 0; right: 0; top: 150px; bottom: 0; background: #0A101C; border-top: 1px solid #2A3650; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,0.5); display: flex; flex-direction: column">
+<a href="MobileSheetPeek.dc.html" aria-label="Collapse panel" style="height: 24px; flex-shrink: 0; display: flex; align-items: center; justify-content: center"><span style="width: 40px; height: 4px; border-radius: 2px; background: #5A6A88"></span></a>
+<div style="padding: 0 20px 10px; display: flex; align-items: baseline; justify-content: space-between">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 26px; line-height: 1">{{ count }} PITCHES</span>
+<span style="font-size: 12px; color: #9AA6BD">updates live</span>
+</div>
+<div role="tablist" aria-label="Panels" style="display: flex; padding: 0 12px; border-bottom: 1px solid #1B2438; flex-shrink: 0">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+<button role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+</sc-for>
+</div>
+
+<div style="flex-grow: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 22px; min-height: 0">
+<sc-if value="{{ isFilters }}" hint-placeholder-val="{{ true }}">
+<fieldset style="border: 0; padding: 0; margin: 0">
+<legend style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; margin-bottom: 10px">BATTER SIDE</legend>
+<div style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 3px">
+<sc-for list="{{ sides }}" as="o" hint-placeholder-count="3">
+<button aria-pressed="{{ o.on }}" onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button>
+</sc-for>
+</div>
+</fieldset>
+<fieldset style="border: 0; padding: 0; margin: 0">
+<legend style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; margin-bottom: 10px">PITCH OUTCOME</legend>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="5">
+<button aria-pressed="{{ o.on }}" onClick="{{ o.toggle }}" style="{{ o.style }}"><span style="{{ o.dot }}"></span>{{ o.label }}</button>
+</sc-for>
+</div>
+</fieldset>
+<fieldset style="border: 0; padding: 0; margin: 0">
+<legend style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; margin-bottom: 10px">AT-BAT RESULT</legend>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ results }}" as="o" hint-placeholder-count="6">
+<button aria-pressed="{{ o.on }}" onClick="{{ o.toggle }}" style="{{ o.style }}">{{ o.label }}</button>
+</sc-for>
+</div>
+</fieldset>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="a2-game" style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">GAME</label>
+<select id="a2-game" style="height: 48px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 15px; font-family: Inter, sans-serif">
+<option>All games in 2026</option>
+<option>Oct 28 · MIL @ TB</option>
+<option>Oct 23 · TB @ MIL</option>
+</select>
+</div>
+</sc-if>
+<sc-if value="{{ isArsenal }}" hint-placeholder-val="{{ false }}">
+<sc-for list="{{ arsenal }}" as="p" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 48px; border-bottom: 1px solid #1B2438">
+<span style="{{ p.dot }}"></span>
+<span style="flex-grow: 1; font-size: 15px; font-weight: 600">{{ p.name }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px">{{ p.mph }}</span>
+<span style="font-size: 12px; color: #9AA6BD; width: 44px; text-align: right">{{ p.pct }}</span>
+</div>
+</sc-for>
+</sc-if>
+<sc-if value="{{ isGames }}" hint-placeholder-val="{{ false }}">
+<sc-for list="{{ games }}" as="g" hint-placeholder-count="6">
+<button style="display: flex; justify-content: space-between; align-items: center; min-height: 48px; padding: 0; border: 0; border-bottom: 1px solid #1B2438; background: transparent; color: #F3F5F9"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 19px">{{ g.m }}</span><span style="font-size: 13px; color: #9AA6BD">{{ g.d }}</span></button>
+</sc-for>
+</sc-if>
+</div>
+
+<div style="flex-shrink: 0; display: flex; gap: 10px; padding: 12px 20px 24px; border-top: 1px solid #1B2438; background: #0A101C">
+<button onClick="{{ reset }}" style="height: 48px; padding: 0 18px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 15px; font-weight: 600">Reset</button>
+<a href="MobileSheetPeek.dc.html" style="flex-grow: 1; height: 48px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center">View {{ count }} pitches</a>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tab: 'filters', side: 'vs LHB', out: { 'Swinging strike': true, 'Called strike': true }, res: {} }; }
+  renderVals() {
+    const s = this.state;
+    const tabs = [['arsenal', 'Arsenal'], ['filters', 'Filters'], ['games', 'Games']].map(([id, label]) => ({
+      label, sel: s.tab === id ? 'true' : 'false', pick: () => this.setState({ tab: id }),
+      style: 'height: 44px; padding: 0 12px; border: 0; background: transparent; font-size: 14px; margin-bottom: -1px; ' + (s.tab === id ? 'color: #F3F5F9; font-weight: 700; border-bottom: 3px solid #E8364F' : 'color: #9AA6BD; font-weight: 600; border-bottom: 3px solid transparent')
+    }));
+    const chip = (on) => 'height: 40px; padding: 0 14px; border-radius: 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; ' + (on ? 'background: #F3F5F9; color: #070B14; border: 1px solid #F3F5F9' : 'background: transparent; color: #C4CCDB; border: 1px solid #2A3650');
+    const sides = ['Both', 'vs LHB', 'vs RHB'].map((label) => ({ label, on: s.side === label ? 'true' : 'false', pick: () => this.setState({ side: label }),
+      style: 'flex: 1; height: 40px; border: 0; border-radius: 2px; font-size: 14px; ' + (s.side === label ? 'background: #F3F5F9; color: #070B14; font-weight: 700' : 'background: transparent; color: #C4CCDB; font-weight: 600') }));
+    const outW = { 'Swinging strike': 0.17, 'Called strike': 0.16, 'Ball': 0.34, 'Foul': 0.17, 'In play': 0.16 };
+    const outcomes = [['Swinging strike', '#F0505A'], ['Called strike', '#F5A524'], ['Ball', '#4C8DF6'], ['Foul', '#9AA6BD'], ['In play', '#22C55E']].map(([label, c]) => {
+      const on = !!s.out[label];
+      return { label, on: on ? 'true' : 'false', style: chip(on), dot: 'width: 8px; height: 8px; border-radius: 50%; background: ' + c, toggle: () => this.setState({ out: Object.assign({}, s.out, { [label]: !on }) }) };
+    });
+    const results = ['Strikeout', 'Walk', 'Hit', 'Home run', 'Out', 'HBP'].map((label) => {
+      const on = !!s.res[label];
+      return { label, on: on ? 'true' : 'false', style: chip(on), toggle: () => this.setState({ res: Object.assign({}, s.res, { [label]: !on }) }) };
+    });
+    let frac = Object.keys(s.out).filter((k) => s.out[k]).reduce((a, k) => a + outW[k], 0) || 1;
+    const sideF = s.side === 'Both' ? 1 : s.side === 'vs LHB' ? 0.42 : 0.58;
+    const nRes = Object.keys(s.res).filter((k) => s.res[k]).length;
+    const resF = nRes ? Math.min(1, 0.22 * nRes) : 1;
+    const count = Math.round(2994 * frac * sideF * resF).toLocaleString();
+    const arsenal = [['Four-Seam', '#F0505A', '100.6', '64%'], ['Cutter', '#F5A524', '95.8', '14%'], ['Slider', '#B392F0', '91.8', '11%'], ['Curveball', '#4C8DF6', '88.0', '10%'], ['Changeup', '#2DD4BF', '92.5', '1%'], ['Sinker', '#FB7C3C', '100.6', '0%']].map(([name, c, mph, pct]) => ({ name, mph, pct, dot: 'width: 12px; height: 12px; border-radius: 50%; background: ' + c }));
+    const games = [['MIL @ TB', 'Oct 28'], ['TB @ MIL', 'Oct 23'], ['LAD @ MIL', 'Oct 11'], ['SD @ MIL', 'Oct 3'], ['STL @ MIL', 'Sep 27'], ['MIL @ BAL', 'Sep 20'], ['MIL @ PIT', 'Sep 15']].map(([m, d]) => ({ m, d }));
+    return {
+      tabs, sides, outcomes, results, arsenal, games, count,
+      isFilters: s.tab === 'filters', isArsenal: s.tab === 'arsenal', isGames: s.tab === 'games',
+      reset: () => this.setState({ side: 'Both', out: {}, res: {} })
+    };
+  }
+}
+</script>
+</body>
+</html>

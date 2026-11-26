@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Homepage mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+.draw{stroke-dasharray:100;stroke-dashoffset:100;animation:ptdraw 4.5s ease-out infinite}
+.draw:nth-of-type(3n+1){animation-delay:.25s}
+.draw:nth-of-type(3n+2){animation-delay:.5s}
+.pop{opacity:0;animation:ptpop 4.5s ease-out infinite}
+.fadein{animation:ptfade .35s ease .18s both}
+@keyframes ptfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes ptdraw{0%{stroke-dashoffset:100;opacity:1}35%{stroke-dashoffset:0}85%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+@keyframes ptpop{0%,30%{opacity:0}42%,85%{opacity:.9}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.fadein{animation:none}.draw{animation:none;stroke-dashoffset:0}.pop{animation:none;opacity:.9}}
+</style>
+</helmet>
+<div style="width: 390px; min-height: 6000px; box-sizing: border-box; background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif">
+
+<header style="height: 56px; padding: 0 8px 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1B2438; background: #0A101C">
+<a href="#" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 26px">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<div style="display: flex">
+<button aria-label="Search" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg></button>
+<button aria-label="Menu" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button>
+</div>
+</header>
+
+<section style="position: relative; overflow: hidden; isolation: isolate; padding: 32px 24px 28px; display: flex; flex-direction: column; gap: 18px">
+<div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1">
+<img src="/_blob/faff1a5efdb390bedbe70b3e69b0ce88" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%">
+<div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(7,11,20,0.6) 0%, rgba(7,11,20,0.88) 45%, #070B14 100%)"></div>
+</div>
+<span style="align-self: flex-start; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.5px; padding: 3px 14px 3px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">STATCAST IN 3D</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 60px; line-height: 0.9; text-transform: uppercase">See the pitch <span style="color: #E8364F">the hitter saw.</span></h1>
+<p style="margin: 0; font-size: 16px; line-height: 1.55; color: #C4CCDB">Every MLB pitch rebuilt as a 3D flight path from Statcast tracking. Study tunnels, break and approach angle from any camera.</p>
+<label for="m-search" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search a pitcher</label>
+<input id="m-search" type="search" placeholder="Search a pitcher" style="height: 52px; padding: 0 16px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 16px; font-family: Inter, sans-serif">
+</section>
+
+<figure style="margin: 0 24px; position: relative; height: 400px; border-radius: 6px; overflow: hidden; border: 1px solid #2A3650">
+<img src="/_blob/6232af7d81a694a91e21900a4a3e99a4" alt="3D scene from behind the catcher with a season of pitch paths converging on the strike zone" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+<svg aria-hidden="true" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<path d="M195 446 Q198 440 192 424" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="192" cy="424" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q183 427 201 525" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="201" cy="525" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q159 472 120 516" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="120" cy="516" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q201 460 228 524" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="228" cy="524" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q200 482 195 546" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="195" cy="546" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q212 466 217 498" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="217" cy="498" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q225 453 241 461" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="241" cy="461" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q203 457 200 474" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="200" cy="474" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q201 465 196 497" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="196" cy="497" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q189 486 240 611" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="240" cy="611" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q196 450 225 592" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="225" cy="592" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q158 454 156 601" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="156" cy="601" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q225 457 240 473" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="240" cy="473" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q198 451 228 595" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="228" cy="595" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q205 472 203 515" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="203" cy="515" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q192 483 181 547" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="181" cy="547" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q193 453 182 462" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="182" cy="462" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q208 450 210 453" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="210" cy="453" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q173 467 145 503" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="145" cy="503" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q204 464 201 494" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="201" cy="494" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q197 462 220 529" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="220" cy="529" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q170 490 204 623" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="204" cy="623" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q210 467 214 503" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="214" cy="503" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q196 481 225 680" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="225" cy="680" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q202 454 235 603" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="235" cy="603" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q170 461 140 484" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="140" cy="484" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q199 440 194 423" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="194" cy="423" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q230 484 314 606" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="314" cy="606" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q187 481 171 542" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="171" cy="542" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q163 486 165 693" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="165" cy="693" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q194 476 184 528" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="184" cy="528" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q209 469 210 506" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="210" cy="506" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q204 464 234 535" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="234" cy="535" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q221 463 233 491" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="233" cy="491" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q202 484 198 549" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="198" cy="549" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q167 481 200 595" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="200" cy="595" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q204 463 202 490" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="202" cy="490" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q205 459 203 477" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="203" cy="477" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q216 458 255 518" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="255" cy="518" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q202 486 262 610" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="262" cy="610" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+</svg>
+<div style="position: absolute; top: 12px; left: 12px; display: flex; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 1px; font-size: 16px">
+<span style="background: #0A101C; padding: 4px 10px">MIL</span>
+<span style="background: #F3F5F9; color: #070B14; padding: 4px 10px">J. MISIOROWSKI</span>
+</div>
+<div style="position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgba(7,11,20,0.88); border-left: 4px solid #E8364F; padding: 8px 12px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px">2,994 PITCHES · 2026</div>
+</figure>
+
+<div style="margin-top: 28px; background: #E8364F; overflow: hidden; white-space: nowrap; height: 44px; display: flex; align-items: center; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px">
+<span style="background: #070B14; height: 100%; display: flex; align-items: center; padding: 0 16px 0 24px; letter-spacing: 1px; clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%)">LEADERS</span>
+<span style="padding: 0 16px; border-right: 1px solid rgba(255,255,255,0.35)"><span style="opacity: 0.8; font-size: 14px">VELO</span> M. Miller 101.4</span>
+<span style="padding: 0 16px; border-right: 1px solid rgba(255,255,255,0.35)"><span style="opacity: 0.8; font-size: 14px">K</span> J. Misiorowski 252</span>
+<span style="padding: 0 16px"><span style="opacity: 0.8; font-size: 14px">WHIFF%</span> M. Miller 17.9</span>
+</div>
+
+<dc-import name="FeatureExpandMobile" hint-size="390px,1060px"></dc-import>
+
+<section style="padding: 32px 24px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 28px; text-transform: uppercase">Daily picks</h2>
+<a href="#" style="font-size: 14px; font-weight: 600; min-height: 44px; display: flex; align-items: center">All →</a>
+</div>
+<a href="#" style="display: flex; flex-direction: column; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; overflow: hidden">
+<div style="height: 150px; position: relative">
+<img src="/_blob/6232af7d81a694a91e21900a4a3e99a4" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%">
+<span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center"><span style="width: 52px; height: 52px; border-radius: 50%; background: #E8364F; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4l13 8-13 8z"></path></svg></span></span>
+</div>
+<div style="padding: 16px 18px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.5px; color: #F6C344">FINAL PITCH OF THE SEASON · OCT 28</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 26px; line-height: 1">Jacob Misiorowski</span>
+<span style="font-size: 14px; color: #C4CCDB">102.8 mph fastball, swing &amp; miss · vs Jonathan Aranda</span>
+</div>
+</a>
+</section>
+
+<section style="padding: 32px 0 32px; display: flex; flex-direction: column; gap: 14px">
+<div style="padding: 0 24px; display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 28px; text-transform: uppercase">Leaderboards</h2>
+<span style="font-size: 13px; color: #9AA6BD">2026 season</span>
+</div>
+<div role="tablist" aria-label="Leaderboard stat" style="display: flex; gap: 8px; padding: 0 24px; overflow-x: auto">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+<button role="tab" aria-selected="{{ t.sel }}" style="{{ t.style }}">{{ t.label }}</button>
+</sc-for>
+</div>
+<article style="margin: 0 24px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<header style="padding: 14px 18px; border-bottom: 1px solid #1B2438; background: #131C30; display: flex; justify-content: space-between; align-items: center">
+<div style="display: flex; flex-direction: column">
+<h3 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; text-transform: uppercase">Top velocity</h3>
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">4-SEAM AVG · MPH</span>
+</div>
+<button aria-label="What is this stat?" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid #2A3650; background: transparent; color: #C4CCDB">?</button>
+</header>
+<ol style="list-style: none; margin: 0; padding: 4px 0">
+<sc-for list="{{ velo }}" as="r" hint-placeholder-count="5">
+<li style="display: flex; align-items: center; gap: 12px; padding: 10px 18px">
+<span style="width: 14px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; color: #9AA6BD">{{ r.rank }}</span>
+<span style="width: 32px; height: 32px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #C4CCDB">{{ r.ini }}</span>
+<span style="flex-grow: 1; font-size: 15px; font-weight: 500">{{ r.name }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px">{{ r.v }}</span>
+</li>
+</sc-for>
+</ol>
+</article>
+</section>
+
+<section style="background: #0F1626; border-top: 1px solid #1B2438; border-bottom: 1px solid #1B2438; padding: 48px 24px; display: flex; flex-direction: column; gap: 16px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.5px; color: #F6C344">FOR COACHES &amp; PLAYER DEVELOPMENT</span>
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 40px; line-height: 0.95; text-transform: uppercase">Built for the film room.</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #C4CCDB">Put a pitcher’s whole arsenal on one screen and show him where his slider peels off the fastball. Scout tomorrow’s starter by what he throws to lefties. Step through the at-bat that got away.</p>
+<svg role="img" aria-label="Side-view diagram: three pitches share one path, then separate after the decision point" viewBox="0 0 560 260" style="width: 100%; height: auto; background: #070B14; border: 1px solid #2A3650; border-radius: 6px">
+<line x1="330" y1="20" x2="330" y2="230" stroke="#F6C344" stroke-width="2" stroke-dasharray="6 6"></line>
+<text x="338" y="38" fill="#F6C344" font-family="Inter, sans-serif" font-size="18" font-weight="600">DECISION POINT</text>
+<path d="M30 70 C 200 78, 360 90, 530 108" stroke="#F0505A" stroke-width="5" fill="none" stroke-linecap="round"></path>
+<path d="M30 70 C 200 80, 360 104, 530 160" stroke="#B392F0" stroke-width="5" fill="none" stroke-linecap="round"></path>
+<path d="M30 70 C 200 76, 360 118, 530 205" stroke="#4C8DF6" stroke-width="5" fill="none" stroke-linecap="round"></path>
+<circle cx="30" cy="70" r="9" fill="#F3F5F9"></circle>
+</svg>
+</section>
+
+<section style="padding: 48px 24px; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0 0 4px; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 36px; line-height: 0.95; text-transform: uppercase">Ask it like you’d ask your analyst.</h2>
+<p style="margin: 0 0 8px; font-size: 15px; line-height: 1.55; color: #C4CCDB">Voice or text. Ask PitchTracker drops you into the matching pitches.</p>
+<a href="#" style="display: flex; align-items: center; min-height: 52px; padding: 0 16px; border: 1px solid #2A3650; border-radius: 4px; font-size: 15px">“Misiorowski’s sliders to lefties with two strikes”</a>
+<a href="#" style="display: flex; align-items: center; min-height: 52px; padding: 0 16px; border: 1px solid #2A3650; border-radius: 4px; font-size: 15px">“Show Cease’s strikeouts from his last start”</a>
+</section>
+
+<section style="padding: 16px 24px 56px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 28px; text-transform: uppercase">Featured pitchers</h2>
+<a href="#" style="font-size: 14px; font-weight: 600; min-height: 44px; display: flex; align-items: center">Teams →</a>
+</div>
+<sc-for list="{{ featured }}" as="p" hint-placeholder-count="4">
+<a href="#" style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<span style="width: 44px; height: 44px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #C4CCDB">{{ p.ini }}</span>
+<span style="display: flex; flex-direction: column; flex-grow: 1">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 21px; line-height: 1.1">{{ p.name }}</span>
+<span style="font-size: 13px; color: #9AA6BD">{{ p.meta }}</span>
+</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; padding: 3px 8px; border: 1px solid #2A3650; border-radius: 3px; color: #C4CCDB">{{ p.team }}</span>
+</a>
+</sc-for>
+</section>
+
+<footer style="border-top: 1px solid #1B2438; background: #0A101C; padding: 32px 24px; font-size: 12px; line-height: 1.6; color: #9AA6BD; display: flex; flex-direction: column; gap: 10px">
+<p style="margin: 0">Not affiliated with or endorsed by Major League Baseball, MLB Advanced Media, or any of its clubs. All MLB and Club marks, logos, and player names are trademarks of their respective owners and are used here for identification purposes only.</p>
+<p style="margin: 0">Pitch trajectory and Statcast data: Baseball Savant. Player metadata, schedule, and headshots: MLB Stats API and mlbstatic.com.</p>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":6000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const on = 'flex-shrink: 0; height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #F3F5F9; background: #F3F5F9; color: #070B14; font-weight: 600; font-size: 14px; font-family: Inter, sans-serif';
+    const off = 'flex-shrink: 0; height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 14px; font-family: Inter, sans-serif';
+    const tabs = ['Velo', 'K', 'Whiff%', 'CSW%', 'Spin', 'VAA'].map((label, i) => ({ label, sel: i === 0 ? 'true' : 'false', style: i === 0 ? on : off }));
+    const velo = [['M. Miller', '101.4', 'MM'], ['E. Henriquez', '100.7', 'EH'], ['J. Misiorowski', '100.6', 'JM'], ['J. Duran', '100.5', 'JD'], ['A. Muñoz', '99.8', 'AM']].map((r, i) => ({ rank: i + 1, name: r[0], v: r[1], ini: r[2] }));
+    return {
+      tabs, velo,
+      features: [
+        { n: '01', title: 'Every pitch in 3D', body: 'Statcast tracking as real flight paths, from catcher, batter, top or side.' },
+        { n: '02', title: 'Tunnels you can see', body: 'Overlay the arsenal and watch where pitches share a lane — and split.' },
+        { n: '03', title: 'Arsenal at a glance', body: 'Velocity and usage per pitch, filtered by outcome, side and game.' },
+        { n: '04', title: 'Replay any at-bat', body: 'Pitch by pitch, in the order the hitter saw it.' }
+      ],
+      featured: [
+        { name: 'Jacob Misiorowski', meta: 'RHP · 252 K', team: 'MIL', ini: 'JM' },
+        { name: 'Gavin Williams', meta: 'RHP · 248 K', team: 'CLE', ini: 'GW' },
+        { name: 'Dylan Cease', meta: 'RHP · 239 K', team: 'TOR', ini: 'DC' },
+        { name: 'Cristopher Sánchez', meta: 'LHP · 231 K', team: 'PHI', ini: 'CS' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+{
+"v": 3,
+"createdOnFiles": {
+"v": 1,
+"at": "2026-11-26T19:50:00Z"
+},
+"title": "PitchTracker Redesign",
+"launch": {
+"view": "canvas"
+},
+"pages": [],
+"boards": {
+"Main.dc.html": {
+"x": 0,
+"y": 0,
+"w": 1440,
+"h": 4600,
+"title": "Homepage — desktop",
+"expand": "fill"
+},
+"HomeMobile.dc.html": {
+"x": 1520,
+"y": 0,
+"w": 390,
+"h": 6000,
+"title": "Homepage — mobile"
+},
+"Pitcher.dc.html": {
+"x": 0,
+"y": 6500,
+"w": 1440,
+"h": 900,
+"title": "Pitcher page — desktop (docked rail)",
+"is_interactive": true
+},
+"MobileSheetPeek.dc.html": {
+"x": 1520,
+"y": 6500,
+"w": 390,
+"h": 844,
+"title": "Mobile A1 — bottom sheet, peek"
+},
+"MobileSheetFilters.dc.html": {
+"x": 1990,
+"y": 6500,
+"w": 390,
+"h": 844,
+"title": "Mobile A2 — sheet expanded, filters",
+"is_interactive": true
+},
+"MobileToolbar.dc.html": {
+"x": 2540,
+"y": 6500,
+"w": 390,
+"h": 844,
+"title": "Mobile B1 — scene + toolbar",
+"is_interactive": true
+},
+"MobileFilterPage.dc.html": {
+"x": 3010,
+"y": 6500,
+"w": 390,
+"h": 844,
+"title": "Mobile B2 — full-screen filters",
+"is_interactive": true
+},
+"Stats.dc.html": {
+"x": 0,
+"y": 8100,
+"w": 1440,
+"h": 900,
+"title": "Stats view — desktop"
+},
+"StatsMobile.dc.html": {
+"x": 1520,
+"y": 8100,
+"w": 390,
+"h": 1500,
+"title": "Stats view — mobile"
+},
+"AtBat.dc.html": {
+"x": 1990,
+"y": 8100,
+"w": 1440,
+"h": 900,
+"title": "At-bat replay — desktop",
+"is_interactive": true
+},
+"AtBatMobile.dc.html": {
+"x": 3510,
+"y": 8100,
+"w": 390,
+"h": 844,
+"title": "At-bat replay — mobile",
+"is_interactive": true
+},
+"FeatureExpand.dc.html": {
+"x": 2430,
+"y": 0,
+"w": 1440,
+"h": 780,
+"title": "Feature cards — hover to expand (desktop)",
+"is_interactive": true
+},
+"FeatureExpandMobile.dc.html": {
+"x": 3950,
+"y": 0,
+"w": 390,
+"h": 1060,
+"title": "Feature cards — tap to expand (mobile)",
+"is_interactive": true
+},
+"HeroOptA.dc.html": {
+"x": 2430,
+"y": 1300,
+"w": 1440,
+"h": 1040,
+"title": "Hero bg A — stadium photo"
+},
+"HeroOptB.dc.html": {
+"x": 2430,
+"y": 2460,
+"w": 1440,
+"h": 1040,
+"title": "Hero bg B — field & zone line art"
+},
+"HeroOptC.dc.html": {
+"x": 2430,
+"y": 3620,
+"w": 1440,
+"h": 1040,
+"title": "Hero bg C — broadcast slab"
+}
+},
+"order": [
+"Main.dc.html",
+"HomeMobile.dc.html",
+"Pitcher.dc.html",
+"MobileSheetPeek.dc.html",
+"MobileSheetFilters.dc.html",
+"MobileToolbar.dc.html",
+"MobileFilterPage.dc.html",
+"Stats.dc.html",
+"StatsMobile.dc.html",
+"AtBat.dc.html",
+"AtBatMobile.dc.html",
+"FeatureExpand.dc.html",
+"FeatureExpandMobile.dc.html",
+"HeroOptA.dc.html",
+"HeroOptB.dc.html",
+"HeroOptC.dc.html"
+],
+"notes": {
+"t1": {
+"x": 0,
+"y": -320,
+"text": "Homepage — broadcast refresh + analyst copy",
+"kind": "title1",
+"maxW": 1910
+},
+"t2": {
+"x": 0,
+"y": 6180,
+"text": "Pitcher page — controls without crowding the scene",
+"kind": "title1",
+"maxW": 3400
+},
+"s1": {
+"x": 1990,
+"y": 0,
+"w": 360,
+"text": "Homepage: the 3D scene becomes the hero (it IS the product). Copy speaks to front-office analysts and player-dev/coaches. Leaders move into a broadcast ticker + boards. No player headshots or club logos in the mock — swap the initials back for real headshots in code.",
+"fill": "orange"
+},
+"s2": {
+"x": 1520,
+"y": 7400,
+"w": 860,
+"text": "CHOSEN. Option A — bottom sheet. Scene owns the top 60%. Active filters ride on the scene as removable chips; everything else lives in a draggable sheet with Arsenal / Filters / Games tabs. Arsenal rows double as the pitch-type filter (no duplicate control).",
+"fill": "blue"
+},
+"s3": {
+"x": 2540,
+"y": 7400,
+"w": 860,
+"text": "NOT CHOSEN (reference only). Option B — toolbar + full-screen filters. Scene is full-bleed; one bottom toolbar. Filters open as a full page with a live pitch count on the apply button. Tap Filters in B1 to play the flow.",
+"fill": "teal"
+},
+"t3": {
+"x": 0,
+"y": 7800,
+"text": "Stats & at-bat replay",
+"kind": "title1",
+"maxW": 3900
+},
+"s4": {
+"x": 1990,
+"y": 9080,
+"w": 860,
+"text": "Stats becomes a view toggle (3D scene | Stats) in the main area, not a rail tab — the rail keeps its job. Game line reads as a broadcast score bug; at-bat rows link straight into the replay. Per-pitch-type numbers, batter names and the at-bat sequence are SAMPLE values (the live APIs returned 401 from my sandbox) — wire to real data.",
+"fill": "orange"
+},
+"s5": {
+"x": 4420,
+"y": 0,
+"w": 420,
+"text": "Feature cards: hover (desktop) or tap (mobile) expands one card into a live preview + 3-step how-to + CTA into the real page. Paths animate in; reduced-motion shows them static. In production the preview should lazy-mount the real R3F scene only when the card opens.",
+"fill": "blue"
+},
+"s6": {
+"x": 3950,
+"y": 1300,
+"w": 420,
+"text": "A was chosen and is applied to the homepage frames; B and C are reference only. Hero background options. A: your existing stadium-sunset photo behind a left-weighted scrim (copy stays legible). B: a lighter navy panel with faint field lines, strike-zone grid and dashed pitch arcs. C: a skewed broadcast slab behind the monitor with a crimson edge. The section below is dimmed for contrast.",
+"fill": "orange"
+},
+"s7": {
+"x": 1990,
+"y": 620,
+"w": 360,
+"text": "FOR THE CODING AGENT: read project/DESIGN.md first. It lists which frames to build vs ignore, all color/type tokens, interaction specs (feature-card expand, drawer, at-bat replay), and which numbers are sample data.",
+"fill": "green",
+"bold": true
+}
+},
+"designSystems": []
+}

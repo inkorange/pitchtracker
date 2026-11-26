@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pitcher mobile — full-screen filters</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #0A101C; color: #F3F5F9; font-family: Inter, system-ui, sans-serif">
+
+<header style="height: 60px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 20px; border-bottom: 1px solid #1B2438">
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 28px; letter-spacing: 0.5px">FILTERS</h1>
+<div style="display: flex; align-items: center">
+<button onClick="{{ reset }}" style="height: 44px; padding: 0 12px; border: 0; background: transparent; color: #FF6B7A; font-size: 14px; font-weight: 600">Clear all</button>
+<a href="MobileToolbar.dc.html" aria-label="Close filters" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+</div>
+</header>
+
+<div style="flex-grow: 1; overflow-y: auto; min-height: 0; padding: 20px; display: flex; flex-direction: column; gap: 26px">
+<section style="display: flex; flex-direction: column; gap: 8px">
+<h2 style="margin: 0 0 4px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCH TYPE</h2>
+<sc-for list="{{ arsenal }}" as="p" hint-placeholder-count="6">
+<button aria-pressed="{{ p.on }}" onClick="{{ p.toggle }}" style="{{ p.rowStyle }}">
+<span style="{{ p.boxStyle }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#070B14" stroke-width="4"><path d="M5 12l5 5 9-10"></path></svg></span>
+<span style="flex-grow: 1; text-align: left; font-size: 15px; font-weight: 600">{{ p.name }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 19px">{{ p.mph }}</span>
+<span style="font-size: 12px; color: #9AA6BD; width: 40px; text-align: right">{{ p.pct }}</span>
+</button>
+</sc-for>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">BATTER SIDE</h2>
+<div style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 3px">
+<sc-for list="{{ sides }}" as="o" hint-placeholder-count="3">
+<button aria-pressed="{{ o.on }}" onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button>
+</sc-for>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCH OUTCOME</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="5">
+<button aria-pressed="{{ o.on }}" onClick="{{ o.toggle }}" style="{{ o.style }}"><span style="{{ o.dot }}"></span>{{ o.label }}</button>
+</sc-for>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">AT-BAT RESULT</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ results }}" as="o" hint-placeholder-count="6">
+<button aria-pressed="{{ o.on }}" onClick="{{ o.toggle }}" style="{{ o.style }}">{{ o.label }}</button>
+</sc-for>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 10px">
+<label for="b2-game" style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">GAME</label>
+<select id="b2-game" style="height: 48px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 15px; font-family: Inter, sans-serif">
+<option>All games in 2026</option>
+<option>Oct 28 · MIL @ TB</option>
+<option>Oct 23 · TB @ MIL</option>
+<option>Oct 11 · LAD @ MIL</option>
+</select>
+</section>
+</div>
+
+<div style="flex-shrink: 0; padding: 12px 20px 28px; border-top: 1px solid #1B2438; background: #0A101C">
+<a href="MobileToolbar.dc.html" style="height: 52px; border-radius: 4px; background: #E8364F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.5px">SHOW {{ count }} PITCHES</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { hidden: {}, side: 'vs LHB', out: { 'Swinging strike': true, 'Called strike': true }, res: {} }; }
+  renderVals() {
+    const s = this.state;
+    const raw = [['Four-Seam', '#F0505A', '100.6', 64], ['Cutter', '#F5A524', '95.8', 14], ['Slider', '#B392F0', '91.8', 11], ['Curveball', '#4C8DF6', '88.0', 10], ['Changeup', '#2DD4BF', '92.5', 1], ['Sinker', '#FB7C3C', '100.6', 0]];
+    let typeF = 0;
+    const arsenal = raw.map(([name, c, mph, pct]) => {
+      const on = !s.hidden[name]; if (on) typeF += pct / 100;
+      return {
+        name, mph, pct: pct + '%', on: on ? 'true' : 'false',
+        toggle: () => this.setState({ hidden: Object.assign({}, s.hidden, { [name]: on }) }),
+        rowStyle: 'display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 12px; border-radius: 6px; border: 1px solid #1B2438; background: #0F1626; color: #F3F5F9; opacity: ' + (on ? '1' : '0.45'),
+        boxStyle: 'width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; ' + (on ? 'background: ' + c : 'border: 2px solid ' + c)
+      };
+    });
+    const chip = (on) => 'height: 40px; padding: 0 14px; border-radius: 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px; ' + (on ? 'background: #F3F5F9; color: #070B14; border: 1px solid #F3F5F9' : 'background: transparent; color: #C4CCDB; border: 1px solid #2A3650');
+    const sides = ['Both', 'vs LHB', 'vs RHB'].map((label) => ({ label, on: s.side === label ? 'true' : 'false', pick: () => this.setState({ side: label }),
+      style: 'flex: 1; height: 40px; border: 0; border-radius: 2px; font-size: 14px; ' + (s.side === label ? 'background: #F3F5F9; color: #070B14; font-weight: 700' : 'background: transparent; color: #C4CCDB; font-weight: 600') }));
+    const outW = { 'Swinging strike': 0.17, 'Called strike': 0.16, 'Ball': 0.34, 'Foul': 0.17, 'In play': 0.16 };
+    const outcomes = [['Swinging strike', '#F0505A'], ['Called strike', '#F5A524'], ['Ball', '#4C8DF6'], ['Foul', '#9AA6BD'], ['In play', '#22C55E']].map(([label, c]) => {
+      const on = !!s.out[label];
+      return { label, on: on ? 'true' : 'false', style: chip(on), dot: 'width: 8px; height: 8px; border-radius: 50%; background: ' + c, toggle: () => this.setState({ out: Object.assign({}, s.out, { [label]: !on }) }) };
+    });
+    const results = ['Strikeout', 'Walk', 'Hit', 'Home run', 'Out', 'HBP'].map((label) => {
+      const on = !!s.res[label];
+      return { label, on: on ? 'true' : 'false', style: chip(on), toggle: () => this.setState({ res: Object.assign({}, s.res, { [label]: !on }) }) };
+    });
+    const frac = Object.keys(s.out).filter((k) => s.out[k]).reduce((a, k) => a + outW[k], 0) || 1;
+    const sideF = s.side === 'Both' ? 1 : s.side === 'vs LHB' ? 0.42 : 0.58;
+    const nRes = Object.keys(s.res).filter((k) => s.res[k]).length;
+    const resF = nRes ? Math.min(1, 0.22 * nRes) : 1;
+    const count = Math.round(2994 * frac * sideF * resF * Math.min(1, typeF)).toLocaleString();
+    return { arsenal, sides, outcomes, results, count, reset: () => this.setState({ hidden: {}, side: 'Both', out: {}, res: {} }) };
+  }
+}
+</script>
+</body>
+</html>

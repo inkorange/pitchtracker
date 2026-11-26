@@ -1,15 +1,112 @@
 @import "tailwindcss";
 
+/* Redesign tokens — source: design/DESIGN.md §2. Keep values in sync
+   with the handoff; components should use the Tailwind utilities
+   generated below (bg-surface, border-line, text-muted, font-display…)
+   rather than raw hex. */
 :root {
-  --background: #0a0e14;
-  --foreground: #ededed;
+  --bg: #070b14;
+  --bg-raised: #0a101c;
+  --surface: #0f1626;
+  --surface-2: #131c30;
+  --line: #1b2438;
+  --line-strong: #2a3650;
+  --avatar: #1e2a40;
+  --text: #f3f5f9;
+  --text-2: #c4ccdb;
+  --text-3: #b4bdce;
+  --muted: #9aa6bd;
+  --accent: #e8364f;
+  --accent-hover: #ff6b7a;
+  --highlight: #f6c344;
+  /* Anything floating on the 3D scene. */
+  --overlay: rgba(7, 11, 20, 0.88);
+
+  /* Legacy aliases — existing pages still read these. */
+  --background: var(--bg);
+  --foreground: var(--text);
 }
 
 @theme inline {
+  --color-bg: var(--bg);
+  --color-bg-raised: var(--bg-raised);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-avatar: var(--avatar);
+  /* "ink" rather than "text" so the utilities read text-ink, not text-text. */
+  --color-ink: var(--text);
+  --color-ink-2: var(--text-2);
+  --color-ink-3: var(--text-3);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-highlight: var(--highlight);
+  --color-overlay: var(--overlay);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-barlow-condensed);
+
+  --radius-control: 4px;
+  --radius-panel: 6px;
+  --radius-drawer: 16px;
+
+  --container-page: 1240px;
+}
+
+/* Page container: 1240 max, 32px sides desktop / 20px mobile. */
+@utility container-page {
+  max-width: var(--container-page);
+  margin-inline: auto;
+  padding-inline: 20px;
+  @media (width >= 48rem) {
+    padding-inline: 32px;
+  }
+}
+
+/* Uppercase micro-label: 11px / 600 / 1.2px tracking, muted. */
+@utility label-caps {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Broadcast-style slanted right edge (eyebrow tags, ticker label). */
+@utility slant-right {
+  clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%);
+}
+
+/* Ticker crawl — see components/broadcast/Ticker.tsx. The track holds
+   the item list 4×, so translating by -50% loops seamlessly. */
+@keyframes pt-crawl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.pt-crawl {
+  animation: pt-crawl 45s linear infinite;
+}
+.pt-crawl-wrap:hover .pt-crawl,
+.pt-crawl-wrap:focus-within .pt-crawl {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pt-crawl {
+    animation: none;
+  }
+  .pt-crawl-wrap {
+    overflow-x: auto;
+  }
 }
 
 html,
@@ -21,8 +118,14 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
   min-height: 100%;
+}
+
+/* Every number in the redesign is tabular. Opt in with .num or
+   Tailwind's tabular-nums. */
+.num {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Subtle scrollbars for inner-scrolling panels (filter rail, dropdowns,
