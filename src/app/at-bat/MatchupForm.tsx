@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { personHeadshotUrl } from "@/lib/viz/headshot";
 
 // Matchup finder form — design/AtBatReplays.dc.html (Matchup tab).
@@ -35,6 +35,9 @@ function PersonPicker({
   value,
   onChange,
   search,
+  browse,
+  browseHeading,
+  emptyText,
   disabled,
 }: {
   label: string;
@@ -42,11 +45,18 @@ function PersonPicker({
   value: Picked | null;
   onChange: (p: Picked | null) => void;
   search: (q: string, signal: AbortSignal) => Promise<Option[]>;
+  /** Suggestions shown on focus before anything is typed. */
+  browse?: (signal: AbortSignal) => Promise<Option[]>;
+  browseHeading?: string;
+  /** Shown when a search returns nothing. */
+  emptyText?: (q: string) => string;
   disabled?: boolean;
 }) {
   const id = useId();
   const [q, setQ] = useState(value?.name ?? "");
   const [opts, setOpts] = useState<Option[]>([]);
+  const [browseOpts, setBrowseOpts] = useState<Option[] | null>(null);
+  const [searched, setSearched] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -59,6 +69,7 @@ function PersonPicker({
       search(term, ctrl.signal)
         .then((o) => {
           setOpts(o);
+          setSearched(term);
           setActive(0);
         })
         .catch(() => {});
@@ -68,6 +79,21 @@ function PersonPicker({
       ctrl.abort();
     };
   }, [q, open, search, value?.name]);
+
+  // Load the browse list the first time the box opens (and again if the
+  // browse source changes, e.g. a different pitcher).
+  useEffect(() => {
+    if (!open || !browse || browseOpts !== null) return;
+    const ctrl = new AbortController();
+    browse(ctrl.signal)
+      .then(setBrowseOpts)
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [open, browse, browseOpts]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset cache when the source changes
+    setBrowseOpts(null);
+  }, [browse]);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -82,7 +108,10 @@ function PersonPicker({
     setQ(o.name);
     setOpen(false);
   };
-  const shown = q.trim().length >= 2 && q !== value?.name ? opts : [];
+  const term = q.trim();
+  const browsing = term.length < 2 && !value;
+  const shown = browsing ? (browseOpts ?? []) : term !== value?.name ? opts : [];
+  const noMatch = !browsing && !value && term.length >= 2 && searched === term && opts.length === 0;
 
   return (
     <div ref={boxRef} className="relative flex flex-col gap-2 min-w-0">
@@ -145,12 +174,28 @@ function PersonPicker({
           </button>
         ) : null}
       </div>
+      {open && browsing && browse && browseOpts === null ? (
+        <p role="status" className="absolute top-full mt-1 z-30 w-full m-0 px-3 py-2.5 rounded-control bg-surface border border-line-strong shadow-2xl text-sm text-muted">
+          Loading batters he faced…
+        </p>
+      ) : null}
+      {open && noMatch && emptyText ? (
+        <p className="absolute top-full mt-1 z-30 w-full m-0 px-3 py-2.5 rounded-control bg-surface border border-line-strong shadow-2xl text-sm text-muted">
+          {emptyText(term)}
+        </p>
+      ) : null}
       {open && shown.length > 0 ? (
         <ul
           id={`${id}-list`}
           role="listbox"
+          aria-label={browsing ? browseHeading : undefined}
           className="absolute top-full mt-1 z-30 w-full list-none m-0 p-1 rounded-control bg-surface border border-line-strong shadow-2xl max-h-80 overflow-y-auto"
         >
+          {browsing && browseHeading ? (
+            <li role="presentation" className="px-2.5 pt-1.5 pb-1 label-caps">
+              {browseHeading}
+            </li>
+          ) : null}
           {shown.map((o, i) => (
             <li
               key={o.key}
@@ -208,23 +253,34 @@ export function MatchupForm({
     }));
   };
 
-  // Batters this pitcher faced, in the selected season (or the latest
-  // one when "All seasons" is chosen).
-  const searchBatters = async (q: string, signal: AbortSignal): Promise<Option[]> => {
-    if (!pitcher) return [];
-    const s = season === "all" ? seasons[0] : season;
-    const res = await fetch(
-      `/api/pitcher/${pitcher.id}/batters?season=${s}&q=${encodeURIComponent(q)}`,
-      { signal },
-    );
-    const data = (await res.json()) as { batters?: { id: number; fullName: string; results: string[] }[] };
-    return (data.batters ?? []).map((b) => ({
-      key: String(b.id),
-      id: b.id,
-      name: b.fullName,
-      meta: b.results.length ? `${b.results.length} PA · ${b.results.slice(0, 6).join(" ")}` : undefined,
-    }));
-  };
+  // Batters this pitcher faced, across the selected season(s). The
+  // endpoint is per season, so "All seasons" asks each and merges.
+  type BatterRow = { id: number; fullName: string };
+  const fetchBatters = useCallback(
+    async (q: string | null, signal: AbortSignal): Promise<Option[]> => {
+      if (!pitcher) return [];
+      const batterSeasons = season === "all" ? seasons : [Number(season)];
+      const lists = await Promise.all(
+        batterSeasons.map(async (s) => {
+          const qs = q ? `&q=${encodeURIComponent(q)}` : "";
+          const res = await fetch(`/api/pitcher/${pitcher.id}/batters?season=${s}${qs}`, { signal });
+          if (!res.ok) return [] as BatterRow[];
+          return ((await res.json()) as { batters?: BatterRow[] }).batters ?? [];
+        }),
+      );
+      const seen = new Set<number>();
+      const out: Option[] = [];
+      for (const b of lists.flat()) {
+        if (seen.has(b.id)) continue;
+        seen.add(b.id);
+        out.push({ key: String(b.id), id: b.id, name: b.fullName });
+      }
+      return out.slice(0, 12);
+    },
+    [pitcher, season, seasons],
+  );
+  const searchBatters = useCallback((q: string, signal: AbortSignal) => fetchBatters(q, signal), [fetchBatters]);
+  const browseBatters = useCallback((signal: AbortSignal) => fetchBatters(null, signal), [fetchBatters]);
 
   return (
     <form
@@ -247,6 +303,7 @@ export function MatchupForm({
           setBatter(null);
         }}
         search={searchPitchers}
+        emptyText={(q) => `No pitcher matches “${q}”.`}
       />
       <span
         aria-hidden="true"
@@ -260,6 +317,9 @@ export function MatchupForm({
         value={batter}
         onChange={setBatter}
         search={searchBatters}
+        browse={pitcher ? browseBatters : undefined}
+        browseHeading="Most faced"
+        emptyText={(q) => `${pitcher?.name ?? "He"} didn’t face a batter matching “${q}”${season === "all" ? "" : ` in ${season}`}.`}
         disabled={!pitcher}
       />
       <label className="flex flex-col gap-2">
