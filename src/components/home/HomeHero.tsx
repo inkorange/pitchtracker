@@ -34,14 +34,17 @@ export function HomeHero() {
         <div className="absolute inset-x-0 bottom-0 h-[120px] hidden md:block bg-[linear-gradient(180deg,rgba(7,11,20,0)_0%,rgba(7,11,20,0.85)_100%)]" />
       </div>
 
-      <div className="container-page pt-8 pb-7 md:pt-[72px] md:pb-16 flex flex-wrap gap-7 md:gap-14 items-center">
+      <div className="container-page pt-8 pb-7 md:pt-[72px] md:pb-16">
+        {/* Eyebrow sits above both columns so the monitor's top edge
+            lines up with the headline's. */}
+        <div className="flex items-center gap-2.5 flex-wrap mb-[18px] md:mb-6">
+          <EyebrowTag>Statcast in 3D</EyebrowTag>
+          <Suspense fallback={null}>
+            <HeroSeasons />
+          </Suspense>
+        </div>
+        <div className="flex flex-wrap gap-7 md:gap-14 items-start">
         <div className="flex-[1_1_440px] min-w-0 flex flex-col gap-[18px] md:gap-6">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <EyebrowTag>Statcast in 3D</EyebrowTag>
-            <Suspense fallback={null}>
-              <HeroSeasons />
-            </Suspense>
-          </div>
           <h1 className="m-0 font-display font-extrabold italic uppercase text-[60px] md:text-[92px] leading-[0.9] tracking-[-0.5px] text-ink">
             See the pitch <br className="hidden md:inline" />
             <span className="text-accent">the hitter saw.</span>
@@ -67,6 +70,7 @@ export function HomeHero() {
         <Suspense fallback={<MonitorFrame />}>
           <HeroMonitor />
         </Suspense>
+        </div>
       </div>
     </section>
   );

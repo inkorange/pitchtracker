@@ -57,7 +57,7 @@ export function SiteHeader({ trackerHref }: { trackerHref: string }) {
   );
 
   return (
-    <header className="relative z-40 border-b border-line bg-bg-raised">
+    <header className="relative md:sticky md:top-0 z-40 border-b border-line bg-bg-raised">
       <div className="container-page h-14 md:h-16 flex items-center gap-8">
         <Link href="/" aria-label="PitchTracker home" className="flex items-baseline hover:opacity-90">
           <Wordmark className="text-[26px] md:text-[30px]" />
