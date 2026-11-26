@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
-// Small ⓘ button that pops a styled tooltip on click. Hover-only
-// tooltips don't work on touch devices, so click-to-toggle handles
-// mobile + desktop uniformly. Click-outside and Escape both close
-// the popover.
+// "?" button that pops a tooltip on click. Hover-only tooltips don't
+// work on touch devices, so click-to-toggle handles mobile + desktop
+// uniformly. Click-outside and Escape both close the popover.
+//
+// Sizing follows the redesign: 32px on desktop, 44px touch target
+// below md.
 export function MetricInfo({
   label,
   description,
@@ -15,6 +17,7 @@ export function MetricInfo({
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLSpanElement>(null);
+  const tipId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -43,14 +46,16 @@ export function MetricInfo({
         }}
         aria-label={`What is ${label}?`}
         aria-expanded={open}
-        className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[10px] font-semibold text-white/75 hover:text-white transition-colors leading-none"
+        aria-describedby={open ? tipId : undefined}
+        className="inline-flex items-center justify-center size-11 md:size-8 rounded-full border border-line-strong text-ink-2 text-sm hover:text-ink hover:border-muted transition-colors leading-none"
       >
         ?
       </button>
       {open ? (
         <span
+          id={tipId}
           role="tooltip"
-          className="absolute top-6 right-0 z-30 w-56 px-3 py-2 rounded-md bg-black/90 backdrop-blur-sm border border-white/15 shadow-xl text-[11px] leading-relaxed text-white/90 whitespace-normal pointer-events-none"
+          className="absolute top-full mt-2 right-0 z-30 w-64 px-3.5 py-3 rounded-control bg-surface border border-line-strong shadow-xl text-[13px] leading-relaxed text-ink-2 whitespace-normal normal-case tracking-normal font-normal"
         >
           {description}
         </span>

@@ -5,7 +5,7 @@ import { teamNickname } from "@/lib/teams/nicknames";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 
 // Shared game-result card used by:
-//   - the homepage YesterdayGamesStrip
+//   - (formerly) the homepage YesterdayGamesStrip, removed in the redesign
 //   - the /at-bat date listing
 //
 // The team rows are a click target that opens the at-bat browser

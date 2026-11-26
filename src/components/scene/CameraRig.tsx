@@ -30,9 +30,17 @@ interface CameraRigProps {
   // with these explicit position/target values. Used by the at-bat
   // replay to angle the front camera toward the batter side.
   presetOverride?: CameraPosition | null;
+  // false = fixed camera: orbit/zoom/pan disabled (homepage monitor,
+  // feature-card previews). Defaults to true.
+  interactive?: boolean;
 }
 
-export function CameraRig({ preset, presetTick = 0, presetOverride }: CameraRigProps) {
+export function CameraRig({
+  preset,
+  presetTick = 0,
+  presetOverride,
+  interactive = true,
+}: CameraRigProps) {
   const { camera } = useThree();
   const orbitRef = useRef<OrbitControlsImpl>(null);
   const targetPos = useRef(new Vector3());
@@ -114,6 +122,7 @@ export function CameraRig({ preset, presetTick = 0, presetOverride }: CameraRigP
   return (
     <OrbitControls
       ref={orbitRef}
+      enabled={interactive}
       enableDamping
       dampingFactor={0.08}
       minDistance={5}

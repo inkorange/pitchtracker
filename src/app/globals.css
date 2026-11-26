@@ -55,10 +55,11 @@
   --radius-panel: 6px;
   --radius-drawer: 16px;
 
-  --container-page: 1240px;
+  /* Handoff says 1240px; widened to 1400px per Chris's review (2026-11-26). */
+  --container-page: 1400px;
 }
 
-/* Page container: 1240 max, 32px sides desktop / 20px mobile. */
+/* Page container: 1400 max, 32px sides desktop / 20px mobile. */
 @utility container-page {
   max-width: var(--container-page);
   margin-inline: auto;
@@ -106,6 +107,72 @@
   }
   .pt-crawl-wrap {
     overflow-x: auto;
+  }
+}
+
+/* Feature-card motion (design/FeatureExpand.dc.html): content fades
+   up when a card opens; tunnel paths draw in a loop; zone dots pop. */
+@keyframes pt-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pt-draw {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 1;
+  }
+  35% {
+    stroke-dashoffset: 0;
+  }
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes pt-pop {
+  0%,
+  30% {
+    opacity: 0;
+  }
+  42%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.pt-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: pt-draw 4.5s ease-out infinite;
+}
+.pt-draw:nth-of-type(3n + 1) {
+  animation-delay: 0.25s;
+}
+.pt-draw:nth-of-type(3n + 2) {
+  animation-delay: 0.5s;
+}
+.pt-pop {
+  animation: pt-pop 4.5s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pt-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .pt-pop {
+    animation: none;
   }
 }
 

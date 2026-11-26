@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AI_OPEN_EVENT, type AiOpenDetail } from "@/lib/ai/open-chat";
 import { isScreenshotRoute } from "@/lib/url/screenshot-routes";
 
 interface ChatMessage {
@@ -148,6 +149,22 @@ export function AiChat() {
       void send(text);
     };
   }, [send]);
+
+  // Open (and optionally ask) from anywhere on the page:
+  //   window.dispatchEvent(new CustomEvent(AI_OPEN_EVENT, { detail: { q } }))
+  // See openAiChat() in src/lib/ai/open-chat.ts.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<AiOpenDetail>).detail ?? {};
+      setOpen(true);
+      if (detail.q) {
+        if (detail.autoSend) sendRef.current(detail.q);
+        else setInput(detail.q);
+      }
+    };
+    window.addEventListener(AI_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(AI_OPEN_EVENT, onOpen);
+  }, []);
 
   const toggleRecording = useCallback(() => {
     const Ctor = getSpeechRecognitionCtor();

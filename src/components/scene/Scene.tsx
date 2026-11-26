@@ -25,6 +25,14 @@ interface SceneProps {
   // first frame. Screenshot mode (`?shot=hero`) sets this so the scene
   // reliably renders for capture.
   forceRender?: boolean;
+  // Stop the render loop (e.g. the canvas has scrolled offscreen).
+  // Takes precedence over forceRender.
+  paused?: boolean;
+  // false = fixed camera, no orbit/zoom. Defaults to true.
+  interactive?: boolean;
+  // Lightweight mode for small embedded canvases: no shadow pass and
+  // a 1.5× DPR cap.
+  lite?: boolean;
   children: ReactNode;
   onPointerMissed?: () => void;
 }
@@ -65,6 +73,9 @@ export function Scene({
   presetTick,
   presetOverride,
   forceRender = false,
+  paused = false,
+  interactive = true,
+  lite = false,
   children,
   onPointerMissed,
 }: SceneProps) {
@@ -75,14 +86,14 @@ export function Scene({
   );
   return (
     <Canvas
-      frameloop={forceRender || pageActive ? "always" : "never"}
+      frameloop={!paused && (forceRender || pageActive) ? "always" : "never"}
       // shadows enables the shadow-map pass; individual lights and
       // meshes still opt in via castShadow / receiveShadow. Off
       // globally would skip the pass entirely and save perf; on
       // means we pay the cost only for lights/meshes that request it.
-      shadows
+      shadows={!lite}
       gl={{ antialias: true, powerPreference: "high-performance" }}
-      dpr={[1, 2]}
+      dpr={lite ? [1, 1.5] : [1, 2]}
       style={{ background: "#7ea7c8" }}
       camera={{ fov: 45, near: 0.02, far: 2500 }}
       onPointerMissed={onPointerMissed}
@@ -95,6 +106,7 @@ export function Scene({
           preset={preset}
           presetTick={presetTick}
           presetOverride={presetOverride}
+          interactive={interactive}
         />
         {children}
       </Suspense>
