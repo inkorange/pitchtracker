@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { TeamMark } from "@/components/team/TeamMark";
+import Image from "next/image";
+import { teamLogoOnDarkUrl } from "@/lib/viz/headshot";
 import { normalizeName } from "@/lib/pitchers/directory-shapes";
 
 export interface GridTeam {
@@ -84,9 +85,14 @@ export function TeamsGrid({
                           <li key={t.id}>
                             <Link
                               href={`/browse/${t.id}?season=${season}`}
-                              className="flex items-center gap-3.5 min-h-[68px] px-3.5 py-2.5 bg-surface border border-line rounded-control text-ink hover:text-ink hover:border-line-strong transition-colors"
+                              className="group relative isolate overflow-hidden flex items-center gap-3.5 min-h-[68px] pl-[104px] pr-3.5 py-2.5 bg-surface border border-line rounded-control text-ink hover:text-ink hover:border-line-strong transition-colors"
                             >
-                              <TeamMark teamId={t.id} name={t.name} size={48} padding={4} className="!bg-bg-raised" />
+                              {/* Oversized club mark behind the left edge,
+                                  cropped by the card and faded into it. */}
+                              <span aria-hidden="true" className="absolute -left-3 top-1/2 -translate-y-1/2 size-[104px] -z-10 opacity-35 group-hover:opacity-60 motion-safe:transition-opacity">
+                                <Image src={teamLogoOnDarkUrl(t.id)} alt="" fill sizes="104px" className="object-contain" unoptimized />
+                              </span>
+                              <span aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,transparent_0%,transparent_30%,var(--surface)_62%)]" />
                               <span className="grow min-w-0 flex flex-col gap-[3px]">
                                 <span className="text-[15px] font-semibold">{t.name}</span>
                                 {t.badge ? <span className="text-xs text-highlight truncate">★ {t.badge}</span> : null}
