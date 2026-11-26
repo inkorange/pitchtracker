@@ -21,6 +21,22 @@ interface Option extends Picked {
   key: string;
 }
 
+/** Wait this long after the last keystroke before searching. */
+const SEARCH_DEBOUNCE_MS = 300;
+
+function Spinner({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className={`size-[18px] shrink-0 text-muted motion-safe:animate-spin ${className}`}
+    >
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -72,8 +88,16 @@ function PersonPicker({
           setSearched(term);
           setActive(0);
         })
-        .catch(() => {});
-    }, 150);
+        .catch((err: unknown) => {
+          // A newer keystroke aborted this request — the next one will
+          // settle the spinner. Anything else ends the search so the
+          // spinner doesn't spin forever.
+          if (!(err instanceof DOMException && err.name === "AbortError")) {
+            setOpts([]);
+            setSearched(term);
+          }
+        });
+    }, SEARCH_DEBOUNCE_MS);
     return () => {
       clearTimeout(t);
       ctrl.abort();
@@ -112,6 +136,11 @@ function PersonPicker({
   const browsing = term.length < 2 && !value;
   const shown = browsing ? (browseOpts ?? []) : term !== value?.name ? opts : [];
   const noMatch = !browsing && !value && term.length >= 2 && searched === term && opts.length === 0;
+  // From the first keystroke until results for exactly this text land
+  // (covers both the debounce wait and the request).
+  const searching = open && !browsing && !value && term.length >= 2 && searched !== term;
+  const loadingBrowse = open && browsing && !!browse && browseOpts === null;
+  const busy = searching || loadingBrowse;
 
   return (
     <div ref={boxRef} className="relative flex flex-col gap-2 min-w-0">
@@ -160,6 +189,10 @@ function PersonPicker({
           />
           {value?.meta ? <span className="text-xs text-muted truncate">{value.meta}</span> : null}
         </span>
+        {busy ? <Spinner /> : null}
+        <span className="sr-only" role="status" aria-live="polite">
+          {busy ? (loadingBrowse ? "Loading suggestions" : "Searching") : ""}
+        </span>
         {value ? (
           <button
             type="button"
@@ -174,8 +207,9 @@ function PersonPicker({
           </button>
         ) : null}
       </div>
-      {open && browsing && browse && browseOpts === null ? (
-        <p role="status" className="absolute top-full mt-1 z-30 w-full m-0 px-3 py-2.5 rounded-control bg-surface border border-line-strong shadow-2xl text-sm text-muted">
+      {loadingBrowse ? (
+        <p className="absolute top-full mt-1 z-30 w-full m-0 px-3 py-2.5 rounded-control bg-surface border border-line-strong shadow-2xl text-sm text-muted flex items-center gap-2.5">
+          <Spinner />
           Loading batters he faced…
         </p>
       ) : null}
