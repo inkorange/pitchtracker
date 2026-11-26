@@ -67,9 +67,9 @@ async function loadPitchers(ids: number[]) {
   });
 }
 
-export const getPitcherDirectory = unstable_cache(
-  async (): Promise<{ season: number; rows: DirectoryRow[] }> => {
-    const season = await getCachedDisplaySeason();
+/** One row per pitcher with tracked pitches in `season`. */
+export const getPitcherDirectoryForSeason = unstable_cache(
+  async (season: number): Promise<DirectoryRow[]> => {
     const [aggs, teams, lines] = await Promise.all([
       loadAggregates(season),
       getCachedTeamMap(),
@@ -110,8 +110,14 @@ export const getPitcherDirectory = unstable_cache(
         mix,
       });
     }
-    return { season, rows };
+    return rows;
   },
-  ["pitcher-directory-v1"],
+  ["pitcher-directory-v2"],
   { revalidate: 60 * 60, tags: ["pitch-pitchers", "pitch-aggregates"] },
 );
+
+/** The directory for the current display season. */
+export async function getPitcherDirectory(): Promise<{ season: number; rows: DirectoryRow[] }> {
+  const season = await getCachedDisplaySeason();
+  return { season, rows: await getPitcherDirectoryForSeason(season) };
+}

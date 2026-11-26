@@ -1,25 +1,22 @@
+import { SiteHeader } from "@/components/chrome/SiteHeader";
+
 export default function Loading() {
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 py-12">
-      <div className="max-w-4xl mx-auto space-y-10">
-        <div className="space-y-3">
-          <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">
-            ← All teams
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white/[0.06] rounded animate-pulse" />
-            <div className="space-y-2">
-              <div className="h-6 w-48 bg-white/[0.08] rounded animate-pulse" />
-              <div className="h-3 w-32 bg-white/[0.06] rounded animate-pulse" />
-            </div>
+    <main className="min-h-screen bg-bg text-ink" aria-busy="true">
+      <SiteHeader active="teams" />
+      <div className="container-page pt-8 pb-16 flex flex-col gap-5">
+        <div className="h-4 w-40 rounded bg-surface motion-safe:animate-pulse" />
+        <div className="flex items-center gap-6">
+          <div className="size-[88px] md:size-[152px] rounded-panel bg-surface motion-safe:animate-pulse" />
+          <div className="flex flex-col gap-3">
+            <div className="h-3 w-40 rounded bg-surface motion-safe:animate-pulse" />
+            <div className="h-12 w-72 rounded bg-surface motion-safe:animate-pulse" />
           </div>
         </div>
-        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="h-[72px] rounded-control bg-surface border border-line motion-safe:animate-pulse" />
+        <ul className="list-none m-0 p-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {Array.from({ length: 9 }).map((_, i) => (
-            <li
-              key={i}
-              className="h-16 rounded-lg bg-white/[0.04] border border-white/[0.06] animate-pulse"
-            />
+            <li key={i} className="h-[150px] rounded-control bg-surface border border-line motion-safe:animate-pulse" />
           ))}
         </ul>
       </div>

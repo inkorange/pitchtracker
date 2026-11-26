@@ -518,3 +518,12 @@ export async function fetchSeasonPitchingLines(season: number): Promise<SeasonPi
     gamesPitched: s.stat.gamesPitched ?? 0,
   }));
 }
+
+// A team's season pitching strikeouts (one small request).
+export async function fetchTeamSeasonStrikeouts(teamId: number, season: number): Promise<number | null> {
+  const data = await fetchJson<{ stats: Array<{ splits: Array<{ stat: { strikeOuts?: number } }> }> }>(
+    `${BASE}/teams/${teamId}/stats?stats=season&group=pitching&season=${season}`,
+    { cache: "force-cache", next: { revalidate: 60 * 60 * 6 } },
+  );
+  return data.stats[0]?.splits[0]?.stat.strikeOuts ?? null;
+}

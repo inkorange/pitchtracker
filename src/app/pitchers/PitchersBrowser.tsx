@@ -25,6 +25,7 @@ import {
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
+import { MixBar } from "@/components/pitch/MixBar";
 
 // /pitchers — design/Pitchers.dc.html + PitchersMobile.dc.html.
 // All state lives in the URL so any view is shareable.
@@ -321,21 +322,6 @@ function Avatar({ id, size }: { id: number; size: number }) {
   );
 }
 
-export function MixBar({ row, width = 140, height = 8 }: { row: DirectoryRow; width?: number; height?: number }) {
-  const label = row.mix.map((m) => `${getPitchLabel(m.type)} ${Math.round(m.usage)}%`).join(", ");
-  return (
-    <span
-      role="img"
-      aria-label={`Arsenal mix: ${label}`}
-      className="flex rounded overflow-hidden bg-line"
-      style={{ width, height }}
-    >
-      {row.mix.map((m) => (
-        <span key={m.type} className="block" style={{ width: `${m.usage}%`, background: getPitchColor(m.type) }} />
-      ))}
-    </span>
-  );
-}
 
 function metaLine(r: DirectoryRow) {
   return [r.team, r.hand ? `${r.hand}HP` : null, r.role].filter(Boolean).join(" · ");
@@ -430,7 +416,7 @@ function DirectoryTable({
                 </td>
               ))}
               <td className="px-3 py-2.5">
-                <MixBar row={r} />
+                <MixBar mix={r.mix} width={140} />
               </td>
               <td className="px-3 py-2.5 text-right">
                 <Link
@@ -473,7 +459,7 @@ function DirectoryCards({ rows, sort, offset }: { rows: DirectoryRow[]; sort: So
             <span className="grow min-w-0 flex flex-col gap-[5px]">
               <span className="font-semibold text-[15px] truncate">{r.name}</span>
               <span className="text-xs text-muted">{metaLine(r)}</span>
-              <MixBar row={r} width={120} height={5} />
+              <MixBar mix={r.mix} width={120} height={5} />
             </span>
             <span className="flex flex-col items-end">
               <span className="font-display font-bold text-[26px] leading-none num">{CELL[sort](r)}</span>
