@@ -9,7 +9,6 @@ import { FilmRoom } from "@/components/home/FilmRoom";
 import { AskSection } from "@/components/home/AskSection";
 import { FeaturedStrip } from "@/components/home/FeaturedStrip";
 import { StripFallback } from "@/components/home/StripFallback";
-import { getHomeRankings } from "@/lib/home/rankings";
 
 // ISR revalidate: rebuild the homepage's static HTML at most every
 // 5 minutes so the daily picks / rankings pick up the daily cron's DB
@@ -22,14 +21,10 @@ export const revalidate = 300;
 // Featured pitchers → Footer (global, from the root layout).
 //
 // Each data section streams in independently via Suspense.
-export default async function Home() {
-  // "Open the tracker" lands on the season strikeout leader.
-  const { boards } = await getHomeRankings();
-  const kLeader = boards.find((b) => b.category.key === "strikeouts")?.rows[0];
-
+export default function Home() {
   return (
     <main className="min-h-screen bg-bg text-ink">
-      <SiteHeader trackerHref={kLeader?.href ?? "/explore"} />
+      <SiteHeader />
       <HomeHero />
       <Suspense fallback={<div className="h-11 md:h-12 bg-accent" />}>
         <HomeTicker />

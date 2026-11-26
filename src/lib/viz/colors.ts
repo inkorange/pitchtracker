@@ -2,21 +2,22 @@
 
 export const PITCH_COLORS: Record<string, string> = {
   // FF/SI/FC/SL/CU/CH: redesign palette (design/DESIGN.md §2, "keep
-  // exact"). The rest predate the redesign and are unchanged.
+  // exact"); ST/SV and FS/FO from design/Pitchers.dc.html. The rest
+  // predate the redesign and are unchanged.
   FF: "#f0505a",
   FA: "#f0505a",
   SI: "#fb7c3c",
   FT: "#fb7c3c",
   FC: "#f5a524",
   SL: "#b392f0",
-  ST: "#5588ff",
-  SV: "#5588ff",
+  ST: "#c084fc",
+  SV: "#c084fc",
   CU: "#4c8df6",
   KC: "#5544aa",
   CS: "#4c8df6",
   CH: "#2dd4bf",
-  FS: "#44cc66",
-  FO: "#44cc66",
+  FS: "#38bdf8",
+  FO: "#38bdf8",
   KN: "#ffd633",
   EP: "#aaaaaa",
   PO: "#aaaaaa",

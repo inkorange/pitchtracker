@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { openAiChat } from "@/lib/ai/open-chat";
+import { CommandPalette, openPalette } from "./CommandPalette";
 
-// Redesign site header — design/Main.dc.html "NAV" + HomeMobile.
-// Desktop: wordmark, primary nav, "Open the tracker" CTA.
-// Mobile: wordmark + Search (jumps to the hero search) + Menu
-// (disclosure panel with the same links).
+// Site header — design/DESIGN.md §3 "Global nav".
+// Desktop: wordmark, primary nav (active item underlined in accent),
+// "Find a pitcher ⌘K" CTA that opens the pitcher search palette.
+// Mobile: wordmark + search (palette) + menu (full-height sheet).
 
-const NAV = [
-  { label: "Pitchers", href: "/explore" },
-  { label: "Teams", href: "/browse" },
-  { label: "At-bat replays", href: "/at-bat" },
-  { label: "Leaders", href: "/strikeout_leaders" },
-] as const;
+export type NavKey = "pitchers" | "teams" | "at-bat" | "explore";
+
+const NAV: { key: NavKey; label: string; href: string }[] = [
+  { key: "pitchers", label: "Pitchers", href: "/pitchers" },
+  { key: "teams", label: "Teams", href: "/browse" },
+  { key: "at-bat", label: "At-bat replays", href: "/at-bat" },
+  { key: "explore", label: "Explore", href: "/explore" },
+];
 
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
@@ -24,22 +27,30 @@ export function Wordmark({ className = "" }: { className?: string }) {
   );
 }
 
-function focusHeroSearch() {
-  const input = document.querySelector<HTMLInputElement>("[data-hero-search] input");
-  if (!input) return false;
-  input.scrollIntoView({ behavior: "smooth", block: "center" });
-  input.focus({ preventScroll: true });
-  return true;
+function isMac() {
+  return typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 }
 
-export function SiteHeader({ trackerHref }: { trackerHref: string }) {
+export function SiteHeader({ active }: { active?: NavKey }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shortcut, setShortcut] = useState("⌘K");
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- platform read after hydration
+    if (!isMac()) setShortcut("Ctrl K");
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    // Lock page scroll behind the full-height sheet.
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
   }, [menuOpen]);
 
   const askLink = (cls: string) => (
@@ -63,28 +74,40 @@ export function SiteHeader({ trackerHref }: { trackerHref: string }) {
           <Wordmark className="text-[26px] md:text-[30px]" />
         </Link>
 
-        <nav aria-label="Primary" className="hidden md:flex gap-7 text-sm font-medium grow">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="text-ink-2 hover:text-accent-hover">
-              {n.label}
-            </Link>
-          ))}
-          {askLink("text-ink-2 hover:text-accent-hover")}
+        <nav aria-label="Primary" className="hidden md:flex gap-7 text-sm font-medium grow h-full">
+          {NAV.map((n) =>
+            n.key === active ? (
+              <Link
+                key={n.key}
+                href={n.href}
+                aria-current="page"
+                className="h-full flex items-center pt-[3px] border-b-[3px] border-accent text-ink font-semibold hover:text-ink"
+              >
+                {n.label}
+              </Link>
+            ) : (
+              <Link key={n.key} href={n.href} className="h-full flex items-center text-ink-2 hover:text-accent-hover">
+                {n.label}
+              </Link>
+            ),
+          )}
+          {askLink("h-full flex items-center text-ink-2 hover:text-accent-hover")}
         </nav>
-        <Link
-          href={trackerHref}
-          className="hidden md:flex h-10 px-[18px] items-center rounded-control bg-accent text-white hover:text-white hover:bg-accent-hover text-sm font-semibold"
+        <button
+          type="button"
+          onClick={openPalette}
+          aria-keyshortcuts="Meta+K Control+K"
+          className="hidden md:flex h-10 pl-4 pr-2 items-center gap-2.5 rounded-control bg-accent hover:bg-accent-hover text-white text-sm font-semibold"
         >
-          Open the tracker
-        </Link>
+          Find a pitcher
+          <kbd className="text-xs px-1.5 py-0.5 rounded-[3px] bg-black/25 font-sans">{shortcut}</kbd>
+        </button>
 
         <div className="md:hidden ml-auto flex">
           <button
             type="button"
-            aria-label="Search pitchers"
-            onClick={() => {
-              if (!focusHeroSearch()) window.location.href = "/explore";
-            }}
+            aria-label="Find a pitcher"
+            onClick={openPalette}
             className="size-11 flex items-center justify-center text-ink"
           >
             <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -111,33 +134,45 @@ export function SiteHeader({ trackerHref }: { trackerHref: string }) {
         <nav
           id="mobile-menu"
           aria-label="Primary"
-          className="md:hidden absolute inset-x-0 top-full bg-bg-raised border-b border-line shadow-2xl"
+          className="md:hidden fixed inset-x-0 top-14 bottom-0 bg-bg-raised overflow-y-auto"
         >
           <ul className="list-none m-0 px-5 py-2 flex flex-col">
             {NAV.map((n) => (
-              <li key={n.href}>
+              <li key={n.key}>
                 <Link
                   href={n.href}
+                  aria-current={n.key === active ? "page" : undefined}
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center min-h-12 text-base font-medium text-ink border-b border-line"
+                  className={`flex items-center min-h-14 text-lg font-display font-bold uppercase tracking-[0.5px] border-b border-line ${
+                    n.key === active ? "text-accent" : "text-ink"
+                  }`}
                 >
                   {n.label}
                 </Link>
               </li>
             ))}
-            <li>{askLink("flex items-center min-h-12 text-base font-medium text-ink border-b border-line")}</li>
-            <li className="py-3">
-              <Link
-                href={trackerHref}
-                onClick={() => setMenuOpen(false)}
-                className="flex h-12 items-center justify-center rounded-control bg-accent text-white hover:text-white font-semibold"
+            <li>
+              {askLink(
+                "flex items-center min-h-14 text-lg font-display font-bold uppercase tracking-[0.5px] text-ink border-b border-line",
+              )}
+            </li>
+            <li className="py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  openPalette();
+                }}
+                className="w-full flex h-12 items-center justify-center rounded-control bg-accent text-white font-semibold"
               >
-                Open the tracker
-              </Link>
+                Find a pitcher
+              </button>
             </li>
           </ul>
         </nav>
       ) : null}
+
+      <CommandPalette />
     </header>
   );
 }

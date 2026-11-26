@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Explore</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+input,select{font-family:Inter,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+.xchip{height:34px;padding:0 12px;border-radius:17px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;background:transparent;color:#C4CCDB;border:1px solid #2A3650}
+.xchip[aria-pressed="true"]{background:#F3F5F9;color:#070B14;border-color:#F3F5F9}
+.zbtn{border:1px solid #2A3650;background:rgba(15,22,38,0.9);color:#9AA6BD;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px}
+.zbtn[aria-pressed="true"]{background:#E8364F;color:#FFFFFF;border-color:#E8364F}
+.cbtn{height:40px;border-radius:4px;border:1px solid #2A3650;background:transparent;color:#C4CCDB;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px}
+.cbtn[aria-pressed="true"]{background:#F3F5F9;color:#070B14;border-color:#F3F5F9}
+</style>
+</helmet>
+<div style="background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; min-height: 100%">
+<header style="border-bottom: 1px solid #1B2438; background: #0A101C">
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 32px">
+<a href="Main.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.5px; color: #F3F5F9">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<nav aria-label="Primary" style="display: flex; gap: 28px; font-size: 14px; font-weight: 500; flex-grow: 1">
+<a href="Pitchers.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Pitchers</a>
+<a href="Teams.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Teams</a>
+<a href="AtBatReplays.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">At-bat replays</a>
+<a href="Explore.dc.html" aria-current="page" style="color: #F3F5F9; font-weight: 600; height: 64px; display: flex; align-items: center; border-bottom: 3px solid #E8364F; box-sizing: border-box; padding-top: 3px">Explore</a>
+<a href="#" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Ask PitchTracker</a>
+</nav>
+<a href="Pitchers.dc.html" style="height: 40px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 10px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 14px; font-weight: 600">Find a pitcher<span style="font-size: 12px; padding: 2px 6px; border-radius: 3px; background: rgba(0,0,0,0.25)">⌘K</span></a>
+</div>
+</header>
+<section style="max-width: 1240px; margin: 0 auto; padding: 32px 32px 16px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="align-self: flex-start; background: #E8364F; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; padding: 3px 16px 3px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">EXPLORE</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 56px; line-height: 0.92; text-transform: uppercase">Query every pitch.</h1>
+<p style="margin: 0; font-size: 16px; color: #C4CCDB; max-width: 620px">Build a Statcast search by who, what, when and outcome, then see the results in 3D.</p>
+</div>
+<div style="display: flex; gap: 8px; align-items: center">
+<span style="font-size: 13px; color: #9AA6BD">Try:</span>
+<button class="xchip" aria-pressed="false">Two-strike sweepers</button><button class="xchip" aria-pressed="false">Chase-zone whiffs</button><button class="xchip" aria-pressed="false">100+ mph in 2026</button>
+</div>
+</section>
+
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px">
+<div aria-label="Current query" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 14px; background: #0F1626; border: 1px solid #1B2438; border-left: 4px solid #E8364F; border-radius: 4px; font-size: 14px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.5px; color: #9AA6BD">PITCHES</span>
+<sc-for list="{{ sentence }}" as="w" hint-placeholder-count="6"><span style="color: #9AA6BD">{{ w.pre }}</span><span style="display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 15px; background: #1E2A40; font-weight: 600">{{ w.v }}</span></sc-for>
+<span style="flex-grow: 1"></span>
+<button style="height: 34px; padding: 0 12px; border-radius: 4px; border: 0; background: transparent; color: #FF6B7A; font-size: 13px; font-weight: 600" onClick="{{ clearAll }}">Clear</button>
+</div>
+</div>
+
+<div style="max-width: 1240px; margin: 16px auto 0; padding: 0 32px; display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap">
+<aside aria-label="Filters" style="flex: 0 1 400px; min-width: 320px; background: #0A101C; border: 1px solid #1B2438; border-radius: 6px; overflow: hidden">
+<section style="border-bottom: 1px solid #1B2438">
+<button aria-expanded="{{ open_whoStr }}" onClick="{{ toggle_who }}" style="width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border: 0; background: transparent; color: #F3F5F9; text-align: left">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; width: 84px">WHO</span>
+<span style="flex-grow: 1; font-size: 13px; color: #9AA6BD; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Misiorowski · RHP · vs LHB</span>
+<span aria-hidden="true" style="{{ chev_who }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg></span>
+</button>
+<sc-if value="{{ open_who }}" hint-placeholder-val="{{ true }}">
+<div style="padding: 0 18px 20px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="ex-p" style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCHERS</label>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 44px; padding: 5px 8px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C">
+<span style="display: inline-flex; align-items: center; gap: 4px; height: 30px; padding-left: 10px; border-radius: 15px; background: #1E2A40; font-size: 13px; font-weight: 600">Jacob Misiorowski<button aria-label="Remove Jacob Misiorowski" style="width: 28px; height: 28px; border: 0; background: transparent; color: #C4CCDB">×</button></span>
+<input id="ex-p" placeholder="Add pitcher…" style="flex: 1 1 100px; min-width: 80px; height: 30px; border: 0; background: transparent; color: #F3F5F9; font-size: 14px">
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<label for="ex-b" style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">BATTERS</label>
+<input id="ex-b" placeholder="Search a batter by name" style="height: 44px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 14px">
+<span style="font-size: 12px; color: #9AA6BD">Name search replaces typing MLB IDs (needs a batter search endpoint).</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCHER THROWS</span><div style="display: flex; gap: 6px"><button class="xchip" aria-pressed="false">LHP</button><button class="xchip" aria-pressed="true">RHP</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">BATTER STANDS</span><div style="display: flex; gap: 6px"><button class="xchip" aria-pressed="true">LHB</button><button class="xchip" aria-pressed="false">RHB</button></div></div>
+</div>
+</div>
+</sc-if>
+</section>
+<section style="border-bottom: 1px solid #1B2438">
+<button aria-expanded="{{ open_whatStr }}" onClick="{{ toggle_what }}" style="width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border: 0; background: transparent; color: #F3F5F9; text-align: left">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; width: 84px">WHAT</span>
+<span style="flex-grow: 1; font-size: 13px; color: #9AA6BD; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ whatSummary }}</span>
+<span aria-hidden="true" style="{{ chev_what }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg></span>
+</button>
+<sc-if value="{{ open_what }}" hint-placeholder-val="{{ true }}">
+<div style="padding: 0 18px 20px; display: flex; flex-direction: column; gap: 18px">
+<sc-for list="{{ ptGroups }}" as="g" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">{{ g.name }}</span><button onClick="{{ g.all }}" style="height: 28px; padding: 0 4px; border: 0; background: transparent; color: #9AA6BD; font-size: 12px; font-weight: 600">{{ g.allLabel }}</button></div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<sc-for list="{{ g.items }}" as="p" hint-placeholder-count="4"><button class="xchip" aria-pressed="{{ p.on }}" onClick="{{ p.toggle }}"><span style="{{ p.dot }}"></span>{{ p.label }}</button></sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</section>
+<section style="border-bottom: 1px solid #1B2438">
+<button aria-expanded="{{ open_whenStr }}" onClick="{{ toggle_when }}" style="width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border: 0; background: transparent; color: #F3F5F9; text-align: left">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; width: 84px">WHEN</span>
+<span style="flex-grow: 1; font-size: 13px; color: #9AA6BD; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ whenSummary }}</span>
+<span aria-hidden="true" style="{{ chev_when }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg></span>
+</button>
+<sc-if value="{{ open_when }}" hint-placeholder-val="{{ true }}">
+<div style="padding: 0 18px 20px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">SEASONS</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><button class="xchip" aria-pressed="true">2026</button><button class="xchip" aria-pressed="false">2025</button><button class="xchip" aria-pressed="false">2024</button><button class="xchip" aria-pressed="false">2023</button><button class="xchip" aria-pressed="false">2022</button><button class="xchip" aria-pressed="false">2021</button></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">FROM</span><input type="date" value="2026-03-26" style="height: 40px; padding: 0 10px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 13px; color-scheme: dark"></label>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">TO</span><input type="date" value="2026-10-28" style="height: 40px; padding: 0 10px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 13px; color-scheme: dark"></label>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">COUNT · BALLS ACROSS, STRIKES DOWN</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{ presets }}" as="c" hint-placeholder-count="5"><button class="xchip" aria-pressed="{{ c.on }}" onClick="{{ c.pick }}">{{ c.label }}</button></sc-for></div>
+<div style="display: grid; grid-template-columns: 28px repeat(4, minmax(0, 1fr)); gap: 6px; align-items: center">
+<span></span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">0</span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">1</span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">2</span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">3</span>
+<sc-for list="{{ countRows }}" as="r" hint-placeholder-count="3">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; text-align: center">{{ r.s }}</span>
+<sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="4"><button class="cbtn" aria-pressed="{{ c.on }}" aria-label="{{ c.label }} count" onClick="{{ c.toggle }}">{{ c.label }}</button></sc-for>
+</sc-for>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">OUTS</span><div style="display: flex; gap: 6px"><button class="xchip" aria-pressed="false">0</button><button class="xchip" aria-pressed="false">1</button><button class="xchip" aria-pressed="false">2</button></div></div>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">GAME TYPE</span><select style="height: 36px; padding: 0 10px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 13px"><option>Regular season</option><option>Postseason (all)</option><option>Wild card</option><option>Division series</option><option>League championship</option><option>World Series</option><option>Spring training</option><option>Exhibition</option><option>All-star</option></select></label>
+</div>
+</div>
+</sc-if>
+</section>
+<section style="border-bottom: 1px solid #1B2438">
+<button aria-expanded="{{ open_outcomeStr }}" onClick="{{ toggle_outcome }}" style="width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 18px; border: 0; background: transparent; color: #F3F5F9; text-align: left">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 1px; width: 84px">OUTCOME</span>
+<span style="flex-grow: 1; font-size: 13px; color: #9AA6BD; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ outSummary }}</span>
+<span aria-hidden="true" style="{{ chev_outcome }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"></path></svg></span>
+</button>
+<sc-if value="{{ open_outcome }}" hint-placeholder-val="{{ true }}">
+<div style="padding: 0 18px 20px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCH RESULT</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><sc-for list="{{ results }}" as="p" hint-placeholder-count="6"><button class="xchip" aria-pressed="{{ p.on }}" onClick="{{ p.toggle }}">{{ p.label }}</button></sc-for></div>
+<span style="font-size: 12px; color: #9AA6BD">Groups expand to Statcast's raw results (e.g. Whiff = swinging strike + blocked + foul tip).</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">AT-BAT RESULT</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><button class="xchip" aria-pressed="false">Hits</button><button class="xchip" aria-pressed="false">Home runs</button><button class="xchip" aria-pressed="false">Walks &amp; HBP</button><button class="xchip" aria-pressed="false">Strikeouts</button><button class="xchip" aria-pressed="false">Outs</button><button class="xchip" aria-pressed="false">More…</button></div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">BATTED BALL</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><button class="xchip" aria-pressed="false">Ground ball</button><button class="xchip" aria-pressed="false">Line drive</button><button class="xchip" aria-pressed="false">Fly ball</button><button class="xchip" aria-pressed="false">Popup</button></div>
+</div>
+<div style="display: flex; gap: 18px; align-items: flex-start">
+<div style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">ZONE · CATCHER VIEW</span>
+<div role="group" aria-label="Strike zone picker" style="position: relative; width: 200px; height: 240px">
+<sc-for list="{{ chase }}" as="z" hint-placeholder-count="4"><button class="zbtn" aria-pressed="{{ z.on }}" aria-label="Zone {{ z.n }} {{ z.name }}" onClick="{{ z.toggle }}" style="{{ z.pos }}">{{ z.n }}</button></sc-for>
+<div style="position: absolute; left: 34px; top: 40px; width: 132px; height: 160px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; background: #070B14; padding: 2px; box-sizing: border-box; border: 2px solid #C4CCDB">
+<sc-for list="{{ zones }}" as="z" hint-placeholder-count="9"><button class="zbtn" aria-pressed="{{ z.on }}" aria-label="Zone {{ z.n }}" onClick="{{ z.toggle }}" style="border: 0">{{ z.n }}</button></sc-for>
+</div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-top: 24px; font-size: 12px; line-height: 1.5; color: #9AA6BD">
+<span>Click squares to pick zones 1–9; the corners are chase zones 11–14.</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px"><button class="xchip" onClick="{{ zIn }}" aria-pressed="false">In zone</button><button class="xchip" onClick="{{ zChase }}" aria-pressed="false">Chase</button><button class="xchip" onClick="{{ zClear }}" aria-pressed="false">Clear</button></div>
+</div>
+</div>
+</div>
+</sc-if>
+</section>
+<div style="position: sticky; bottom: 0; padding: 14px 18px; background: #0A101C; border-top: 1px solid #2A3650; display: flex; gap: 10px; align-items: center">
+<span style="flex-grow: 1; font-size: 13px; color: #9AA6BD">≈ <span style="color: #F3F5F9; font-weight: 700">{{ count }}</span> pitches</span>
+<button style="height: 48px; padding: 0 22px; border-radius: 4px; border: 0; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: 1px">RUN SEARCH</button>
+</div>
+</aside>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #0F1626; border: 1px solid #1B2438; border-top: 3px solid #E8364F; border-radius: 4px">
+<sc-for list="{{ summary }}" as="s" hint-placeholder-count="5"><div style="padding: 12px 14px; border-right: 1px solid #1B2438; display: flex; flex-direction: column"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">{{ s.k }}</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; line-height: 1.05">{{ s.v }}</span></div></sc-for>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+<div role="tablist" aria-label="Result view" style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 3px">
+<button role="tab" aria-selected="true" style="height: 34px; padding: 0 14px; border: 0; border-radius: 2px; background: #F3F5F9; color: #070B14; font-weight: 700; font-size: 13px">3D scene</button>
+<button role="tab" aria-selected="false" style="height: 34px; padding: 0 14px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 13px">Zone heat</button>
+<button role="tab" aria-selected="false" style="height: 34px; padding: 0 14px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 13px">Table only</button>
+</div>
+<div style="display: flex; gap: 6px"><button style="height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 13px; font-weight: 600">Save query</button><button style="height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 13px; font-weight: 600">Copy link</button><button style="height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 13px; font-weight: 600">Export CSV</button></div>
+</div>
+<figure style="margin: 0; position: relative; height: 420px; border-radius: 6px; overflow: hidden; border: 1px solid #2A3650">
+<img src="/_blob/919acb456528e5f27426f1b2bdb6bfe2" alt="3D scene showing the matching pitches" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+<svg aria-hidden="true" viewBox="0 0 1080 840" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<path d="M512 440 Q654 462 760 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="760" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q667 462 783 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="783" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q680 455 807 478" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="807" cy="478" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q694 465 833 507" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="833" cy="507" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q627 483 783 621" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="783" cy="621" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q646 441 745 438" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="745" cy="438" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q670 442 790 439" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="790" cy="439" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q673 444 795 446" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="795" cy="446" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q710 472 862 527" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="862" cy="527" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q664 433 778 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="778" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q682 458 846 533" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="846" cy="533" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q610 492 753 648" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="753" cy="648" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q666 484 854 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="854" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q692 462 830 498" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="830" cy="498" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q665 484 779 561" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="779" cy="561" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q657 483 765 558" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="765" cy="558" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q696 452 837 469" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="837" cy="469" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q696 420 878 536" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="878" cy="536" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q685 493 851 634" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="851" cy="634" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q679 447 846 614" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="846" cy="614" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q675 495 832 640" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="832" cy="640" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q670 472 790 525" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="790" cy="525" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q665 479 853 610" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="853" cy="610" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q646 484 819 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="819" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q677 433 801 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="801" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q668 463 784 499" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="784" cy="499" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q649 495 786 639" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="786" cy="639" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q581 457 668 642" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="668" cy="642" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q695 476 835 538" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="835" cy="538" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q678 482 804 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="804" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q675 470 798 520" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="798" cy="520" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q636 517 799 719" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="799" cy="719" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q639 471 775 684" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="775" cy="684" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q656 449 763 459" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="763" cy="459" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q638 439 731 433" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="731" cy="433" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q644 477 741 540" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="741" cy="540" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q655 508 762 630" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="762" cy="630" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q669 465 787 506" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="787" cy="506" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q669 464 786 504" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="786" cy="504" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q667 462 784 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="784" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q643 471 740 523" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="740" cy="523" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q663 440 777 435" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="777" cy="435" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q699 475 842 534" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="842" cy="534" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q656 477 805 699" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="805" cy="699" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q664 480 778 549" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="778" cy="549" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q654 482 760 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="760" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+</svg>
+<div style="position: absolute; left: 12px; bottom: 12px; display: flex; background: rgba(7,11,20,0.9); border-radius: 4px; padding: 3px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1px"><span style="padding: 5px 10px; background: #F3F5F9; color: #070B14; border-radius: 2px">FRONT</span><span style="padding: 5px 10px; color: #C4CCDB">BACK</span><span style="padding: 5px 10px; color: #C4CCDB">TOP</span><span style="padding: 5px 10px; color: #C4CCDB">SIDE</span><span style="padding: 5px 10px; color: #C4CCDB">TUNNEL</span></div>
+<a href="Pitcher.dc.html" style="position: absolute; right: 12px; bottom: 12px; height: 36px; padding: 0 14px; border-radius: 4px; background: rgba(7,11,20,0.9); border: 1px solid #2A3650; font-size: 13px; font-weight: 600; display: flex; align-items: center">Open full screen ↗</a>
+</figure>
+<div style="background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 720px">
+<thead><tr style="background: #131C30; text-align: left"><th scope="col" style="padding: 12px 16px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">DATE</th><th scope="col" style="padding: 12px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">OPPONENT</th><th scope="col" style="padding: 12px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">COUNT</th><th scope="col" style="padding: 12px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCH</th><th scope="col" style="padding: 12px; text-align: right; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">MPH</th><th scope="col" style="padding: 12px; text-align: right; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">SPIN</th><th scope="col" style="padding: 12px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">RESULT</th><th scope="col" style="padding: 12px 16px"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Replay</span></th></tr></thead>
+<tbody>
+<sc-for list="{{ table }}" as="r" hint-placeholder-count="6">
+<tr style="border-top: 1px solid #1B2438"><td style="padding: 10px 16px; color: #C4CCDB">{{ r.d }}</td><td style="padding: 10px 12px; font-weight: 600">{{ r.b }}</td><td style="padding: 10px 12px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 17px">{{ r.c }}</td><td style="padding: 10px 12px"><span style="display: inline-flex; align-items: center; gap: 8px"><span style="{{ r.dot }}"></span>{{ r.p }}</span></td><td class="num" style="padding: 10px 12px; text-align: right; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px">{{ r.v }}</td><td class="num" style="padding: 10px 12px; text-align: right; color: #C4CCDB">{{ r.s }}</td><td style="padding: 10px 12px">{{ r.r }}</td><td style="padding: 10px 16px; text-align: right"><a href="AtBat.dc.html" style="font-size: 13px; font-weight: 600; color: #FF6B7A">Replay ▶</a></td></tr>
+</sc-for>
+</tbody>
+</table>
+<div style="padding: 12px 16px; border-top: 1px solid #1B2438; display: flex; justify-content: space-between; font-size: 13px; color: #9AA6BD"><span>Showing 6 of {{ count }} · <span style="color: #F6C344">sample rows</span></span><button style="height: 32px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 13px">Load more</button></div>
+</div>
+</main>
+</div>
+<footer style="border-top: 1px solid #1B2438; background: #0A101C; margin-top: 64px">
+<div style="max-width: 1240px; margin: 0 auto; padding: 32px; font-size: 12px; line-height: 1.6; color: #9AA6BD">
+<p style="margin: 0">Not affiliated with or endorsed by Major League Baseball, MLB Advanced Media, or any of its clubs. All MLB and Club marks, logos, and player names are trademarks of their respective owners and are used here for identification purposes only. Pitch trajectory and Statcast data: Baseball Savant. Player metadata, schedule, and headshots: MLB Stats API and mlbstatic.com.</p>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { open: { who: false, what: true, when: true, outcome: true }, pt: { 'Slider': true, 'Sweeper': true }, counts: { '0-2': true, '1-2': true, '2-2': true, '3-2': true }, zones: { 13: true, 14: true }, res: { 'Whiff': true } }; }
+  renderVals() {
+    const s = this.state, self = this;
+    const tog = (k, key) => () => self.setState({ [k]: Object.assign({}, self.state[k], { [key]: !self.state[k][key] }) });
+    const C = { '4-Seam Fastball': '#F0505A', 'Sinker': '#FB7C3C', 'Cutter': '#F5A524', 'Fastball (other)': '#F0505A', 'Slider': '#B392F0', 'Sweeper': '#C084FC', 'Slurve': '#A78BFA', 'Curveball': '#4C8DF6', 'Knuckle Curve': '#60A5FA', 'Slow Curve': '#93C5FD', 'Changeup': '#2DD4BF', 'Splitter': '#38BDF8', 'Forkball': '#22D3EE', 'Screwball': '#5EEAD4', 'Eephus': '#9AA6BD', 'Knuckleball': '#9AA6BD', 'Unidentified': '#5A6A88' };
+    const G = [['FASTBALLS', ['4-Seam Fastball', 'Sinker', 'Cutter', 'Fastball (other)']], ['BREAKING', ['Slider', 'Sweeper', 'Slurve', 'Curveball', 'Knuckle Curve', 'Slow Curve']], ['OFFSPEED', ['Changeup', 'Splitter', 'Forkball', 'Screwball']], ['OTHER', ['Eephus', 'Knuckleball', 'Unidentified']]];
+    const ptGroups = G.map(([name, items]) => {
+      const allOn = items.every((i) => s.pt[i]);
+      return { name, allLabel: allOn ? 'Clear group' : 'Select all',
+        all: () => { const n = Object.assign({}, s.pt); items.forEach((i) => { n[i] = !allOn; }); self.setState({ pt: n }); },
+        items: items.map((label) => ({ label, on: s.pt[label] ? 'true' : 'false', toggle: tog('pt', label), dot: 'width: 8px; height: 8px; border-radius: 50%; background: ' + C[label] })) };
+    });
+    const countRows = [0, 1, 2].map((st) => ({ s: st, cells: [0, 1, 2, 3].map((b) => { const k = b + '-' + st; return { label: k, on: s.counts[k] ? 'true' : 'false', toggle: tog('counts', k) }; }) }));
+    const all = []; [0, 1, 2, 3].forEach((b) => [0, 1, 2].forEach((st) => all.push([b, st])));
+    const setCounts = (fn) => () => { const n = {}; all.forEach(([b, st]) => { if (fn(b, st)) n[b + '-' + st] = true; }); self.setState({ counts: n }); };
+    const presets = [['First pitch', (b, st) => b === 0 && st === 0], ['Ahead', (b, st) => st > b], ['Even', (b, st) => st === b], ['Behind', (b, st) => b > st], ['2 strikes', (b, st) => st === 2], ['3 balls', (b, st) => b === 3]].map(([label, fn]) => {
+      const keys = all.filter(([b, st]) => fn(b, st)).map(([b, st]) => b + '-' + st);
+      const on = keys.length === Object.keys(s.counts).filter((k) => s.counts[k]).length && keys.every((k) => s.counts[k]);
+      return { label, on: on ? 'true' : 'false', pick: setCounts(fn) };
+    });
+    const zones = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ n, on: s.zones[n] ? 'true' : 'false', toggle: tog('zones', n) }));
+    const cpos = { 11: 'left: 0; top: 0; border-radius: 6px 0 0 0', 12: 'right: 0; top: 0; border-radius: 0 6px 0 0', 13: 'left: 0; bottom: 0; border-radius: 0 0 0 6px', 14: 'right: 0; bottom: 0; border-radius: 0 0 6px 0' };
+    const cname = { 11: 'chase up-in', 12: 'chase up-out', 13: 'chase down-in', 14: 'chase down-out' };
+    const chase = [11, 12, 13, 14].map((n) => ({ n, name: cname[n], on: s.zones[n] ? 'true' : 'false', toggle: tog('zones', n), pos: 'position: absolute; width: 100px; height: 120px; display: flex; padding: 6px; ' + (n % 2 ? 'justify-content: flex-start; ' : 'justify-content: flex-end; ') + (n < 13 ? 'align-items: flex-start; ' : 'align-items: flex-end; ') + cpos[n] }));
+    const results = ['Whiff', 'Called strike', 'Foul', 'Ball', 'In play', 'HBP'].map((label) => ({ label, on: s.res[label] ? 'true' : 'false', toggle: tog('res', label) }));
+    const ptSel = Object.keys(s.pt).filter((k) => s.pt[k]);
+    const cSel = Object.keys(s.counts).filter((k) => s.counts[k]);
+    const zSel = Object.keys(s.zones).filter((k) => s.zones[k]);
+    const rSel = Object.keys(s.res).filter((k) => s.res[k]);
+    const sentence = [{ pre: 'by', v: 'Jacob Misiorowski' }];
+    if (ptSel.length) sentence.push({ pre: '·', v: ptSel.join(', ') });
+    sentence.push({ pre: 'vs', v: 'LHB' }, { pre: 'in', v: '2026' });
+    if (cSel.length) sentence.push({ pre: 'in', v: cSel.length === 4 && cSel.every((k) => k.endsWith('-2')) ? '2-strike counts' : cSel.length + ' counts' });
+    if (rSel.length) sentence.push({ pre: '→', v: rSel.join(', ') });
+    if (zSel.length) sentence.push({ pre: 'in', v: 'zones ' + zSel.join(', ') });
+    const n = Math.max(1, Math.round(2994 * (ptSel.length ? ptSel.length * 0.11 : 1) * 0.42 * (cSel.length ? cSel.length / 12 : 1) * (rSel.length ? rSel.length * 0.17 : 1) * (zSel.length ? zSel.length / 13 : 1) * 6));
+    const PC = { Slider: '#B392F0', Sweeper: '#C084FC' };
+    const table = [['Oct 28', '@ TB', '1-2', 'Slider', '92.1', '2,540', 'Swinging strike'], ['Oct 23', 'vs TB', '0-2', 'Slider', '91.4', '2,510', 'Swinging strike'], ['Oct 11', 'vs LAD', '2-2', 'Slider', '92.6', '2,580', 'Swinging strike'], ['Oct 11', 'vs LAD', '3-2', 'Slider', '91.9', '2,500', 'Swinging strike'], ['Oct 3', 'vs SD', '1-2', 'Slider', '92.0', '2,530', 'Swinging strike'], ['Sep 27', 'vs STL', '0-2', 'Slider', '91.2', '2,490', 'Swinging strike']]
+      .map(([d, b, c, p, v, sp, r]) => ({ d, b, c, p, v, s: sp, r, dot: 'width: 9px; height: 9px; border-radius: 50%; background: ' + (PC[p] || '#B392F0') }));
+    const chev = (k) => 'width: 28px; height: 28px; border-radius: 50%; border: 1px solid #2A3650; display: flex; align-items: center; justify-content: center; color: #C4CCDB; transition: transform 0.2s; transform: rotate(' + (s.open[k] ? '180' : '0') + 'deg)';
+    const vals = { sentence, ptGroups, countRows, presets, zones, chase, results, table, count: n.toLocaleString(),
+      whatSummary: ptSel.length ? ptSel.join(', ') : 'Any pitch', whenSummary: '2026 · ' + (cSel.length ? cSel.length + ' counts' : 'any count'), outSummary: [rSel.join(', '), zSel.length ? 'zones ' + zSel.join(',') : ''].filter(Boolean).join(' · ') || 'Any outcome',
+      summary: [{ k: 'PITCHES', v: n.toLocaleString() }, { k: 'AVG MPH', v: '91.8' }, { k: 'AVG SPIN', v: '2,530' }, { k: 'WHIFF%', v: '100' }, { k: 'BATTERS', v: '[n]' }],
+      zIn: () => { const z = {}; [1,2,3,4,5,6,7,8,9].forEach((i) => { z[i] = true; }); self.setState({ zones: z }); },
+      zChase: () => self.setState({ zones: { 11: true, 12: true, 13: true, 14: true } }), zClear: () => self.setState({ zones: {} }),
+      clearAll: () => self.setState({ pt: {}, counts: {}, zones: {}, res: {} }) };
+    ['who', 'what', 'when', 'outcome'].forEach((k) => { vals['open_' + k] = !!s.open[k]; vals['open_' + k + 'Str'] = s.open[k] ? 'true' : 'false'; vals['chev_' + k] = chev(k); vals['toggle_' + k] = () => self.setState({ open: Object.assign({}, self.state.open, { [k]: !self.state.open[k] }) }); });
+    return vals;
+  }
+}
+</script>
+</body>
+</html>

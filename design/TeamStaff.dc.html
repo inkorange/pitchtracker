@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Milwaukee Brewers staff</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+input,select{font-family:Inter,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; min-height: 100%">
+<header style="border-bottom: 1px solid #1B2438; background: #0A101C">
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 32px">
+<a href="Main.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.5px; color: #F3F5F9">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<nav aria-label="Primary" style="display: flex; gap: 28px; font-size: 14px; font-weight: 500; flex-grow: 1">
+<a href="Pitchers.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Pitchers</a>
+<a href="Teams.dc.html" aria-current="page" style="color: #F3F5F9; font-weight: 600; height: 64px; display: flex; align-items: center; border-bottom: 3px solid #E8364F; box-sizing: border-box; padding-top: 3px">Teams</a>
+<a href="AtBatReplays.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">At-bat replays</a>
+<a href="Explore.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Explore</a>
+<a href="#" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Ask PitchTracker</a>
+</nav>
+<a href="Pitchers.dc.html" style="height: 40px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 10px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 14px; font-weight: 600">Find a pitcher<span style="font-size: 12px; padding: 2px 6px; border-radius: 3px; background: rgba(0,0,0,0.25)">⌘K</span></a>
+</div>
+</header>
+<section style="max-width: 1240px; margin: 0 auto; padding: 32px 32px 20px; display: flex; flex-direction: column; gap: 18px">
+<nav aria-label="Breadcrumb" style="font-size: 14px; color: #9AA6BD; display: flex; gap: 8px"><a href="Teams.dc.html" style="color: #9AA6BD">Teams</a><span aria-hidden="true">/</span><span style="color: #F3F5F9">Milwaukee Brewers</span></nav>
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap">
+<div style="display: flex; align-items: center; gap: 24px">
+<span role="img" aria-label="Milwaukee Brewers logo (placeholder)" style="width: 152px; height: 152px; flex-shrink: 0; border-radius: 8px; background: #0F1626; border: 1px dashed #5A6A88; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 48px; line-height: 1">MIL</span><span style="font-size: 10px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">CLUB LOGO · 152PX</span></span>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">NL CENTRAL · PITCHING STAFF</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 60px; line-height: 0.92; text-transform: uppercase">Milwaukee Brewers</h1>
+</div>
+</div>
+<div style="display: flex; gap: 10px; align-items: center">
+<div role="group" aria-label="Season" style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 4px">
+<button aria-pressed="true" style="height: 38px; padding: 0 14px; border: 0; border-radius: 3px; background: #F3F5F9; color: #070B14; font-weight: 700; font-size: 14px">2026</button>
+<button aria-pressed="false" style="height: 38px; padding: 0 14px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 14px">2025</button>
+</div>
+<a href="Pitcher.dc.html" style="height: 46px; padding: 0 16px; border-radius: 4px; border: 1px solid #2A3650; display: flex; align-items: center; font-size: 14px; font-weight: 600">Compare staff in 3D</a>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: #0F1626; border: 1px solid #1B2438; border-top: 3px solid #E8364F; border-radius: 4px">
+<sc-for list="{{ line }}" as="s" hint-placeholder-count="6"><div style="padding: 12px 14px; border-right: 1px solid #1B2438; display: flex; flex-direction: column"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">{{ s.k }}</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; line-height: 1.05">{{ s.v }}</span></div></sc-for>
+</div>
+</section>
+
+<section style="max-width: 1240px; margin: 0 auto; padding: 0 32px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+<div role="group" aria-label="Throws" style="display: flex; gap: 6px"><sc-for list="{{ hands }}" as="o" hint-placeholder-count="3"><button aria-pressed="{{ o.on }}" onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div>
+<span style="font-size: 13px; color: #9AA6BD">{{ count }} pitchers · names &amp; handedness from MLB roster · <span style="color: #F6C344">stats are sample values except Misiorowski</span></span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="9">
+<a href="Pitcher.dc.html" style="display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="width: 44px; height: 44px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #C4CCDB; flex-shrink: 0">{{ r.ini }}</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ r.name }}</span><span style="font-size: 12px; color: #9AA6BD">{{ r.hand }}HP · {{ r.pitches }} pitches</span></span>
+<span style="width: 34px; height: 34px; border-radius: 50%; background: #E8364F; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4l13 8-13 8z"></path></svg></span>
+</div>
+<span role="img" aria-label="{{ r.mixLabel }}" style="display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #1B2438"><sc-for list="{{ r.mix }}" as="m" hint-placeholder-count="4"><span style="{{ m }}"></span></sc-for></span>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{ r.stats }}" as="s" hint-placeholder-count="4"><span style="display: flex; flex-direction: column"><span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">{{ s.k }}</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px">{{ s.v }}</span></span></sc-for>
+</div>
+</a>
+</sc-for>
+</div>
+<button style="align-self: center; height: 44px; padding: 0 20px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 14px; font-weight: 600">Show all {{ total }} pitchers</button>
+</section>
+<footer style="border-top: 1px solid #1B2438; background: #0A101C; margin-top: 64px">
+<div style="max-width: 1240px; margin: 0 auto; padding: 32px; font-size: 12px; line-height: 1.6; color: #9AA6BD">
+<p style="margin: 0">Not affiliated with or endorsed by Major League Baseball, MLB Advanced Media, or any of its clubs. All MLB and Club marks, logos, and player names are trademarks of their respective owners and are used here for identification purposes only. Pitch trajectory and Statcast data: Baseball Savant. Player metadata, schedule, and headshots: MLB Stats API and mlbstatic.com.</p>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { hand: 'All' }; }
+  renderVals() {
+    const s = this.state;
+    const C = { FF: '#F0505A', FC: '#F5A524', SL: '#B392F0', CU: '#4C8DF6', CH: '#2DD4BF', SI: '#FB7C3C' };
+    const R = [
+      ['Jacob Misiorowski', 'R', '2,994', ['252', '17.1', '33.4', '100.6'], [['FF',64],['FC',14],['SL',11],['CU',10],['CH',1]]],
+      ['Brandon Woodruff', 'R', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['FF',40],['SI',20],['CH',20],['SL',20]]],
+      ['Chad Patrick', 'R', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['FC',45],['FF',25],['SI',20],['SL',10]]],
+      ['Trevor Megill', 'R', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['FF',60],['CU',40]]],
+      ['Abner Uribe', 'R', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['SI',55],['SL',45]]],
+      ['Aaron Ashby', 'L', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['SI',45],['SL',30],['CH',25]]],
+      ['Jared Koenig', 'L', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['SI',50],['FC',30],['CU',20]]],
+      ['Robert Gasser', 'L', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['SI',40],['SL',35],['CH',25]]],
+      ['DL Hall', 'L', '[n]', ['[n]', '[n]', '[n]', '[n]'], [['FF',55],['SL',25],['CH',20]]]
+    ];
+    const rows = R.filter((r) => s.hand === 'All' || r[1] === s.hand).map((r) => ({
+      name: r[0], hand: r[1], pitches: r[2], ini: r[0].split(' ').map((x) => x[0]).join('').slice(0, 2),
+      stats: ['K', 'WHIFF%', 'CSW%', 'FB MPH'].map((k, i) => ({ k, v: r[3][i] })),
+      mix: r[4].map(([t, p]) => 'display: block; height: 8px; width: ' + p + '%; background: ' + C[t]),
+      mixLabel: 'Pitch mix: ' + r[4].map(([t, p]) => t + ' ' + p + '%').join(', ')
+    }));
+    const seg = (on) => 'height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13px; font-weight: 600; ' + (on ? 'background: #F3F5F9; color: #070B14; border: 1px solid #F3F5F9' : 'background: transparent; color: #C4CCDB; border: 1px solid #2A3650');
+    const hands = [['All', 'All pitchers'], ['R', 'Right-handed'], ['L', 'Left-handed']].map(([v, label]) => ({ label, on: s.hand === v ? 'true' : 'false', style: seg(s.hand === v), pick: () => this.setState({ hand: v }) }));
+    const line = [['PITCHERS', '32'], ['STAFF K', '[n]'], ['WHIFF%', '[n]'], ['CSW%', '[n]'], ['AVG FB MPH', '[n]'], ['K LEADER', 'Misiorowski']].map(([k, v]) => ({ k, v }));
+    return { rows, hands, line, count: rows.length, total: 32 };
+  }
+}
+</script>
+</body>
+</html>

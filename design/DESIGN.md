@@ -15,6 +15,11 @@ Source of truth: the frames on this canvas (`project/*.dc.html`). This file tell
 | `MobileSheetFilters.dc.html` | **Build** — same drawer, expanded on Filters tab | same |
 | `Stats.dc.html` / `StatsMobile.dc.html` | **Build** — `?view=stats` | same route |
 | `AtBat.dc.html` / `AtBatMobile.dc.html` | **Build** — at-bat mode (`?vsBatter&abGame&abNum`) | same route |
+| `Pitchers.dc.html` / `PitchersMobile.dc.html` | **Build** — new page (nothing exists today) | `/pitchers` |
+| `Explore.dc.html` / `ExploreMobile.dc.html` | **Build** — rework of the existing query builder | `/explore` |
+| `AtBatReplays.dc.html` | **Build** — rework of `/at-bat` (matchup search first) | `/at-bat` |
+| `Teams.dc.html` | **Build** — rework of `/browse` | `/browse` (consider `/teams` + redirect) |
+| `TeamStaff.dc.html` | **Build** — team → staff step of browse | `/browse/[team]?season=` |
 | `MobileToolbar.dc.html`, `MobileFilterPage.dc.html` | **Do not build** — Option B, rejected in favor of the drawer | — |
 | `HeroOptA/B/C.dc.html` | **Reference only** — A was chosen and is already in `Main`/`HomeMobile` | — |
 
@@ -68,6 +73,39 @@ Swinging strike `#F0505A` · Called strike `#F5A524` · Ball `#4C8DF6` · Foul `
 
 ## 3. Page specs
 
+### Global nav (all pages)
+- Items: Pitchers · Teams · At-bat replays · Explore · Ask PitchTracker. Active item: `--text`, 600, 3px `--accent` bottom border, `aria-current="page"`.
+- Right CTA is **"Find a pitcher ⌘K"** (replaces "Open the tracker"): opens a global pitcher search overlay (command palette, `⌘K` / `Ctrl+K`, results jump to `/pitcher/[id]/[slug]`); with no query it navigates to `/pitchers`.
+- Mobile: logo + search + menu buttons; menu opens a full-height sheet with the same items.
+
+### Pitchers (`/pitchers`, new)
+- Page head: eyebrow "PITCHERS · 2026", H1 "Find any arm.", name search (52px).
+- Mode tabs: **All pitchers | Find by pitch** (`role=tablist`).
+- All pitchers: filter bar (Team select, Throws All/RHP/LHP, Role All/SP/RP, Min pitches) + sortable table: Pitcher (avatar, name, team · hand · role) | K | Whiff% | CSW% | FB mph | FB spin | VAA | arsenal mix bar | ▶. Every stat header is a sort `<button>`; `aria-sort` on the `<th>`; active column renders in Barlow 19px. Default sort K desc. Paginate or virtualize. Table scrolls horizontally inside its box below ~1100px.
+- Find by pitch: pitch-type chips (colored dot), min-velo stepper (−/+, 1 mph), rank-by select (whiff%, velo, spin, break, usage) → ranked cards (rank, name, team/hand, mini path, MPH/usage/whiff%/spin). Needs a per-pitcher-per-pitch-type aggregate endpoint.
+- Mobile: search, mode tabs, filter pill row, stat sort pills (K, Whiff%, CSW%, FB mph, Spin) and a ranked card list showing the sorted stat large on the right.
+
+### Explore (`/explore`, rework)
+- Query sentence bar on top (accent left border): "PITCHES by [pitcher] · [types] vs [side] in [season] in [counts] → [results] in [zones]", generated from filter state; Clear.
+- Left panel (400px; stacks on narrow) = 4 accordions **Who / What / When / Outcome**, each header shows a one-line summary when collapsed. Sticky footer: live "≈ N pitches" estimate + RUN SEARCH.
+  - Who: pitcher multi-select (chips in an input), **batter name search** (replace the batter-ID text field; needs a batter search endpoint), Pitcher throws / Batter stands toggles.
+  - What: pitch types grouped Fastballs / Breaking / Offspeed / Other with per-group Select all.
+  - When: seasons chips, from/to dates, **count grid** (balls across × strikes down, 12 toggles) + presets (First pitch, Ahead, Even, Behind, 2 strikes, 3 balls), outs, game type select (Postseason group option).
+  - Outcome: pitch-result groups (Whiff = swinging strike + blocked + foul tip, Called strike, Foul, Ball, In play, HBP) mapping to raw Statcast codes; at-bat result groups with "More…" for the long tail; batted ball; **clickable zone picker** (3×3 zones 1–9 inside 4 chase quadrants 11–14, catcher view) + In zone / Chase / Clear.
+- Results: 5-up summary strip, view tabs (3D scene / Zone heat / Table only), Save query, Copy link (encode filters in the URL), Export CSV; 3D scene; result table with Replay ▶ per row; Load more.
+- Mobile: query chips row, 3-up summary, scene, floating "EDIT FILTERS (n)" button → drawer with tabs Who/What/When/Outcome and a sticky "SHOW N PITCHES".
+
+### At-bat replays (`/at-bat`, rework)
+- Tabs **Matchup | By game date**; Matchup is default.
+- Matchup form: Pitcher search VS Batter search (each shows avatar + team · hand once picked), seasons select, FIND AT-BATS. Batter optional (empty = every PA for the pitcher). Suggested matchup chips.
+- Result: ScoreBug "PITCHER | VS | BATTER", 7-up summary (PA, AB, H, K, BB, pitches, whiff%), list rows: date, game, inning, pitch-sequence dots + count, result, Replay ▶ → at-bat mode.
+- By game date: date + optional team; **off-season defaults to the last date with games** (not "yesterday"); results as game cards → pick an at-bat.
+
+### Teams (`/browse`, rework) and team page
+- Grid: search "Jump to a team", season toggle; American League then National League, each 3 division columns (East/Central/West) with slanted division tags; team rows 68px: abbreviation tile (swap for club logo), full name, optional ★ badge when a staff member leads a leaderboard (e.g. "J. Misiorowski · #1 in K").
+- Team page logo: **152×152 club logo** slot left of the team name (dashed placeholder in the mock). Render the real logo from the same source the app already uses for club marks (e.g. `https://www.mlbstatic.com/team-logos/{teamId}.svg`, MIL = 158), `object-fit: contain`, on `--surface` with 16px padding; keep the abbreviation as `alt`-text fallback. Grid tiles on `/browse` use the same logo at 48px.
+- Team page: breadcrumb, team tile + NL CENTRAL · PITCHING STAFF + name, season toggle, "Compare staff in 3D"; 6-up staff strip (pitchers, staff K, whiff%, CSW%, avg FB mph, K leader); throws filter; 3-col pitcher cards (avatar, name, hand · pitches, mix bar, K/Whiff%/CSW%/FB mph, ▶) → pitcher page; "Show all N".
+
 ### Homepage
 - Hero bg: `/field-background.jpg` (existing asset), `object-fit: cover; object-position: 50% 45%` (mobile 50% 30%). Scrims — desktop: `linear-gradient(90deg, rgba(7,11,20,.95) 0%, rgba(7,11,20,.82) 42%, rgba(7,11,20,.45) 100%)` + bottom 120px fade to `.85`; mobile: `linear-gradient(180deg, rgba(7,11,20,.6) 0%, rgba(7,11,20,.88) 45%, #070B14 100%)`. Use `isolation: isolate` on the section and `z-index:-1` on the bg layer.
 - Hero right = "monitor": the **real** 3D scene component in a 16:10.5 frame, non-interactive, FRONT camera, season paths, with ScoreBug top-left, LowerThird + camera pill bottom. Lazy-load; poster image fallback.
@@ -114,6 +152,8 @@ Swinging strike `#F0505A` · Called strike `#F5A524` · Ball `#4C8DF6` · Foul `
 ## 4. Data the frames assume
 
 Real (from the live site): leaderboards, Misiorowski arsenal (velo/usage/counts), game list, Oct 11 vs LAD game line, Pitch/Whiff of the season.
+
+**Sample / placeholder on the nav pages:** Pitchers table cells not from the leaderboards (and all arsenal mix bars except Misiorowski), Find-by-pitch results, Explore summary/table rows/estimates, matchup summary + at-bat rows on At-bat replays, all team staff stats and mix bars (roster names and handedness on the MIL page are real, from the MLB Stats API 2026 full-season roster).
 
 **Sample / placeholder — wire to real data:** per-pitch-type stats on the Stats view, outcome counts, batter-side splits (`[n]`), at-bat list batter names (`[Batter 1]`…), the 6-pitch Crow-Armstrong sequence, the live filtered counts (frames use a rough multiplier), Ask example queries (confirm the app can answer them).
 

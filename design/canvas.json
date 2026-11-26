@@ -130,6 +130,66 @@
 "w": 1440,
 "h": 1040,
 "title": "Hero bg C — broadcast slab"
+},
+"Pitchers.dc.html": {
+"x": 0,
+"y": 10200,
+"w": 1440,
+"h": 1500,
+"title": "Pitchers — directory (desktop)",
+"expand": "fill",
+"is_interactive": true
+},
+"PitchersMobile.dc.html": {
+"x": 1520,
+"y": 10200,
+"w": 390,
+"h": 1400,
+"title": "Pitchers — mobile",
+"is_interactive": true
+},
+"Explore.dc.html": {
+"x": 1990,
+"y": 10200,
+"w": 1440,
+"h": 1900,
+"title": "Explore — query builder (desktop)",
+"expand": "fill",
+"is_interactive": true
+},
+"ExploreMobile.dc.html": {
+"x": 3510,
+"y": 10200,
+"w": 390,
+"h": 844,
+"title": "Explore — mobile, filter drawer open",
+"is_interactive": true
+},
+"AtBatReplays.dc.html": {
+"x": 0,
+"y": 12700,
+"w": 1440,
+"h": 1300,
+"title": "At-bat replays — matchup search",
+"expand": "fill",
+"is_interactive": true
+},
+"Teams.dc.html": {
+"x": 1520,
+"y": 12700,
+"w": 1440,
+"h": 1900,
+"title": "Teams — browse grid",
+"expand": "fill"
+},
+"TeamStaff.dc.html": {
+"x": 3040,
+"y": 12700,
+"w": 1440,
+"h": 1300,
+"title": "Team page — Milwaukee staff",
+"expand": "fill",
+"is_interactive": true
 }
 },
 "order": [
@@ -148,7 +208,14 @@
 "FeatureExpandMobile.dc.html",
 "HeroOptA.dc.html",
 "HeroOptB.dc.html",
-"HeroOptC.dc.html"
+"HeroOptC.dc.html",
+"Pitchers.dc.html",
+"PitchersMobile.dc.html",
+"Explore.dc.html",
+"ExploreMobile.dc.html",
+"AtBatReplays.dc.html",
+"Teams.dc.html",
+"TeamStaff.dc.html"
 ],
 "notes": {
 "t1": {
@@ -220,6 +287,42 @@
 "w": 360,
 "text": "FOR THE CODING AGENT: read project/DESIGN.md first. It lists which frames to build vs ignore, all color/type tokens, interaction specs (feature-card expand, drawer, at-bat replay), and which numbers are sample data.",
 "fill": "green",
+"bold": true
+},
+"t4": {
+"x": 0,
+"y": 9900,
+"text": "Nav pages — Pitchers & Explore",
+"kind": "title1",
+"maxW": 3900
+},
+"t5": {
+"x": 0,
+"y": 12400,
+"text": "Nav pages — At-bat replays & Teams",
+"kind": "title1",
+"maxW": 4480
+},
+"s8": {
+"x": 3980,
+"y": 10200,
+"w": 420,
+"text": "Pitchers (new page): one directory with two modes. All pitchers = filter bar + sortable table (click any stat header). Find by pitch = pick a pitch type + min velo, ranked cards. Explore (reworked): plain-English query sentence on top, Who/What/When/Outcome accordions, pitch types grouped, count grid with presets, clickable zone picker, live pitch estimate on Run, results as 3D + table with Save / Copy link / CSV.",
+"fill": "blue"
+},
+"s9": {
+"x": 4560,
+"y": 12700,
+"w": 420,
+"text": "At-bat replays: matchup search (pitcher VS batter) is the lead; 'By game date' kept as a tab and defaults to the last day with games in the off-season. Teams: league → division grid with leaderboard badges; team page = staff cards (real roster names, sample stats). Nav CTA is now 'Find a pitcher ⌘K'.",
+"fill": "orange"
+},
+"s10": {
+"x": 1520,
+"y": 14680,
+"w": 620,
+"text": "LOGOS: every dashed tile marked LOGO (56px on this grid, 152px on the team page) is a club-logo slot. The mock can't include MLB club marks; in code render the real logo the app already uses, e.g. https://www.mlbstatic.com/team-logos/{teamId}.svg (object-fit: contain), with the abbreviation as alt/fallback.",
+"fill": "red",
 "bold": true
 }
 },

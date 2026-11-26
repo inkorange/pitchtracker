@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Pitchers</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+input,select{font-family:Inter,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; min-height: 100%">
+<header style="border-bottom: 1px solid #1B2438; background: #0A101C">
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 32px">
+<a href="Main.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.5px; color: #F3F5F9">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<nav aria-label="Primary" style="display: flex; gap: 28px; font-size: 14px; font-weight: 500; flex-grow: 1">
+<a href="Pitchers.dc.html" aria-current="page" style="color: #F3F5F9; font-weight: 600; height: 64px; display: flex; align-items: center; border-bottom: 3px solid #E8364F; box-sizing: border-box; padding-top: 3px">Pitchers</a>
+<a href="Teams.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Teams</a>
+<a href="AtBatReplays.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">At-bat replays</a>
+<a href="Explore.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Explore</a>
+<a href="#" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Ask PitchTracker</a>
+</nav>
+<a href="Pitchers.dc.html" style="height: 40px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 10px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 14px; font-weight: 600">Find a pitcher<span style="font-size: 12px; padding: 2px 6px; border-radius: 3px; background: rgba(0,0,0,0.25)">⌘K</span></a>
+</div>
+</header>
+<section style="max-width: 1240px; margin: 0 auto; padding: 48px 32px 24px; display: flex; flex-direction: column; gap: 14px">
+<span style="align-self: flex-start; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; padding: 3px 16px 3px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">PITCHERS · 2026</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 64px; line-height: 0.92; text-transform: uppercase">Find any arm.</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.55; color: #C4CCDB; max-width: 680px">Search every pitcher with tracked pitches, sort the league by the numbers that matter, or start from a pitch: find every 95+ cutter, every sweeper with elite spin.</p>
+</section>
+
+<section style="max-width: 1240px; margin: 0 auto; padding: 0 32px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+<label for="pp-search" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search pitchers</label>
+<input id="pp-search" type="search" placeholder="Search by name — try “Miller”" style="flex: 1 1 320px; height: 52px; padding: 0 18px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 16px">
+<div role="tablist" aria-label="Mode" style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 4px">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+<button role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button>
+</sc-for>
+</div>
+</div>
+
+<sc-if value="{{ isAll }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 14px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<label style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; display: flex; align-items: center; gap: 8px">TEAM <select style="height: 36px; padding: 0 10px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 13px"><option>All 30 teams</option><option>MIL</option><option>LAD</option></select></label>
+<span style="width: 1px; height: 24px; background: #1B2438"></span>
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">THROWS</span>
+<div role="group" aria-label="Throws" style="display: flex; gap: 4px"><sc-for list="{{ hands }}" as="o" hint-placeholder-count="3"><button aria-pressed="{{ o.on }}" onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div>
+<span style="width: 1px; height: 24px; background: #1B2438"></span>
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">ROLE</span>
+<div role="group" aria-label="Role" style="display: flex; gap: 4px"><sc-for list="{{ roles }}" as="o" hint-placeholder-count="3"><button aria-pressed="{{ o.on }}" onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div>
+<span style="width: 1px; height: 24px; background: #1B2438"></span>
+<label style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; display: flex; align-items: center; gap: 8px">MIN PITCHES <select style="height: 36px; padding: 0 10px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 13px"><option>500+</option><option>250+</option><option>1,000+</option></select></label>
+<span style="flex-grow: 1"></span>
+<span style="font-size: 13px; color: #9AA6BD">Showing <span style="color: #F3F5F9; font-weight: 600">{{ shown }}</span> · <span style="color: #F6C344">sample values</span></span>
+</div>
+
+<div style="background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; overflow-x: auto">
+<table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1100px">
+<thead>
+<tr style="background: #131C30; border-bottom: 1px solid #1B2438">
+<th scope="col" style="text-align: left; padding: 0 18px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCHER</th>
+<sc-for list="{{ cols }}" as="c" hint-placeholder-count="7">
+<th scope="col" aria-sort="{{ c.aria }}" style="padding: 0; text-align: right"><button onClick="{{ c.sort }}" style="{{ c.style }}">{{ c.label }}<span aria-hidden="true" style="color: #E8364F; width: 8px">{{ c.arrow }}</span></button></th>
+</sc-for>
+<th scope="col" style="text-align: left; padding: 0 12px; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">ARSENAL MIX</th>
+<th scope="col" style="width: 48px"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Open</span></th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="12">
+<tr style="border-top: 1px solid #1B2438">
+<th scope="row" style="text-align: left; padding: 10px 18px; font-weight: 500">
+<a href="Pitcher.dc.html" style="display: flex; align-items: center; gap: 12px">
+<span style="width: 36px; height: 36px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #C4CCDB; flex-shrink: 0">{{ r.ini }}</span>
+<span style="display: flex; flex-direction: column"><span style="font-weight: 600">{{ r.name }}</span><span style="font-size: 12px; color: #9AA6BD">{{ r.team }} · {{ r.hand }}HP · {{ r.role }}</span></span>
+</a>
+</th>
+<sc-for list="{{ r.cells }}" as="v" hint-placeholder-count="7">
+<td class="num" style="{{ v.style }}">{{ v.t }}</td>
+</sc-for>
+<td style="padding: 10px 12px"><span role="img" aria-label="{{ r.mixLabel }}" style="display: flex; width: 140px; height: 8px; border-radius: 4px; overflow: hidden; background: #1B2438"><sc-for list="{{ r.mix }}" as="m" hint-placeholder-count="4"><span style="{{ m }}"></span></sc-for></span></td>
+<td style="padding: 10px 12px; text-align: right"><a href="Pitcher.dc.html" aria-label="Open {{ r.name }} in 3D" style="width: 36px; height: 36px; border-radius: 50%; background: #E8364F; display: inline-flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4l13 8-13 8z"></path></svg></a></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #9AA6BD">
+<span>Page 1 of [N] · click a column to sort</span>
+<div style="display: flex; gap: 6px"><button style="height: 36px; padding: 0 14px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px">← Prev</button><button style="height: 36px; padding: 0 14px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 13px">Next →</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPitch }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 18px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">1 · PICK A PITCH TYPE</span>
+<div style="display: flex; gap: 8px; flex-wrap: wrap">
+<sc-for list="{{ ptypes }}" as="p" hint-placeholder-count="8">
+<button aria-pressed="{{ p.on }}" onClick="{{ p.pick }}" style="{{ p.style }}"><span style="{{ p.dot }}"></span>{{ p.label }}</button>
+</sc-for>
+</div>
+<div style="display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">2 · MIN VELOCITY</span>
+<div style="display: flex; align-items: center; gap: 8px">
+<button aria-label="Lower minimum velocity" onClick="{{ veloDown }}" style="width: 40px; height: 40px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 18px">−</button>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; width: 96px; text-align: center">{{ velo }}+ <span style="font-size: 15px; color: #9AA6BD">MPH</span></span>
+<button aria-label="Raise minimum velocity" onClick="{{ veloUp }}" style="width: 40px; height: 40px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 18px">+</button>
+</div>
+</div>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">3 · RANK BY</span><select style="height: 40px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 14px"><option>Whiff %</option><option>Velocity</option><option>Spin rate</option><option>Horizontal break</option><option>Usage</option></select></label>
+<span style="flex-grow: 1"></span>
+<span style="font-size: 13px; color: #9AA6BD">{{ pitchCount }} pitchers throw a {{ ptypeName }} at {{ velo }}+ · <span style="color: #F6C344">sample results</span></span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ finds }}" as="f" hint-placeholder-count="6">
+<a href="Pitcher.dc.html" style="display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; background: #0F1626; border: 1px solid #1B2438; border-left: 4px solid {{ pcolor }}; border-radius: 4px">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 26px; color: #9AA6BD; width: 24px">{{ f.rank }}</span>
+<span style="display: flex; flex-direction: column; flex-grow: 1"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1">{{ f.name }}</span><span style="font-size: 12px; color: #9AA6BD">{{ f.team }} · {{ f.hand }}HP</span></span>
+<svg aria-hidden="true" viewBox="0 0 80 40" width="80" height="40"><path d="{{ f.path }}" stroke="{{ pcolor }}" stroke-width="3" fill="none" stroke-linecap="round"></path><circle cx="6" cy="8" r="3" fill="#F3F5F9"></circle></svg>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{ f.stats }}" as="s" hint-placeholder-count="4"><span style="display: flex; flex-direction: column"><span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">{{ s.k }}</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px">{{ s.v }}</span></span></sc-for>
+</div>
+</a>
+</sc-for>
+</div>
+</sc-if>
+</section>
+<footer style="border-top: 1px solid #1B2438; background: #0A101C; margin-top: 64px">
+<div style="max-width: 1240px; margin: 0 auto; padding: 32px; font-size: 12px; line-height: 1.6; color: #9AA6BD">
+<p style="margin: 0">Not affiliated with or endorsed by Major League Baseball, MLB Advanced Media, or any of its clubs. All MLB and Club marks, logos, and player names are trademarks of their respective owners and are used here for identification purposes only. Pitch trajectory and Statcast data: Baseball Savant. Player metadata, schedule, and headshots: MLB Stats API and mlbstatic.com.</p>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tab: 'all', sort: 'k', dir: -1, hand: 'All', role: 'All', ptype: 'Cutter', velo: 93 }; }
+  renderVals() {
+    const s = this.state;
+    const C = { FF: '#F0505A', FC: '#F5A524', SL: '#B392F0', ST: '#C084FC', CU: '#4C8DF6', CH: '#2DD4BF', SI: '#FB7C3C', FS: '#38BDF8' };
+    const R = [
+      ['Jacob Misiorowski', 'MIL', 'R', 'SP', 252, 17.1, 33.4, 100.6, 2635, -4.6, [['FF',64],['FC',14],['SL',11],['CU',10],['CH',1]]],
+      ['Gavin Williams', 'CLE', 'R', 'SP', 248, 14.2, 31.6, 96.4, 2390, -4.9, [['FF',45],['CU',22],['SL',18],['CH',15]]],
+      ['Cam Schlittler', 'NYY', 'R', 'SP', 239, 13.5, 30.2, 98.1, 2450, -4.8, [['FF',52],['FC',20],['CU',18],['SI',10]]],
+      ['Dylan Cease', 'TOR', 'R', 'SP', 239, 15.8, 30.9, 96.9, 2550, -4.7, [['FF',40],['SL',42],['CU',10],['CH',8]]],
+      ['Cristopher Sánchez', 'PHI', 'L', 'SP', 231, 13.1, 30.5, 95.2, 2210, -5.1, [['SI',45],['CH',35],['SL',20]]],
+      ['Tyler Glasnow', 'LAD', 'R', 'SP', 198, 15.0, 31.4, 96.8, 2480, -4.3, [['FF',45],['CU',30],['SL',25]]],
+      ['Mason Miller', 'SD', 'R', 'RP', 104, 17.9, 36.0, 101.4, 2480, -4.4, [['FF',60],['SL',40]]],
+      ['Edgardo Henriquez', 'LAD', 'R', 'RP', 70, 14.0, 30.0, 100.7, 2390, -4.9, [['FF',55],['SL',30],['CU',15]]],
+      ['Jhoan Duran', 'PHI', 'R', 'RP', 80, 15.5, 32.0, 100.5, 2300, -4.8, [['FF',45],['FS',40],['CU',15]]],
+      ['Andrés Muñoz', 'SEA', 'R', 'RP', 85, 16.0, 33.0, 99.8, 2420, -4.5, [['FF',50],['SL',50]]],
+      ['Lake Bachar', 'PIT', 'R', 'RP', 60, 13.0, 29.5, 96.0, 2713, -4.2, [['FF',55],['ST',45]]],
+      ['Paul Sewald', 'TOR', 'R', 'RP', 55, 12.5, 29.0, 92.5, 2450, -3.10, [['FF',60],['ST',40]]]
+    ];
+    const keys = [['k', 'K', 4], ['whiff', 'WHIFF%', 5], ['csw', 'CSW%', 6], ['velo', 'FB MPH', 7], ['spin', 'FB SPIN', 8], ['vaa', 'VAA', 9]];
+    let rows = R.filter((r) => (s.hand === 'All' || r[2] === s.hand) && (s.role === 'All' || r[3] === s.role));
+    const ki = keys.find((k) => k[0] === s.sort)[2];
+    rows = rows.slice().sort((a, b) => (a[ki] - b[ki]) * s.dir);
+    const fmt = [(v) => String(v), (v) => v.toFixed(1), (v) => v.toFixed(1), (v) => v.toFixed(1), (v) => v.toLocaleString(), (v) => v.toFixed(2) + '°'];
+    const cols = keys.map(([id, label]) => {
+      const on = s.sort === id;
+      return { label, arrow: on ? (s.dir < 0 ? '↓' : '↑') : '', aria: on ? (s.dir < 0 ? 'descending' : 'ascending') : 'none',
+        sort: () => this.setState({ sort: id, dir: on ? -s.dir : -1 }),
+        style: 'width: 100%; height: 44px; padding: 0 12px; border: 0; background: transparent; display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 11px; letter-spacing: 1.2px; font-weight: 600; ' + (on ? 'color: #F3F5F9' : 'color: #9AA6BD') };
+    });
+    const out = rows.map((r) => ({
+      name: r[0], team: r[1], hand: r[2], role: r[3], ini: r[0].split(' ').map((x) => x[0]).join(''),
+      cells: keys.map(([id], i) => ({ t: fmt[i](r[i + 4]), style: 'padding: 10px 12px; text-align: right; ' + (s.sort === id ? 'font-family: Barlow Condensed, sans-serif; font-weight: 700; font-size: 19px; color: #F3F5F9' : 'color: #C4CCDB') })),
+      mix: r[10].map(([t, p]) => 'display: block; height: 8px; width: ' + p + '%; background: ' + C[t]),
+      mixLabel: r[10].map(([t, p]) => t + ' ' + p + '%').join(', ')
+    }));
+    const seg = (on) => 'height: 32px; padding: 0 12px; border-radius: 4px; font-size: 13px; font-weight: 600; ' + (on ? 'background: #F3F5F9; color: #070B14; border: 1px solid #F3F5F9' : 'background: transparent; color: #C4CCDB; border: 1px solid #2A3650');
+    const hands = ['All', 'R', 'L'].map((l) => ({ label: l === 'All' ? 'All' : l + 'HP', on: s.hand === l ? 'true' : 'false', style: seg(s.hand === l), pick: () => this.setState({ hand: l }) }));
+    const roles = ['All', 'SP', 'RP'].map((l) => ({ label: l, on: s.role === l ? 'true' : 'false', style: seg(s.role === l), pick: () => this.setState({ role: l }) }));
+    const tabs = [['all', 'All pitchers'], ['pitch', 'Find by pitch']].map(([id, label]) => ({ label, sel: s.tab === id ? 'true' : 'false', pick: () => this.setState({ tab: id }),
+      style: 'height: 42px; padding: 0 18px; border: 0; border-radius: 3px; font-size: 14px; ' + (s.tab === id ? 'background: #F3F5F9; color: #070B14; font-weight: 700' : 'background: transparent; color: #C4CCDB; font-weight: 600') }));
+    const PT = [['4-Seam', 'FF'], ['Sinker', 'SI'], ['Cutter', 'FC'], ['Slider', 'SL'], ['Sweeper', 'ST'], ['Curveball', 'CU'], ['Changeup', 'CH'], ['Splitter', 'FS']];
+    const ptypes = PT.map(([label, code]) => { const on = s.ptype === label; return { label, on: on ? 'true' : 'false', pick: () => this.setState({ ptype: label }),
+      dot: 'width: 9px; height: 9px; border-radius: 50%; background: ' + C[code],
+      style: 'height: 40px; padding: 0 14px; border-radius: 20px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; ' + (on ? 'background: #131C30; color: #F3F5F9; border: 1.5px solid ' + C[code] : 'background: transparent; color: #C4CCDB; border: 1px solid #2A3650') }; });
+    const code = PT.find((p) => p[0] === s.ptype)[1];
+    const names = [['Jacob Misiorowski', 'MIL', 'R'], ['Emmet Sheehan', 'LAD', 'R'], ['Cade Smith', 'CLE', 'R'], ['Eury Pérez', 'MIA', 'R'], ['Joe Ryan', 'MIN', 'R'], ['Adrian Morejon', 'SD', 'L']];
+    const finds = names.map((n, i) => ({ rank: i + 1, name: n[0], team: n[1], hand: n[2],
+      path: 'M6 8 Q ' + (40 + i * 3) + ' ' + (4 + i) + ' ' + (74 - i * 4) + ' ' + (20 + i * 3),
+      stats: [{ k: 'MPH', v: (s.velo + 2.8 - i * 0.4).toFixed(1) }, { k: 'USAGE', v: (18 - i * 2) + '%' }, { k: 'WHIFF%', v: (38 - i * 2.5).toFixed(1) }, { k: 'SPIN', v: (2600 - i * 40).toLocaleString() }] }));
+    return {
+      tabs, hands, roles, cols, rows: out, shown: out.length + ' of 12 (sample)', isAll: s.tab === 'all', isPitch: s.tab === 'pitch',
+      ptypes, finds, velo: s.velo, ptypeName: s.ptype.toLowerCase(), pcolor: C[code], pitchCount: 6 + Math.max(0, 100 - s.velo) * 3,
+      veloUp: () => this.setState({ velo: Math.min(103, s.velo + 1) }), veloDown: () => this.setState({ velo: Math.max(70, s.velo - 1) })
+    };
+  }
+}
+</script>
+</body>
+</html>
