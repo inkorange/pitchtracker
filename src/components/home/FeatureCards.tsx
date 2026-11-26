@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { HomeFeature } from "@/lib/home/feature-shapes";
 import type { TunnelDiagram } from "@/lib/home/tunnel";
 import { ArsenalVisual, AtBatVisual, SceneVisual, TunnelVisual } from "./FeatureVisuals";
@@ -28,10 +28,26 @@ export interface FeatureCardData {
 }
 
 const FADE = "motion-safe:animate-[pt-fade_.35s_ease_.18s_both]";
+const ACCORDION_MS = 350;
 
 export function FeatureCards({ cards }: { cards: FeatureCardData[] }) {
   const [open, setOpen] = useState(0);
   const [mobileOpen, setMobileOpen] = useState<number | null>(0);
+  // The panel that is animating closed keeps its visual mounted until
+  // the collapse finishes, so the height animates instead of jumping.
+  const [closing, setClosing] = useState<number | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+
+  const toggleMobile = (i: number) => {
+    const prev = mobileOpen;
+    setMobileOpen(prev === i ? null : i);
+    if (prev !== null) {
+      setClosing(prev);
+      clearTimeout(closeTimer.current);
+      closeTimer.current = setTimeout(() => setClosing(null), ACCORDION_MS + 50);
+    }
+  };
 
   return (
     <>
@@ -114,8 +130,8 @@ export function FeatureCards({ cards }: { cards: FeatureCardData[] }) {
           return (
             <article
               key={c.n}
-              className={`rounded-panel bg-surface border overflow-hidden ${
-                isOpen ? "border-line-strong border-t-[3px] border-t-accent" : "border-line"
+              className={`rounded-panel bg-surface border border-t-[3px] overflow-hidden motion-safe:transition-colors motion-safe:duration-300 ${
+                isOpen ? "border-line-strong border-t-accent" : "border-line border-t-line"
               }`}
             >
               <h3 className="m-0">
@@ -123,7 +139,7 @@ export function FeatureCards({ cards }: { cards: FeatureCardData[] }) {
                   type="button"
                   aria-expanded={isOpen}
                   aria-controls={panelId}
-                  onClick={() => setMobileOpen(isOpen ? null : i)}
+                  onClick={() => toggleMobile(i)}
                   className="w-full flex items-center gap-3.5 min-h-16 px-4 py-3 text-left text-ink"
                 >
                   <span className="font-display font-extrabold text-[28px] text-accent leading-none">{c.n}</span>
@@ -138,16 +154,27 @@ export function FeatureCards({ cards }: { cards: FeatureCardData[] }) {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2.4"
-                    className={`text-ink-2 motion-safe:transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    className={`text-ink-2 motion-safe:transition-transform motion-safe:duration-[350ms] ${isOpen ? "rotate-180" : ""}`}
                   >
                     <path d="M6 9l6 6 6-6" />
                   </svg>
                 </button>
               </h3>
-              {isOpen ? (
-                <div id={panelId}>
+              {/* Height animates via grid-template-rows 0fr → 1fr. */}
+              <div
+                id={panelId}
+                inert={!isOpen}
+                className={`grid motion-safe:transition-[grid-template-rows] motion-safe:duration-[350ms] motion-safe:ease-[cubic-bezier(.2,.7,.2,1)] ${
+                  isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+                <div
+                  className={`min-h-0 overflow-hidden motion-safe:transition-opacity motion-safe:duration-[350ms] ${
+                    isOpen ? "opacity-100" : "opacity-0"
+                  }`}
+                >
                   <div className="relative h-[220px] overflow-hidden bg-bg-raised border-y border-line">
-                    {c.visual(true)}
+                    {isOpen || closing === i ? c.visual(true) : null}
                   </div>
                   <div className="p-4 flex flex-col gap-3.5">
                     <p className="m-0 text-sm leading-[1.55] text-ink-2">{c.body}</p>
@@ -170,7 +197,7 @@ export function FeatureCards({ cards }: { cards: FeatureCardData[] }) {
                     </Link>
                   </div>
                 </div>
-              ) : null}
+              </div>
             </article>
           );
         })}
