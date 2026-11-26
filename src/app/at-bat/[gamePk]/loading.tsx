@@ -1,3 +1,5 @@
+import { ScrollToTop } from "@/components/chrome/ScrollToTop";
+
 // Renders while /at-bat/[gamePk] resolves on the server.
 //
 // The at-bat list is now built from a cached Savant read rather than a
@@ -11,6 +13,7 @@
 export default function Loading() {
   return (
     <div className="text-white/90 px-6 pt-20 pb-12">
+      <ScrollToTop />
       <div className="max-w-3xl mx-auto space-y-8">
         {/* Game header: team logos + matchup line */}
         <div className="space-y-2">
