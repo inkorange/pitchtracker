@@ -12,6 +12,7 @@ import {
 import {
   filterAndSort,
   findByPitch,
+  normalizeName,
   fromWire,
   FIND_TYPES,
   PITCH_RANKS,
@@ -80,10 +81,14 @@ export function PitchersBrowser({
   type Patch = Exclude<Parameters<typeof set>[0], ((old: typeof s) => unknown) | null>;
   const setFilter = (patch: Patch) => set({ ...patch, page: null });
 
-  const finds = useMemo(
-    () => (s.mode === "pitch" ? findByPitch(rows, s.pt, s.velo, s.rank) : []),
-    [rows, s.mode, s.pt, s.velo, s.rank],
-  );
+  // Find by pitch ranks the whole league first, then the name box
+  // narrows the list — so a pitcher keeps his league rank (#7 stays #7).
+  const finds = useMemo(() => {
+    if (s.mode !== "pitch") return [];
+    const ranked = findByPitch(rows, s.pt, s.velo, s.rank).map((f, i) => ({ ...f, rank: i + 1 }));
+    const q = normalizeName(s.q.trim());
+    return q === "" ? ranked : ranked.filter((f) => normalizeName(f.row.name).includes(q));
+  }, [rows, s.mode, s.pt, s.velo, s.rank, s.q]);
 
   return (
     <div className="container-page flex flex-col gap-3 md:gap-4 pb-16">
@@ -212,6 +217,7 @@ export function PitchersBrowser({
       ) : (
         <FindByPitch
           finds={finds}
+          query={s.q.trim()}
           type={s.pt}
           velo={s.velo}
           rank={s.rank}
@@ -475,6 +481,7 @@ function DirectoryCards({ rows, sort, offset }: { rows: DirectoryRow[]; sort: So
 
 function FindByPitch({
   finds,
+  query,
   type,
   velo,
   rank,
@@ -482,7 +489,8 @@ function FindByPitch({
   onVelo,
   onRank,
 }: {
-  finds: PitchFind[];
+  finds: (PitchFind & { rank: number })[];
+  query: string;
   type: (typeof FIND_TYPES)[number];
   velo: number;
   rank: PitchRankKey;
@@ -559,13 +567,15 @@ function FindByPitch({
           </label>
           <span className="grow" />
           <span className="text-[13px] text-muted" aria-live="polite">
-            {finds.length.toLocaleString()} pitchers throw a {typeName.toLowerCase()} at {velo}+
+            {query
+              ? `${finds.length.toLocaleString()} matching “${query}” ${finds.length === 1 ? "throws" : "throw"} a ${typeName.toLowerCase()} at ${velo}+`
+              : `${finds.length.toLocaleString()} pitchers throw a ${typeName.toLowerCase()} at ${velo}+`}
           </span>
         </div>
       </div>
 
       <ol className="list-none m-0 p-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {finds.slice(0, 30).map((f, i) => (
+        {finds.slice(0, 30).map((f) => (
           <li key={f.row.id}>
             <Link
               href={f.row.href}
@@ -582,7 +592,7 @@ function FindByPitch({
                     style={{ background: color }}
                   >
                     <span className="sr-only">Rank </span>
-                    {i + 1}
+                    {f.rank}
                   </span>
                 </span>
                 <span className="flex flex-col grow min-w-0">
@@ -604,7 +614,11 @@ function FindByPitch({
         ))}
       </ol>
       {finds.length === 0 ? (
-        <p className="text-center text-muted py-8">No pitchers throw a {typeName.toLowerCase()} at {velo}+ mph (50+ thrown).</p>
+        <p className="text-center text-muted py-8">
+          {query
+            ? `No pitcher matching “${query}” throws a ${typeName.toLowerCase()} at ${velo}+ mph (50+ thrown).`
+            : `No pitchers throw a ${typeName.toLowerCase()} at ${velo}+ mph (50+ thrown).`}
+        </p>
       ) : null}
     </>
   );
