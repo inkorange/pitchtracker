@@ -316,7 +316,7 @@ function PagerButton({ disabled, onClick, children }: { disabled: boolean; onCli
 
 function Avatar({ id, size }: { id: number; size: number }) {
   return (
-    <span className="relative shrink-0 rounded-full bg-avatar overflow-hidden" style={{ width: size, height: size }}>
+    <span className="relative block shrink-0 rounded-full bg-avatar overflow-hidden" style={{ width: size, height: size }}>
       <Image src={pitcherHeadshotUrl(id, 80)} alt="" fill sizes={`${size}px`} className="object-cover" unoptimized />
     </span>
   );
@@ -573,8 +573,18 @@ function FindByPitch({
               style={{ borderLeftColor: color }}
             >
               <div className="flex items-center gap-3">
-                <span className="font-display font-extrabold text-[26px] text-muted w-7 num">{i + 1}</span>
-                <Avatar id={f.row.id} size={44} />
+                {/* Headshot with the rank as a badge on its lower-left
+                    edge, keyed to the selected pitch type's color. */}
+                <span className="relative shrink-0">
+                  <Avatar id={f.row.id} size={64} />
+                  <span
+                    className="absolute -bottom-1 -left-1.5 min-w-[28px] h-7 px-1.5 rounded-full border-2 border-surface flex items-center justify-center font-display font-extrabold text-[17px] leading-none text-bg num"
+                    style={{ background: color }}
+                  >
+                    <span className="sr-only">Rank </span>
+                    {i + 1}
+                  </span>
+                </span>
                 <span className="flex flex-col grow min-w-0">
                   <span className="font-display font-bold text-[22px] leading-[1.1] truncate">{f.row.name}</span>
                   <span className="text-xs text-muted">
