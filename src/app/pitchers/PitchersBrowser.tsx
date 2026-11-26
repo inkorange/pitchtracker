@@ -574,6 +574,7 @@ function FindByPitch({
             >
               <div className="flex items-center gap-3">
                 <span className="font-display font-extrabold text-[26px] text-muted w-7 num">{i + 1}</span>
+                <Avatar id={f.row.id} size={44} />
                 <span className="flex flex-col grow min-w-0">
                   <span className="font-display font-bold text-[22px] leading-[1.1] truncate">{f.row.name}</span>
                   <span className="text-xs text-muted">
