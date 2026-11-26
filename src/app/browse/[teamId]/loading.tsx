@@ -1,8 +1,10 @@
+import { ScrollToTop } from "@/components/chrome/ScrollToTop";
 import { SiteHeader } from "@/components/chrome/SiteHeader";
 
 export default function Loading() {
   return (
     <main className="min-h-screen bg-bg text-ink" aria-busy="true">
+      <ScrollToTop />
       <SiteHeader active="teams" />
       <div className="container-page pt-8 pb-16 flex flex-col gap-5">
         <div className="h-4 w-40 rounded bg-surface motion-safe:animate-pulse" />
