@@ -111,7 +111,7 @@ export function PitchersBrowser({
               <select
                 value={s.team ?? ""}
                 onChange={(e) => setFilter({ team: e.target.value ? Number(e.target.value) : null })}
-                className="h-11 md:h-9 px-2.5 rounded-control border border-line-strong bg-bg-raised text-ink text-[13px] normal-case tracking-normal font-normal"
+                className="select-chevron h-11 md:h-9 pl-2.5 rounded-control border border-line-strong bg-bg-raised text-ink text-[13px] normal-case tracking-normal font-normal"
               >
                 <option value="">All 30 teams</option>
                 {teams.map((t) => (
@@ -149,7 +149,7 @@ export function PitchersBrowser({
               <select
                 value={s.min}
                 onChange={(e) => setFilter({ min: Number(e.target.value) === 500 ? null : Number(e.target.value) })}
-                className="h-11 md:h-9 px-2.5 rounded-control border border-line-strong bg-bg-raised text-ink text-[13px] normal-case tracking-normal font-normal"
+                className="select-chevron h-11 md:h-9 pl-2.5 rounded-control border border-line-strong bg-bg-raised text-ink text-[13px] normal-case tracking-normal font-normal"
               >
                 {MIN_PITCH_OPTIONS.map((n) => (
                   <option key={n} value={n}>
@@ -548,7 +548,7 @@ function FindByPitch({
             <select
               value={rank}
               onChange={(e) => onRank(e.target.value as PitchRankKey)}
-              className="h-11 md:h-10 px-3 rounded-control border border-line-strong bg-bg-raised text-ink text-sm"
+              className="select-chevron h-11 md:h-10 pl-3 rounded-control border border-line-strong bg-bg-raised text-ink text-sm"
             >
               {PITCH_RANKS.map((r) => (
                 <option key={r.key} value={r.key}>
