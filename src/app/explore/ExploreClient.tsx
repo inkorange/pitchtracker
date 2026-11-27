@@ -51,7 +51,8 @@ const filterParsers = {
   pth: HAND,
   bst: HAND,
   pt: parseAsArrayOf(parseAsString).withDefault([]),
-  s: parseAsArrayOf(parseAsInteger).withDefault([]),
+  // Seasons default to the current one — see makeParsers().
+  s: parseAsArrayOf(parseAsInteger).withDefault([] as number[]),
   df: parseAsString,
   dt: parseAsString,
   c: parseAsArrayOf(parseAsString).withDefault([]),
@@ -120,7 +121,15 @@ const CLEARED: Patch = {
 };
 
 export function ExploreClient({ seasons }: { seasons: number[] }) {
-  const [state, setState] = useQueryStates(filterParsers, { history: "replace" });
+  // The current season is selected unless the URL says otherwise. (An
+  // empty selection would mean every season at once — slow, and rarely
+  // what anyone wants — so clearing the last season falls back here too.)
+  const defaultSeasons = useMemo(() => [seasons[0]], [seasons]);
+  const parsers = useMemo(
+    () => ({ ...filterParsers, s: parseAsArrayOf(parseAsInteger).withDefault(defaultSeasons) }),
+    [defaultSeasons],
+  );
+  const [state, setState] = useQueryStates(parsers, { history: "replace" });
   const { view, ...f } = state;
   const set = useCallback((patch: Patch) => void setState(patch), [setState]);
 
@@ -137,7 +146,7 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
   const [saved, setSaved] = useState<SavedQuery[]>([]);
 
   const queryKey = JSON.stringify(toQuery(f));
-  const nActive = activeFilterCount(f);
+  const nActive = activeFilterCount(f, defaultSeasons);
   const pName = useCallback((id: number) => pitcherInfo.get(id)?.name ?? `#${id}`, [pitcherInfo]);
   const bName = useCallback((id: number) => batterInfo.get(id)?.name ?? `#${id}`, [batterInfo]);
 

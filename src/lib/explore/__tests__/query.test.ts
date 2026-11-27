@@ -63,6 +63,11 @@ describe("activeFilterCount", () => {
     expect(activeFilterCount(empty)).toBe(0);
     expect(activeFilterCount({ ...empty, pt: ["FF"], c: ["0-0"], gt: ["W"] })).toBe(3);
   });
+  it("doesn't count the default season, but counts a different one", () => {
+    expect(activeFilterCount({ ...empty, s: [2026] }, [2026])).toBe(0);
+    expect(activeFilterCount({ ...empty, s: [2025] }, [2026])).toBe(1);
+    expect(activeFilterCount({ ...empty, s: [2026, 2025] }, [2026])).toBe(1);
+  });
 });
 
 describe("zoneFor", () => {

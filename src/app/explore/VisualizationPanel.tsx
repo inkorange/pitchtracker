@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Sphere } from "@react-three/drei";
 import { Scene } from "@/components/scene/Scene";
+import { statcastToThree } from "@/lib/viz/coords";
+import { getOutcomeColor } from "@/lib/viz/colors";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
@@ -32,6 +35,10 @@ interface PreparedRibbon {
   path: Array<[number, number, number]>;
   pitchType: string;
   subset: Subset;
+  /** Where the ball crosses the plate (Three.js coords), colored by
+   *  outcome — same treatment as the pitcher page. */
+  platePosition: [number, number, number] | null;
+  outcomeColor: string;
 }
 
 // Trajectory inputs the Pitch class actually needs. Accepting the
@@ -131,7 +138,8 @@ function sampleEvenly<T>(arr: T[], cap: number): T[] {
 }
 
 export function VisualizationPanel({ rows }: VisualizationPanelProps) {
-  const [preset, setPreset] = useState<CameraPreset>("side");
+  // Front camera by default, like the pitcher page.
+  const [preset, setPreset] = useState<CameraPreset>("front");
   const [presetTick, setPresetTick] = useState(0);
   const [splitMode, setSplitMode] = useState<SplitMode>("none");
   const handlePresetChange = (next: CameraPreset) => {
@@ -150,6 +158,10 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
         path,
         pitchType: row.pitch_type ?? "UN",
         subset: classifyForSplit(row, splitMode),
+        // Anchor the ball at the tube's own end point (not Statcast's
+        // reported plate_x/z) so the two never visibly separate.
+        platePosition: path.length ? statcastToThree(path[path.length - 1]) : null,
+        outcomeColor: getOutcomeColor(row.description),
       });
     }
     return out;
@@ -175,6 +187,8 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
       path,
       pitchType: meanRow.pitch_type ?? "UN",
       subset: null,
+      platePosition: null,
+      outcomeColor: "#ffffff",
     };
   }, [rows]);
 
@@ -231,18 +245,27 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
       <div className="relative h-[420px] md:h-[480px] rounded-panel bg-surface border border-line overflow-hidden">
         <Scene preset={preset} presetTick={presetTick}>
           {prepared.map((p) => {
-            // In split mode, pitches not in either subset fade to near-zero
-            // so the contrast between a/b clusters is the visual story.
+            // Same ribbon + plate-ball treatment as the pitcher page. In
+            // split mode, pitches outside both subsets fade right down so
+            // the a/b contrast is the visual story.
             const dimmed = splitMode !== "none" && p.subset === null;
+            const opacity = dimmed ? 0.05 : 1;
             return (
-              <Ribbon
-                key={p.id}
-                path={p.path}
-                pitchType={p.pitchType}
-                radius={0.04}
-                opacity={dimmed ? 0.02 : 0.18}
-                side={p.subset ?? undefined}
-              />
+              <group key={p.id}>
+                <Ribbon path={p.path} pitchType={p.pitchType} radius={0.06} opacity={opacity} side={p.subset ?? undefined} />
+                {p.platePosition ? (
+                  <Sphere args={[0.1, 16, 16]} position={p.platePosition}>
+                    <meshStandardMaterial
+                      color={p.outcomeColor}
+                      roughness={0.4}
+                      metalness={0.05}
+                      transparent
+                      opacity={opacity}
+                      depthWrite={opacity >= 0.95}
+                    />
+                  </Sphere>
+                ) : null}
+              </group>
             );
           })}
 

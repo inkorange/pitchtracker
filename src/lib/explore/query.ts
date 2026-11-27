@@ -166,15 +166,19 @@ export function querySentence(
   return parts;
 }
 
-/** How many filter controls are set (for the mobile "Edit filters (n)" badge). */
-export function activeFilterCount(f: ExploreFilters): number {
+/**
+ * How many filter controls are set (for the "Edit filters (n)" badge and
+ * to require at least one real filter before searching). The default
+ * season (the current one) doesn't count as a choice.
+ */
+export function activeFilterCount(f: ExploreFilters, defaultSeasons: readonly number[] = []): number {
   return [
     f.pid.length,
     f.bid.length,
     f.pth,
     f.bst,
     f.pt.length,
-    f.s.length,
+    f.s.length && !sameSet(f.s, defaultSeasons),
     f.df || f.dt,
     f.c.length,
     f.o.length,
