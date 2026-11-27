@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
 import { Scene } from "@/components/scene/Scene";
 import { HistoricalPitchLines } from "@/components/ribbon/HistoricalPitchLines";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
@@ -26,12 +27,15 @@ export default function MiniScene({
   preset = "front",
   presetOverride = MONITOR_FRONT,
   opacity = 0.6,
+  onReady,
 }: {
   pitches: SlimPitch[];
   paused?: boolean;
   preset?: CameraPreset;
   presetOverride?: CameraPosition | null;
   opacity?: number;
+  /** Called once the scene has drawn its first full frame. */
+  onReady?: () => void;
 }) {
   const entries = useMemo(
     () =>
@@ -63,6 +67,20 @@ export default function MiniScene({
   return (
     <Scene preset={preset} presetOverride={presetOverride} interactive={false} paused={paused} lite>
       <HistoricalPitchLines entries={entries} opacity={opacity} />
+      {onReady ? <FirstFrame onReady={onReady} /> : null}
     </Scene>
   );
+}
+
+// Scene renders its children inside a Suspense boundary that waits for
+// the stage textures, so the first frame this sees is a complete one
+// (field, sky and paths) — the right moment to fade the canvas in.
+function FirstFrame({ onReady }: { onReady: () => void }) {
+  const done = useRef(false);
+  useFrame(() => {
+    if (done.current) return;
+    done.current = true;
+    requestAnimationFrame(() => onReady());
+  });
+  return null;
 }

@@ -9,7 +9,7 @@ export async function HomeTicker() {
     const top = b.rows[0];
     if (!top) return [];
     const unit = b.category.unit === "°" ? "°" : "";
-    return [{ k: b.category.tickerKey, name: top.name, v: `${top.value}${unit}` }];
+    return [{ k: b.category.tickerKey, name: top.name, v: `${top.value}${unit}`, href: top.href }];
   });
   return <Ticker items={items} label={`${season} Leaders`} />;
 }

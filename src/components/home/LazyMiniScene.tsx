@@ -7,7 +7,7 @@ import type MiniSceneType from "./MiniScene";
 
 const MiniScene = dynamic(() => import("./MiniScene"), { ssr: false });
 
-type MiniSceneProps = Omit<ComponentProps<typeof MiniSceneType>, "paused">;
+type MiniSceneProps = Omit<ComponentProps<typeof MiniSceneType>, "paused" | "onReady">;
 
 /**
  * Mounts the WebGL MiniScene the first time its box nears the
@@ -23,6 +23,9 @@ export function LazyMiniScene({
   const ref = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
+  // Fade the canvas in over the poster once it has drawn a full frame,
+  // instead of popping in.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -42,8 +45,13 @@ export function LazyMiniScene({
     <div ref={ref} className={`absolute inset-0 ${className}`}>
       {fallback}
       {mounted ? (
-        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
-          <MiniScene {...sceneProps} paused={!visible} />
+        <div
+          className={`absolute inset-0 pointer-events-none transition-opacity duration-700 ease-out motion-reduce:transition-none ${
+            ready ? "opacity-100" : "opacity-0"
+          }`}
+          aria-hidden="true"
+        >
+          <MiniScene {...sceneProps} paused={!visible} onReady={() => setReady(true)} />
         </div>
       ) : null}
     </div>

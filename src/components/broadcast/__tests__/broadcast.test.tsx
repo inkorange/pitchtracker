@@ -26,6 +26,14 @@ describe("Ticker", () => {
     expect(TICKER_REPEAT % 2).toBe(0);
   });
 
+  it("links names when given an href, keeping the loop copies out of the tab order", () => {
+    render(<Ticker items={[{ ...items[0], href: "/pitcher/1/m-miller" }]} label="L" />);
+    const links = screen.getAllByRole("link", { name: "M. Miller", hidden: true });
+    expect(links).toHaveLength(TICKER_REPEAT);
+    expect(links[0].getAttribute("href")).toBe("/pitcher/1/m-miller");
+    expect(links.filter((a) => a.getAttribute("tabindex") === "-1")).toHaveLength(TICKER_REPEAT - 1);
+  });
+
   it("renders nothing with no items", () => {
     const { container } = render(<Ticker items={[]} />);
     expect(container.innerHTML).toBe("");
