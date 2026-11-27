@@ -204,3 +204,23 @@ export function zoneFor(plateX: number | null, plateZ: number | null): number | 
   const left = plateX < 0;
   return high ? (left ? 11 : 12) : left ? 13 : 14;
 }
+
+/**
+ * The only handedness that can match the selected players, or null.
+ *
+ * When every selected pitcher throws with the same arm (or every
+ * selected batter hits from the same side), the other option can only
+ * return zero pitches — so the UI locks to this one. Switch hitters
+ * ("S") bat from either side, so any switch hitter unlocks it. Unknown
+ * handedness (still loading) also leaves it unlocked.
+ */
+export function lockedHand(
+  ids: readonly number[],
+  handOf: (id: number) => string | null | undefined,
+): "L" | "R" | null {
+  if (ids.length === 0) return null;
+  const hands = new Set(ids.map(handOf));
+  if (hands.size !== 1) return null;
+  const [h] = hands;
+  return h === "L" || h === "R" ? h : null;
+}

@@ -19,6 +19,13 @@ interface Hit {
   mlb_id: number;
   full_name: string;
   meta: string;
+  /** Pitchers: throws (L/R). Batters: bats (L/R/S). */
+  hand: string | null;
+}
+
+export interface PersonInfo {
+  name: string;
+  hand: string | null;
 }
 
 const DEBOUNCE_MS = 300;
@@ -31,9 +38,19 @@ async function searchPeople(kind: PersonKind, q: string, signal?: AbortSignal): 
     batters?: { mlb_id: number; full_name: string; bats: string | null }[];
   };
   if (kind === "pitcher") {
-    return (data.pitchers ?? []).map((p) => ({ mlb_id: p.mlb_id, full_name: p.full_name, meta: p.throws ? `${p.throws}HP` : "" }));
+    return (data.pitchers ?? []).map((p) => ({
+      mlb_id: p.mlb_id,
+      full_name: p.full_name,
+      meta: p.throws ? `${p.throws}HP` : "",
+      hand: p.throws,
+    }));
   }
-  return (data.batters ?? []).map((b) => ({ mlb_id: b.mlb_id, full_name: b.full_name, meta: b.bats ? `Bats ${b.bats}` : "" }));
+  return (data.batters ?? []).map((b) => ({
+    mlb_id: b.mlb_id,
+    full_name: b.full_name,
+    meta: b.bats ? `Bats ${b.bats}` : "",
+    hand: b.bats,
+  }));
 }
 
 export function MultiPersonPicker({
@@ -42,15 +59,15 @@ export function MultiPersonPicker({
   placeholder,
   value,
   onChange,
-  onNames,
+  onPeople,
 }: {
   kind: PersonKind;
   label: string;
   placeholder: string;
   value: number[];
   onChange: (next: number[]) => void;
-  /** Reports id → name for every selected person (for query summaries). */
-  onNames?: (names: Map<number, string>) => void;
+  /** Reports id → name + handedness for every selected person. */
+  onPeople?: (people: Map<number, PersonInfo>) => void;
 }) {
   const id = useId();
   const [q, setQ] = useState("");
@@ -58,7 +75,7 @@ export function MultiPersonPicker({
   const [searched, setSearched] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const [names, setNames] = useState<Map<number, string>>(new Map());
+  const [people, setPeople] = useState<Map<number, PersonInfo>>(new Map());
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -89,25 +106,28 @@ export function MultiPersonPicker({
 
   // Resolve names for pre-selected IDs (deep links, example queries).
   useEffect(() => {
-    const missing = value.filter((v) => !names.has(v));
+    const missing = value.filter((v) => !people.has(v));
     if (missing.length === 0) return;
     let cancelled = false;
     Promise.all(missing.map((m) => searchPeople(kind, String(m)).catch(() => [] as Hit[]))).then((lists) => {
       if (cancelled) return;
-      setNames((prev) => {
+      setPeople((prev) => {
         const next = new Map(prev);
-        lists.forEach((l, i) => next.set(missing[i], l.find((h) => h.mlb_id === missing[i])?.full_name ?? `#${missing[i]}`));
+        lists.forEach((l, i) => {
+          const hit = l.find((h) => h.mlb_id === missing[i]);
+          next.set(missing[i], { name: hit?.full_name ?? `#${missing[i]}`, hand: hit?.hand ?? null });
+        });
         return next;
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [value, names, kind]);
+  }, [value, people, kind]);
 
   useEffect(() => {
-    onNames?.(names);
-  }, [names, onNames]);
+    onPeople?.(people);
+  }, [people, onPeople]);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -122,7 +142,7 @@ export function MultiPersonPicker({
   const noMatch = term.length >= 2 && searched === term && shown.length === 0;
 
   const add = (h: Hit) => {
-    setNames((prev) => new Map(prev).set(h.mlb_id, h.full_name));
+    setPeople((prev) => new Map(prev).set(h.mlb_id, { name: h.full_name, hand: h.hand }));
     onChange([...value, h.mlb_id]);
     setQ("");
     setHits([]);
@@ -144,10 +164,10 @@ export function MultiPersonPicker({
             <span className="relative size-6 rounded-full bg-avatar overflow-hidden">
               <Image src={personHeadshotUrl(v, 48)} alt="" fill sizes="24px" className="object-cover" unoptimized />
             </span>
-            <span className="pl-1">{names.get(v) ?? `#${v}`}</span>
+            <span className="pl-1">{people.get(v)?.name ?? `#${v}`}</span>
             <button
               type="button"
-              aria-label={`Remove ${names.get(v) ?? v}`}
+              aria-label={`Remove ${people.get(v)?.name ?? v}`}
               onClick={(e) => {
                 e.stopPropagation();
                 remove(v);

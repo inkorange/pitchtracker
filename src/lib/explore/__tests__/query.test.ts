@@ -5,6 +5,7 @@ import {
   describeZones,
   gameTypeLabel,
   groupOn,
+  lockedHand,
   querySentence,
   RESULT_GROUPS,
   toggleGroup,
@@ -72,5 +73,19 @@ describe("zoneFor", () => {
     expect(zoneFor(-1.5, 4)).toBe(11);
     expect(zoneFor(1.5, 1)).toBe(14);
     expect(zoneFor(null, 2)).toBeNull();
+  });
+});
+
+describe("lockedHand", () => {
+  const hand = (id: number) => ({ 1: "L", 2: "L", 3: "R", 4: "S" } as Record<number, string>)[id] ?? null;
+  it("locks when every selected player shares one side", () => {
+    expect(lockedHand([1], hand)).toBe("L");
+    expect(lockedHand([1, 2], hand)).toBe("L");
+  });
+  it("stays open for mixed sides, switch hitters, unknowns, or nobody", () => {
+    expect(lockedHand([1, 3], hand)).toBeNull();
+    expect(lockedHand([4], hand)).toBeNull();
+    expect(lockedHand([99], hand)).toBeNull();
+    expect(lockedHand([], hand)).toBeNull();
   });
 });

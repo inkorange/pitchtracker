@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { MultiPersonPicker } from "@/components/search/MultiPersonPicker";
+import { MultiPersonPicker, type PersonInfo } from "@/components/search/MultiPersonPicker";
 import { BATTED_BALL_TYPES, EVENTS, PITCH_TYPES } from "@/lib/savant/enums";
 import {
   CHASE_ZONES,
@@ -34,8 +34,11 @@ export interface SectionProps {
   f: ExploreFilters;
   set: (patch: Patch) => void;
   seasons: number[];
-  onPitcherNames: (m: Map<number, string>) => void;
-  onBatterNames: (m: Map<number, string>) => void;
+  onPitcherPeople: (m: Map<number, PersonInfo>) => void;
+  onBatterPeople: (m: Map<number, PersonInfo>) => void;
+  /** Set when the selected pitchers / batters all share one side. */
+  lockPth: { hand: "L" | "R"; reason: string } | null;
+  lockBst: { hand: "L" | "R"; reason: string } | null;
   showAllEvents: boolean;
   setShowAllEvents: (v: boolean) => void;
 }
@@ -98,25 +101,47 @@ function Segmented({
   onChange,
   options,
   label,
+  lock,
 }: {
   value: "L" | "R" | null;
   onChange: (v: "L" | "R" | null) => void;
   options: [string, string];
   label: string;
+  /** Only this side can match the selected players: the other is disabled. */
+  lock?: { hand: "L" | "R"; reason: string } | null;
 }) {
   return (
-    <div role="group" aria-label={label} className="flex gap-1.5">
-      {(["L", "R"] as const).map((h, i) => (
-        <Chip key={h} on={value === h} onClick={() => onChange(value === h ? null : h)}>
-          {options[i]}
-        </Chip>
-      ))}
+    <div className="flex flex-col gap-1.5">
+      <div role="group" aria-label={label} className="flex gap-1.5">
+        {(["L", "R"] as const).map((h, i) => {
+          const on = value === h;
+          const disabled = lock != null && lock.hand !== h;
+          return (
+            <button
+              key={h}
+              type="button"
+              aria-pressed={on}
+              disabled={disabled || (lock != null && on)}
+              title={disabled ? lock?.reason : undefined}
+              onClick={() => onChange(on ? null : h)}
+              className={`h-11 md:h-9 px-3 rounded-full border text-[13px] font-semibold transition-colors ${
+                on
+                  ? "bg-ink text-bg border-ink disabled:opacity-100"
+                  : "text-ink-2 border-line-strong hover:text-ink hover:border-ink-2 disabled:opacity-35 disabled:hover:text-ink-2 disabled:hover:border-line-strong disabled:cursor-not-allowed"
+              }`}
+            >
+              {options[i]}
+            </button>
+          );
+        })}
+      </div>
+      {lock ? <span className="text-xs text-muted">{lock.reason}</span> : null}
     </div>
   );
 }
 
 // ── Who ───────────────────────────────────────────────────────────────
-export function WhoBody({ f, set, onPitcherNames, onBatterNames }: SectionProps) {
+export function WhoBody({ f, set, onPitcherPeople, onBatterPeople, lockPth, lockBst }: SectionProps) {
   return (
     <>
       <MultiPersonPicker
@@ -125,7 +150,7 @@ export function WhoBody({ f, set, onPitcherNames, onBatterNames }: SectionProps)
         placeholder="Add pitcher…"
         value={f.pid}
         onChange={(v) => set({ pid: nullIfEmpty(v) })}
-        onNames={onPitcherNames}
+        onPeople={onPitcherPeople}
       />
       <MultiPersonPicker
         kind="batter"
@@ -133,14 +158,14 @@ export function WhoBody({ f, set, onPitcherNames, onBatterNames }: SectionProps)
         placeholder="Search a batter by name"
         value={f.bid}
         onChange={(v) => set({ bid: nullIfEmpty(v) })}
-        onNames={onBatterNames}
+        onPeople={onBatterPeople}
       />
       <div className="grid grid-cols-2 gap-3.5">
         <Field label="Pitcher throws">
-          <Segmented label="Pitcher throws" value={f.pth} onChange={(v) => set({ pth: v })} options={["LHP", "RHP"]} />
+          <Segmented label="Pitcher throws" value={f.pth} onChange={(v) => set({ pth: v })} options={["LHP", "RHP"]} lock={lockPth} />
         </Field>
         <Field label="Batter stands">
-          <Segmented label="Batter stands" value={f.bst} onChange={(v) => set({ bst: v })} options={["LHB", "RHB"]} />
+          <Segmented label="Batter stands" value={f.bst} onChange={(v) => set({ bst: v })} options={["LHB", "RHB"]} lock={lockBst} />
         </Field>
       </div>
     </>

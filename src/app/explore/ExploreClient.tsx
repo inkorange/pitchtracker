@@ -10,9 +10,11 @@ import {
 } from "nuqs";
 import { EyebrowTag } from "@/components/broadcast";
 import { Spinner } from "@/components/feedback/Spinner";
+import { type PersonInfo } from "@/components/search/MultiPersonPicker";
 import {
   activeFilterCount,
   CHASE_ZONES,
+  lockedHand,
   querySentence,
   RESULT_GROUPS,
   type ExploreFilters,
@@ -129,15 +131,45 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
   const [open, setOpen] = useState<Record<SectionKey, boolean>>({ who: true, what: true, when: false, outcome: false });
   const [sheet, setSheet] = useState<SectionKey | null>(null);
   const [showAllEvents, setShowAllEvents] = useState(false);
-  const [pitcherNames, setPitcherNames] = useState<Map<number, string>>(new Map());
-  const [batterNames, setBatterNames] = useState<Map<number, string>>(new Map());
+  const [pitcherInfo, setPitcherInfo] = useState<Map<number, PersonInfo>>(new Map());
+  const [batterInfo, setBatterInfo] = useState<Map<number, PersonInfo>>(new Map());
   const [toast, setToast] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedQuery[]>([]);
 
   const queryKey = JSON.stringify(toQuery(f));
   const nActive = activeFilterCount(f);
-  const pName = useCallback((id: number) => pitcherNames.get(id) ?? `#${id}`, [pitcherNames]);
-  const bName = useCallback((id: number) => batterNames.get(id) ?? `#${id}`, [batterNames]);
+  const pName = useCallback((id: number) => pitcherInfo.get(id)?.name ?? `#${id}`, [pitcherInfo]);
+  const bName = useCallback((id: number) => batterInfo.get(id)?.name ?? `#${id}`, [batterInfo]);
+
+  // If every selected pitcher throws with one arm (or every batter hits
+  // from one side), the other option can only return nothing: lock to
+  // the matching side. An arm we set this way clears again as soon as
+  // the lock releases (players removed, or a mix of arms added), so it
+  // never silently filters out a player the user picked.
+  const lockedPth = lockedHand(f.pid, (id) => pitcherInfo.get(id)?.hand);
+  const lockedBst = lockedHand(f.bid, (id) => batterInfo.get(id)?.hand);
+  const autoHand = useRef<{ pth: boolean; bst: boolean }>({ pth: false, bst: false });
+  useEffect(() => {
+    const patch: Patch = {};
+    if (lockedPth && f.pth !== lockedPth) {
+      patch.pth = lockedPth;
+      autoHand.current.pth = true;
+    } else if (!lockedPth && autoHand.current.pth) {
+      patch.pth = null;
+      autoHand.current.pth = false;
+    }
+    if (lockedBst && f.bst !== lockedBst) {
+      patch.bst = lockedBst;
+      autoHand.current.bst = true;
+    } else if (!lockedBst && autoHand.current.bst) {
+      patch.bst = null;
+      autoHand.current.bst = false;
+    }
+    if (Object.keys(patch).length) set(patch);
+  }, [lockedPth, lockedBst, f.pth, f.bst, set]);
+  const handWord = (h: "L" | "R") => (h === "L" ? "left" : "right");
+  const lockReason = (ids: number[], name: (id: number) => string, verb: string, h: "L" | "R") =>
+    ids.length === 1 ? `${name(ids[0])} ${verb} ${handWord(h)}-handed.` : `All selected ${verb === "throws" ? "pitchers throw" : "batters hit"} ${handWord(h)}-handed.`;
   const sentence = querySentence(f, { pitchers: pName, batters: bName, pitchLabel: getPitchLabel });
   const sentenceText = `Pitches ${sentence.map((p) => `${p.pre} ${p.v}`).join(" ")}`;
 
@@ -255,8 +287,10 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
     f,
     set,
     seasons,
-    onPitcherNames: setPitcherNames,
-    onBatterNames: setBatterNames,
+    onPitcherPeople: setPitcherInfo,
+    onBatterPeople: setBatterInfo,
+    lockPth: lockedPth ? { hand: lockedPth, reason: lockReason(f.pid, pName, "throws", lockedPth) } : null,
+    lockBst: lockedBst ? { hand: lockedBst, reason: lockReason(f.bid, bName, "bats", lockedBst) } : null,
     showAllEvents,
     setShowAllEvents,
   };
