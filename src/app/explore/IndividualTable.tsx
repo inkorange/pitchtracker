@@ -143,11 +143,15 @@ export function IndividualTable({ rows }: IndividualTableProps) {
                     {labelOutcome(p.events ?? p.description ?? null)}
                   </td>
                   <td className="px-3 py-2">
+                    {/* Round play button, same as the /pitchers table. */}
                     <Link
                       href={replayHref}
-                      className="inline-flex h-8 px-3 items-center rounded-control bg-accent text-white text-xs font-bold hover:bg-accent-hover hover:text-white"
+                      aria-label={`Replay this ${getPitchLabel(p.pitch_type ?? "UN")} from ${p.game_date ?? "this game"}`}
+                      className="size-9 rounded-full bg-accent hover:bg-accent-hover inline-flex items-center justify-center"
                     >
-                      Replay →
+                      <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="#fff">
+                        <path d="M7 4l13 8-13 8z" />
+                      </svg>
                     </Link>
                   </td>
                 </tr>
