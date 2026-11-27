@@ -145,7 +145,6 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
   const [toast, setToast] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedQuery[]>([]);
 
-  const queryKey = JSON.stringify(toQuery(f));
   const nActive = activeFilterCount(f, defaultSeasons);
   // With nothing filtered there is no query, so there are no results:
   // clearing the last filter (e.g. removing every pitcher) blanks the
@@ -180,6 +179,15 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
     }
     if (Object.keys(patch).length) set(patch);
   }, [lockedPth, lockedBst, f.pth, f.bst, set]);
+  // A side locked to the selected players can't change which pitches
+  // match, so it's left out of the query (and its key): the automatic
+  // lock never marks fresh results as stale or triggers a re-search.
+  const searchFilters: ExploreFilters = {
+    ...f,
+    pth: lockedPth ? null : f.pth,
+    bst: lockedBst ? null : f.bst,
+  };
+  const queryKey = JSON.stringify(toQuery(searchFilters));
   const handWord = (h: "L" | "R") => (h === "L" ? "left" : "right");
   const lockReason = (ids: number[], name: (id: number) => string, verb: string, h: "L" | "R") =>
     ids.length === 1 ? `${name(ids[0])} ${verb} ${handWord(h)}-handed.` : `All selected ${verb === "throws" ? "pitchers throw" : "batters hit"} ${handWord(h)}-handed.`;
@@ -645,6 +653,12 @@ function Results({
 
   return (
     <>
+      {/* Summary + view/actions stick under the query bar on desktop
+          (same offset as the filter panel); results scroll beneath. */}
+      <div
+        className="flex flex-col gap-3.5 lg:sticky z-10 bg-bg lg:pt-3 lg:-mt-3 lg:pb-3.5 lg:-mb-3.5"
+        style={{ top: "calc(4rem + var(--query-h, 80px))" }}
+      >
       <dl
         className={`m-0 grid grid-cols-3 md:grid-cols-5 bg-surface border border-line border-t-[3px] border-t-accent rounded-control transition-opacity ${
           stale || loading ? "opacity-60" : ""
@@ -699,6 +713,7 @@ function Results({
             </button>
           ))}
         </div>
+      </div>
       </div>
 
       {view === "scene" ? <VisualizationPanel rows={result.rows} /> : null}

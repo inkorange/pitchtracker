@@ -242,7 +242,7 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
         ) : null}
       </div>
 
-      <div className="relative h-[420px] md:h-[480px] rounded-panel bg-surface border border-line overflow-hidden">
+      <div className="relative isolate h-[420px] md:h-[480px] rounded-panel bg-surface border border-line overflow-hidden">
         <Scene preset={preset} presetTick={presetTick}>
           {prepared.map((p) => {
             // Same ribbon + plate-ball treatment as the pitcher page. In
