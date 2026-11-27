@@ -1,40 +1,34 @@
 import { getHomeRankings } from "@/lib/home/rankings";
-import { LeaderboardCard } from "./LeaderboardCard";
-import { LeaderboardTabs } from "./LeaderboardTabs";
-import { SectionHeader } from "./SectionHeader";
+import { getPastSeasonBoards, PAST_MIN_PITCHES } from "@/lib/leaderboards/history";
+import { LeaderboardSeasons, type SeasonBoards } from "./LeaderboardSeasons";
 
-// Leaderboards — design/Main.dc.html "LEADERS" + HomeMobile.
-// Desktop: 3×2 grid of boards. Mobile: one board at a time behind a
-// scrollable pill tablist. Renders nothing until the rankings cron
-// has populated the season.
+// Leaderboards — design/Main.dc.html "LEADERS" + HomeMobile, plus a
+// season dropdown. The current season shows all six boards from our own
+// rankings; past seasons show only the boards external sources can
+// supply (strikeouts, four-seam velocity and spin — see
+// lib/leaderboards/history.ts). Every season is loaded here (cached) so
+// switching is instant and the homepage stays statically rendered.
+const PAST_SEASONS = 4;
+
 export async function Leaderboards() {
   const { season, boards } = await getHomeRankings();
   if (boards.length === 0) return null;
 
-  return (
-    <section className="container-page py-8 md:pt-10 md:pb-[72px]" aria-labelledby="leaders-h">
-      <SectionHeader
-        id="leaders-h"
-        title={
-          <>
-            Leaderboards{" "}
-            <span className="text-muted font-semibold text-base md:text-xl normal-case md:uppercase">
-              <span className="hidden md:inline">· {season} regular season</span>
-            </span>
-          </>
-        }
-        aside={<span className="md:hidden text-[13px] text-muted">{season} season</span>}
-      />
-
-      <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {boards.map((b) => (
-          <LeaderboardCard key={b.category.key} board={b} />
-        ))}
-      </div>
-
-      <div className="md:hidden -mx-5">
-        <LeaderboardTabs boards={boards} />
-      </div>
-    </section>
+  const past = await Promise.all(
+    Array.from({ length: PAST_SEASONS }, (_, i) => season - 1 - i).map(async (s) => ({
+      season: s,
+      boards: await getPastSeasonBoards(s).catch(() => []),
+    })),
   );
+  const seasons: SeasonBoards[] = [
+    { season, boards, note: null },
+    ...past
+      .filter((p) => p.boards.length > 0)
+      .map((p) => ({
+        ...p,
+        note: `Past seasons show strikeouts (MLB) plus four-seam velocity and spin from Baseball Savant (pitchers with ${PAST_MIN_PITCHES}+ pitches). Whiff, CSW and approach-angle boards are current-season only.`,
+      })),
+  ];
+
+  return <LeaderboardSeasons seasons={seasons} />;
 }
