@@ -27,6 +27,11 @@ export interface StatPitch {
   // pitcher. Callers sum `-delta_run_exp` so positive numbers mean
   // "saved runs".
   delta_run_exp: number | null;
+  // Present on arsenal API rows; used by the Stats summary splits.
+  events?: string | null;
+  stand?: string | null;
+  game_pk?: number | null;
+  at_bat_number?: number | null;
 }
 
 /**

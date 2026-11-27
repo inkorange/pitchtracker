@@ -8,9 +8,10 @@ import {
   fetchStrikeoutLeaders,
   fetchVelocityLeaders,
 } from "@/lib/leaderboards/external";
-import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
+import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { TeamLogo } from "@/components/team/TeamLogo";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
+import { SectionHeader } from "./SectionHeader";
 
 // Two-track blend so the strip mixes stable elite names with a
 // rotating "trending now" block:
@@ -26,15 +27,20 @@ import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 // Page is edge-cached on a 5-min s-maxage so the recompute cost is
 // amortized across viewers; the underlying data only changes when the
 // daily cron runs, so the visible list shifts at most once per day.
-const ELITE_COUNT = 6;
-const TRENDING_COUNT = 6;
+// The redesign shows six cards (3×2 desktop, four on mobile): four
+// stable elite arms plus two trending.
+const ELITE_COUNT = 4;
+const TRENDING_COUNT = 2;
+// Offseason the trending feeds go quiet; backfill from further down
+// the K leaderboard so the grid stays full.
+const TOTAL_COUNT = ELITE_COUNT + TRENDING_COUNT;
 const FEATURE_LOOKBACK_DAYS = 14;
 const VELO_LOOKBACK_DAYS = 7;
 const VELO_POOL_SIZE = 12; // pull more velo leaders than slots so dedup vs elite still leaves us enough
 
 async function getFeaturedPitcherIds(
   supabase: SupabaseClient<Database>,
-): Promise<number[]> {
+): Promise<{ ids: number[]; strikeoutsById: Map<number, number> }> {
   // The season we hold data for, not the calendar year — this strip
   // reads season-scoped RPCs and would go quiet every January.
   const season = await resolveDisplaySeason(supabase);
@@ -44,9 +50,9 @@ async function getFeaturedPitcherIds(
   // and the leaderboard agree on who the top arms are.
   const kRows = await fetchStrikeoutLeaders({
     season,
-    limit: ELITE_COUNT,
+    limit: TOTAL_COUNT,
   });
-  const elite: number[] = kRows.map((r) => r.pitcher_id);
+  const elite: number[] = kRows.slice(0, ELITE_COUNT).map((r) => r.pitcher_id);
 
   // Track 2 — trending. Two feeds, in priority order:
   //   2a. Pitchers featured in POTD or WoW in the last 14 days (highest
@@ -89,12 +95,21 @@ async function getFeaturedPitcherIds(
     if (trending.length >= TRENDING_COUNT) break;
   }
 
-  return [...elite, ...trending];
+  const ids = [...elite, ...trending];
+  for (const r of kRows.slice(ELITE_COUNT)) {
+    if (ids.length >= TOTAL_COUNT) break;
+    if (!ids.includes(r.pitcher_id)) ids.push(r.pitcher_id);
+  }
+
+  return {
+    ids,
+    strikeoutsById: new Map(kRows.map((r) => [r.pitcher_id, r.strikeouts])),
+  };
 }
 
 export async function FeaturedStrip() {
   const supabase = await createClient();
-  const ids = await getFeaturedPitcherIds(supabase);
+  const { ids, strikeoutsById } = await getFeaturedPitcherIds(supabase);
   if (ids.length === 0) return null;
 
   const { data: pitchers } = await supabase
@@ -104,47 +119,60 @@ export async function FeaturedStrip() {
 
   if (!pitchers || pitchers.length === 0) return null;
 
-  // Preserve the elite-then-trending order returned by the helper. A
-  // missing pitcher_row (e.g. just-traded player not in pitch_pitchers
-  // yet) just drops that slot — the grid auto-fills.
+  // Preserve the elite-then-trending order. A missing row (e.g. a
+  // just-traded player not in pitch_pitchers yet) drops that slot.
   const ordered = ids
     .map((id) => pitchers.find((p) => p.mlb_id === id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
   return (
-    <section className="space-y-3">
-      <div className="text-[10px] uppercase tracking-[0.18em] text-white/45">
-        Featured pitchers
-      </div>
-      <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {ordered.map((p) => (
-          <li key={p.mlb_id}>
-            <Link
-              href={pitcherPagePath(p.mlb_id, p.full_name)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] hover:border-white/15 transition-colors"
-            >
-              <div className="relative w-10 h-10 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                <Image
-                  src={pitcherHeadshotUrl(p.mlb_id, 80)}
-                  alt=""
-                  fill
-                  sizes="40px"
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-white/95 truncate">{p.full_name}</div>
-                <div className="text-[11px] text-white/45 tabular-nums">
-                  {p.throws ? `${p.throws}HP` : ""}
-                </div>
-              </div>
-              {p.current_team_id ? (
-                <TeamLogo teamId={p.current_team_id} size={28} />
-              ) : null}
-            </Link>
-          </li>
-        ))}
+    <section aria-labelledby="featured-h" className="container-page pt-4 pb-14 md:pt-14 md:pb-24">
+      <SectionHeader
+        id="featured-h"
+        title="Featured pitchers"
+        aside={
+          <Link
+            href="/browse"
+            className="text-sm font-semibold min-h-11 flex items-center text-ink hover:text-accent-hover"
+          >
+            <span className="md:hidden">Teams →</span>
+            <span className="hidden md:inline">Browse by team →</span>
+          </Link>
+        }
+      />
+      <ul className="list-none m-0 p-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 md:gap-3">
+        {ordered.map((p, i) => {
+          const k = strikeoutsById.get(p.mlb_id);
+          const meta = [p.throws ? `${p.throws}HP` : null, k != null ? `${k} K` : null]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <li key={p.mlb_id} className={i >= 4 ? "max-md:hidden" : undefined}>
+              <Link
+                href={pitcherPagePath(p.mlb_id, p.full_name)}
+                className="flex items-center gap-3.5 px-4 py-3 md:px-[18px] md:py-3.5 bg-surface border border-line rounded-control text-ink hover:text-ink hover:border-line-strong transition-colors"
+              >
+                <span className="relative size-11 md:size-12 shrink-0 rounded-full bg-avatar overflow-hidden">
+                  <Image
+                    src={pitcherHeadshotUrl(p.mlb_id, 96)}
+                    alt=""
+                    fill
+                    sizes="48px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </span>
+                <span className="flex flex-col grow min-w-0">
+                  <span className="font-display font-bold text-[21px] md:text-[22px] leading-[1.1] truncate">
+                    {p.full_name}
+                  </span>
+                  {meta ? <span className="text-[13px] text-muted num">{meta}</span> : null}
+                </span>
+                {p.current_team_id ? <TeamLogo teamId={p.current_team_id} size={32} /> : null}
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

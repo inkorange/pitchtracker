@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { COMPETITIVE_GAME_TYPES } from "@/lib/season/current-season";
 
 // Resolve a (team, date) pair to a game and 302 to its at-bat browser.
 // Falls back to the legacy (gamePk, atBatNumber) pair so existing
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
 
   if (!date) {
     return NextResponse.redirect(
-      new URL("/at-bat?error=missing", request.url),
+      new URL("/at-bat?tab=date&error=missing", request.url),
     );
   }
 
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
   // on that date. The team is intentionally optional now.
   if (!teamRaw) {
     const back = new URL("/at-bat", request.url);
+    back.searchParams.set("tab", "date");
     back.searchParams.set("date", date);
     return NextResponse.redirect(back);
   }
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
   const teamId = Number(teamRaw);
   if (!Number.isFinite(teamId)) {
     return NextResponse.redirect(
-      new URL("/at-bat?error=missing", request.url),
+      new URL("/at-bat?tab=date&error=missing", request.url),
     );
   }
 
@@ -55,7 +57,8 @@ export async function GET(request: Request) {
   const { data: matches } = await supabase
     .from("pitch_games")
     .select("game_pk, game_date")
-    .eq("game_type", "R")
+    // Any competitive game (regular season or postseason).
+    .in("game_type", [...COMPETITIVE_GAME_TYPES])
     .eq("game_date", date)
     .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
     .order("game_pk", { ascending: true });
@@ -63,6 +66,7 @@ export async function GET(request: Request) {
   const games = matches ?? [];
   if (games.length === 0) {
     const back = new URL("/at-bat", request.url);
+    back.searchParams.set("tab", "date");
     back.searchParams.set("error", "notfound");
     back.searchParams.set("team", String(teamId));
     back.searchParams.set("date", date);

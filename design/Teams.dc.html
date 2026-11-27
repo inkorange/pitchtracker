@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Teams</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+input,select{font-family:Inter,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; min-height: 100%">
+<header style="border-bottom: 1px solid #1B2438; background: #0A101C">
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 32px">
+<a href="Main.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.5px; color: #F3F5F9">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<nav aria-label="Primary" style="display: flex; gap: 28px; font-size: 14px; font-weight: 500; flex-grow: 1">
+<a href="Pitchers.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Pitchers</a>
+<a href="Teams.dc.html" aria-current="page" style="color: #F3F5F9; font-weight: 600; height: 64px; display: flex; align-items: center; border-bottom: 3px solid #E8364F; box-sizing: border-box; padding-top: 3px">Teams</a>
+<a href="AtBatReplays.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">At-bat replays</a>
+<a href="Explore.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Explore</a>
+<a href="#" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Ask PitchTracker</a>
+</nav>
+<a href="Pitchers.dc.html" style="height: 40px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 10px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 14px; font-weight: 600">Find a pitcher<span style="font-size: 12px; padding: 2px 6px; border-radius: 3px; background: rgba(0,0,0,0.25)">⌘K</span></a>
+</div>
+</header>
+<section style="max-width: 1240px; margin: 0 auto; padding: 48px 32px 24px; display: flex; flex-direction: column; gap: 14px">
+<span style="align-self: flex-start; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; padding: 3px 16px 3px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">TEAMS</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 64px; line-height: 0.92; text-transform: uppercase">Pick a staff.</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.55; color: #C4CCDB; max-width: 680px">Every club’s pitching staff by season. Open a team to compare its arms side by side, then drop into any pitcher in 3D.</p>
+</section>
+
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px 8px; display: flex; gap: 12px; flex-wrap: wrap">
+<label for="tm-search" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Jump to a team</label>
+<input id="tm-search" type="search" placeholder="Jump to a team — name, city or abbreviation" style="flex: 1 1 360px; height: 52px; padding: 0 18px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 16px">
+<div role="group" aria-label="Season" style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 4px">
+<button aria-pressed="true" style="height: 42px; padding: 0 16px; border: 0; border-radius: 3px; background: #F3F5F9; color: #070B14; font-weight: 700; font-size: 14px">2026</button>
+<button aria-pressed="false" style="height: 42px; padding: 0 16px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 14px">2025</button>
+</div>
+</div>
+<div style="max-width: 1240px; margin: 0 auto; padding: 24px 32px 0; display: flex; flex-direction: column; gap: 48px">
+<section style="display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 36px; text-transform: uppercase">American League</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{ al }}" as="d" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="align-self: flex-start; background: #1E2A40; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; padding: 3px 16px 3px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">{{ d.div }}</span>
+<sc-for list="{{ d.teams }}" as="t" hint-placeholder-count="5">
+<a href="{{ t.href }}" style="display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 10px 14px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<span role="img" aria-label="{{ t.name }} logo (placeholder)" style="width: 56px; height: 56px; flex-shrink: 0; border-radius: 6px; background: #0A101C; border: 1px dashed #5A6A88; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 18px; line-height: 1">{{ t.ab }}</span><span style="font-size: 8px; letter-spacing: 1px; color: #9AA6BD; font-weight: 700">LOGO</span></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 15px; font-weight: 600">{{ t.name }}</span>
+<sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #F6C344; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">★ {{ t.badge }}</span></sc-if>
+</span>
+<span aria-hidden="true" style="color: #5A6A88">›</span>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</section>
+<section style="display: flex; flex-direction: column; gap: 16px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 36px; text-transform: uppercase">National League</h2>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{ nl }}" as="d" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="align-self: flex-start; background: #1E2A40; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; padding: 3px 16px 3px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">{{ d.div }}</span>
+<sc-for list="{{ d.teams }}" as="t" hint-placeholder-count="5">
+<a href="{{ t.href }}" style="display: flex; align-items: center; gap: 14px; min-height: 68px; padding: 10px 14px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<span role="img" aria-label="{{ t.name }} logo (placeholder)" style="width: 56px; height: 56px; flex-shrink: 0; border-radius: 6px; background: #0A101C; border: 1px dashed #5A6A88; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 18px; line-height: 1">{{ t.ab }}</span><span style="font-size: 8px; letter-spacing: 1px; color: #9AA6BD; font-weight: 700">LOGO</span></span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+<span style="font-size: 15px; font-weight: 600">{{ t.name }}</span>
+<sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #F6C344; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">★ {{ t.badge }}</span></sc-if>
+</span>
+<span aria-hidden="true" style="color: #5A6A88">›</span>
+</a>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</section>
+</div>
+<footer style="border-top: 1px solid #1B2438; background: #0A101C; margin-top: 64px">
+<div style="max-width: 1240px; margin: 0 auto; padding: 32px; font-size: 12px; line-height: 1.6; color: #9AA6BD">
+<p style="margin: 0">Not affiliated with or endorsed by Major League Baseball, MLB Advanced Media, or any of its clubs. All MLB and Club marks, logos, and player names are trademarks of their respective owners and are used here for identification purposes only. Pitch trajectory and Statcast data: Baseball Savant. Player metadata, schedule, and headshots: MLB Stats API and mlbstatic.com.</p>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {"al": [{"div": "EAST", "teams": [{"ab": "BAL", "name": "Baltimore Orioles", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "BOS", "name": "Boston Red Sox", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "NYY", "name": "New York Yankees", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "TB", "name": "Tampa Bay Rays", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "TOR", "name": "Toronto Blue Jays", "badge": "P. Sewald · flattest VAA", "hasBadge": true, "href": "#"}]}, {"div": "CENTRAL", "teams": [{"ab": "CWS", "name": "Chicago White Sox", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "CLE", "name": "Cleveland Guardians", "badge": "G. Williams · #2 in K", "hasBadge": true, "href": "#"}, {"ab": "DET", "name": "Detroit Tigers", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "KC", "name": "Kansas City Royals", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "MIN", "name": "Minnesota Twins", "badge": "", "hasBadge": false, "href": "#"}]}, {"div": "WEST", "teams": [{"ab": "ATH", "name": "Athletics", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "HOU", "name": "Houston Astros", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "LAA", "name": "Los Angeles Angels", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "SEA", "name": "Seattle Mariners", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "TEX", "name": "Texas Rangers", "badge": "", "hasBadge": false, "href": "#"}]}], "nl": [{"div": "EAST", "teams": [{"ab": "ATL", "name": "Atlanta Braves", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "MIA", "name": "Miami Marlins", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "NYM", "name": "New York Mets", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "PHI", "name": "Philadelphia Phillies", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "WSH", "name": "Washington Nationals", "badge": "", "hasBadge": false, "href": "#"}]}, {"div": "CENTRAL", "teams": [{"ab": "CHC", "name": "Chicago Cubs", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "CIN", "name": "Cincinnati Reds", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "MIL", "name": "Milwaukee Brewers", "badge": "J. Misiorowski · #1 in K", "hasBadge": true, "href": "TeamStaff.dc.html"}, {"ab": "PIT", "name": "Pittsburgh Pirates", "badge": "L. Bachar · #1 in spin", "hasBadge": true, "href": "#"}, {"ab": "STL", "name": "St. Louis Cardinals", "badge": "", "hasBadge": false, "href": "#"}]}, {"div": "WEST", "teams": [{"ab": "AZ", "name": "Arizona Diamondbacks", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "COL", "name": "Colorado Rockies", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "LAD", "name": "Los Angeles Dodgers", "badge": "", "hasBadge": false, "href": "#"}, {"ab": "SD", "name": "San Diego Padres", "badge": "M. Miller · #1 in velo", "hasBadge": true, "href": "#"}, {"ab": "SF", "name": "San Francisco Giants", "badge": "", "hasBadge": false, "href": "#"}]}]};
+  }
+}
+</script>
+</body>
+</html>

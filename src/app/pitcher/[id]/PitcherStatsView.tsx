@@ -5,7 +5,6 @@ import { useParams, useSearchParams } from "next/navigation";
 import { parseAsInteger, useQueryStates } from "nuqs";
 import { aggregate, type StatPitch } from "./stats/aggregations";
 import { LazyMount } from "./stats/LazyMount";
-import { StatsHeadline } from "./stats/StatsHeadline";
 import { StatsScopeBanner } from "./stats/StatsScopeBanner";
 import { ArsenalCard } from "./stats/ArsenalCard";
 import { MovementPlot } from "./stats/MovementPlot";
@@ -16,6 +15,7 @@ import { HeatMapGrid } from "./stats/HeatMapGrid";
 import { VAABars } from "./stats/VAABars";
 import { SequencingMatrix } from "./stats/SequencingMatrix";
 import { SequencingDrift } from "./stats/SequencingDrift";
+import { StatsSummary, type StatsAtBat, type StatsGame } from "./stats/StatsSummary";
 import type { SequencingMatrix as SequencingMatrixData } from "@/lib/pitch/sequencingMatrix";
 import type { SequencingDrift as SequencingDriftData } from "@/lib/pitch/sequencingDrift";
 import type { ArsenalRadar as ArsenalRadarData } from "@/lib/pitch/arsenalRadar";
@@ -33,12 +33,20 @@ import type { ArsenalRadar as ArsenalRadarData } from "@/lib/pitch/arsenalRadar"
 // hiding content behind tabs.
 export function PitcherStatsView({
   filterSummary,
+  game,
+  atBats,
+  season,
+  hasPostseason,
 }: {
   /** Pre-rendered scope text from the page server. Mirrors the
    *  TopNav title so the banner reflects every active URL filter
    *  (game / pitch / outcome / event / hand / velo / batter /
    *  at-bat), not just season + vsBatter. */
   filterSummary: string;
+  game: StatsGame | null;
+  atBats: StatsAtBat[] | null;
+  season: number;
+  hasPostseason: boolean;
 }) {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
@@ -160,7 +168,7 @@ export function PitcherStatsView({
 
   if (loading && pitches.length === 0) {
     return (
-      <div className="text-[11px] text-white/55 italic px-1 py-3">
+      <div className="text-sm text-muted px-1 py-3">
         Loading stats…
       </div>
     );
@@ -174,7 +182,7 @@ export function PitcherStatsView({
           batterScoped={vsBatter != null}
           onClearBatter={clearBatterScope}
         />
-        <div className="text-[11px] text-white/55 italic px-1 py-3">
+        <div className="text-sm text-muted px-1 py-3">
           {vsBatter != null && sequenceBatterName
             ? `No pitches to ${sequenceBatterName} in the current filter.`
             : "No pitches in the current filter."}
@@ -194,8 +202,8 @@ export function PitcherStatsView({
         batterScoped={vsBatter != null}
         onClearBatter={clearBatterScope}
       />
-      {/* Headline spans full width on every breakpoint. */}
-      <StatsHeadline total={aggregated.total} />
+      <StatsSummary pitches={pitches} game={game} atBats={atBats} season={season} hasPostseason={hasPostseason} />
+      <h2 className="m-0 pt-5 pb-1 font-display font-bold text-[26px] uppercase leading-none">Deeper analysis</h2>
       {/* The two headline cards — Arsenal (per-pitch stats + league
           radar combined) and Sequencing — span full width because
           they ARE the main view of the pitcher's pitches. */}

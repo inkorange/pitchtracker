@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Barlow_Condensed, Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { BotIdClient } from "botid/client";
@@ -37,14 +37,19 @@ const BOTID_PROTECT = [
 const GA_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "G-LWQ9HE34Y6";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Redesign type (design/DESIGN.md §2): Inter for UI/body, Barlow
+// Condensed for display headings, stat values and broadcast chrome.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-barlow-condensed",
   subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  style: ["normal", "italic"],
 });
 
 // metadataBase resolves every relative URL the per-page metadata
@@ -159,7 +164,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} antialiased dark`}
+      className={`${inter.variable} ${barlowCondensed.variable} antialiased dark`}
     >
       <head>
         {/* BotIdClient must live in <head> so the signal-collection
@@ -169,7 +174,7 @@ export default function RootLayout({
             the server-side checkBotId() gates. */}
         <BotIdClient protect={[...BOTID_PROTECT]} />
       </head>
-      <body className="bg-[#0a0e14] text-white/90">
+      <body className="bg-bg text-white/90">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}

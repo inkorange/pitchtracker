@@ -1,20 +1,23 @@
 // Pitch-type semantic colors, tuned for emissive materials on a dark stage.
 
 export const PITCH_COLORS: Record<string, string> = {
-  FF: "#ff4655",
-  FA: "#ff4655",
-  SI: "#ff7a3a",
-  FT: "#ff7a3a",
-  FC: "#ffaa44",
-  SL: "#9b6bff",
-  ST: "#5588ff",
-  SV: "#5588ff",
-  CU: "#3855ff",
+  // FF/SI/FC/SL/CU/CH: redesign palette (design/DESIGN.md §2, "keep
+  // exact"); ST/SV and FS/FO from design/Pitchers.dc.html. The rest
+  // predate the redesign and are unchanged.
+  FF: "#f0505a",
+  FA: "#f0505a",
+  SI: "#fb7c3c",
+  FT: "#fb7c3c",
+  FC: "#f5a524",
+  SL: "#b392f0",
+  ST: "#c084fc",
+  SV: "#c084fc",
+  CU: "#4c8df6",
   KC: "#5544aa",
-  CS: "#3855ff",
-  CH: "#33d4aa",
-  FS: "#44cc66",
-  FO: "#44cc66",
+  CS: "#4c8df6",
+  CH: "#2dd4bf",
+  FS: "#38bdf8",
+  FO: "#38bdf8",
   KN: "#ffd633",
   EP: "#aaaaaa",
   PO: "#aaaaaa",
@@ -113,10 +116,10 @@ function rgbToHsl(r: number, g: number, b: number) {
 export type OutcomeCategory = "whiff" | "called" | "ball" | "foul" | "inplay" | "other";
 
 export const OUTCOME_COLORS: Record<OutcomeCategory, string> = {
-  whiff: "#ef4444", // bright red — swing and miss
-  called: "#f59e0b", // amber — caught looking
-  ball: "#3b82f6", // blue — outside the zone
-  foul: "#a3a3a3", // neutral gray
+  whiff: "#f0505a", // red — swing and miss
+  called: "#f5a524", // amber — caught looking
+  ball: "#4c8df6", // blue — outside the zone
+  foul: "#9aa6bd", // neutral gray (= --muted)
   inplay: "#22c55e", // green — bat met ball
   other: "#7a8694", // unknown
 };

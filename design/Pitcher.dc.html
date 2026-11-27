@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Pitcher page desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; overflow: hidden">
+
+<!-- top bar -->
+<header style="height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 20px; padding: 0 20px; background: #0A101C; border-bottom: 1px solid #1B2438">
+<a href="Main.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 26px">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<nav aria-label="Breadcrumb" style="font-size: 14px; color: #9AA6BD; display: flex; gap: 8px"><a href="#" style="color: #9AA6BD">Pitchers</a><span aria-hidden="true">/</span><span style="color: #F3F5F9">Jacob Misiorowski</span></nav>
+<div style="flex-grow: 1"></div>
+<label for="p-search" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search a pitcher</label>
+<input id="p-search" type="search" placeholder="Search a pitcher" style="width: 260px; height: 36px; padding: 0 14px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 14px; font-family: Inter, sans-serif">
+<button style="height: 36px; padding: 0 14px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"></path></svg>Ask</button>
+<button style="height: 36px; padding: 0 16px; border-radius: 4px; border: 0; background: #E8364F; color: #FFFFFF; font-size: 13px; font-weight: 700; letter-spacing: 0.5px">Compare</button>
+</header>
+
+<div style="flex-grow: 1; display: flex; min-height: 0">
+
+<!-- docked rail -->
+<aside aria-label="Pitcher controls" style="width: 384px; flex-shrink: 0; display: flex; flex-direction: column; background: #0A101C; border-right: 1px solid #1B2438; min-height: 0">
+<div style="padding: 20px 20px 16px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid #1B2438">
+<div style="display: flex; align-items: center; gap: 14px">
+<span style="width: 56px; height: 56px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #C4CCDB">JM</span>
+<div style="display: flex; flex-direction: column; flex-grow: 1">
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 30px; line-height: 1">JACOB MISIOROWSKI</h1>
+<span style="font-size: 13px; color: #9AA6BD; margin-top: 4px">RHP · Milwaukee · debut 2025</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; justify-content: space-between">
+<div role="group" aria-label="Season" style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 3px">
+<button aria-pressed="true" style="height: 30px; padding: 0 14px; border: 0; border-radius: 2px; background: #F3F5F9; color: #070B14; font-weight: 700; font-size: 13px">2026</button>
+<button aria-pressed="false" style="height: 30px; padding: 0 14px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 13px">2025</button>
+</div>
+<span style="font-size: 12px; color: #9AA6BD">MLB Statcast</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #1B2438; border-radius: 4px; overflow: hidden">
+<sc-for list="{{ bug }}" as="b" hint-placeholder-count="4">
+<div style="padding: 8px 10px; display: flex; flex-direction: column; background: #0F1626; border-right: 1px solid #1B2438">
+<span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">{{ b.k }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; line-height: 1.05">{{ b.v }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div role="tablist" aria-label="Panels" style="display: flex; border-bottom: 1px solid #1B2438; padding: 0 12px">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+<button role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}<sc-if value="{{ t.badge }}" hint-placeholder-val="{{ false }}"><span style="margin-left: 6px; background: #E8364F; color: #FFFFFF; border-radius: 9px; padding: 1px 7px; font-size: 11px">{{ t.badge }}</span></sc-if></button>
+</sc-for>
+</div>
+
+<div style="flex-grow: 1; overflow-y: auto; padding: 16px 20px; min-height: 0">
+<sc-if value="{{ isArsenal }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; padding: 0 4px 8px"><span>PITCH · TAP TO SHOW/HIDE</span><span>MPH · USAGE</span></div>
+<sc-for list="{{ arsenal }}" as="p" hint-placeholder-count="6">
+<button aria-pressed="{{ p.on }}" onClick="{{ p.toggle }}" style="{{ p.rowStyle }}">
+<span style="{{ p.boxStyle }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#070B14" stroke-width="4"><path d="M5 12l5 5 9-10"></path></svg></span>
+<span style="flex-grow: 1; text-align: left; display: flex; flex-direction: column; gap: 5px">
+<span style="font-size: 14px; font-weight: 600">{{ p.name }}</span>
+<span style="height: 4px; background: #1B2438; border-radius: 2px; overflow: hidden; display: block"><span style="{{ p.barStyle }}"></span></span>
+</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; width: 52px; text-align: right">{{ p.mph }}</span>
+<span style="font-size: 12px; color: #9AA6BD; width: 62px; text-align: right">{{ p.use }}</span>
+</button>
+</sc-for>
+</sc-if>
+
+<sc-if value="{{ isFilters }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 22px">
+<fieldset style="border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px">
+<legend style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; margin-bottom: 10px">BATTER SIDE</legend>
+<div style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 3px">
+<button style="flex: 1; height: 34px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 13px">Both</button>
+<button style="flex: 1; height: 34px; border: 0; border-radius: 2px; background: #F3F5F9; color: #070B14; font-weight: 700; font-size: 13px">vs LHB</button>
+<button style="flex: 1; height: 34px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 13px">vs RHB</button>
+</div>
+</fieldset>
+<fieldset style="border: 0; padding: 0; margin: 0">
+<legend style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; margin-bottom: 10px">PITCH OUTCOME</legend>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="5">
+<button aria-pressed="{{ o.on }}" style="{{ o.style }}"><span style="{{ o.dot }}"></span>{{ o.label }}</button>
+</sc-for>
+</div>
+</fieldset>
+<fieldset style="border: 0; padding: 0; margin: 0">
+<legend style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; margin-bottom: 10px">AT-BAT RESULT</legend>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{ results }}" as="o" hint-placeholder-count="6">
+<button aria-pressed="{{ o.on }}" style="{{ o.style }}">{{ o.label }}</button>
+</sc-for>
+</div>
+</fieldset>
+<button style="align-self: flex-start; height: 36px; padding: 0 4px; border: 0; background: transparent; color: #FF6B7A; font-size: 13px; font-weight: 600">Reset all filters</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isGames }}" hint-placeholder-val="{{ false }}">
+<div style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; padding: 0 4px 8px">34 GAMES · TAP FOR AT-BATS</div>
+<button style="width: 100%; display: flex; justify-content: space-between; align-items: center; height: 44px; padding: 0 12px; border-radius: 4px; border: 1px solid #F3F5F9; background: #131C30; color: #F3F5F9; font-size: 14px; font-weight: 600; margin-bottom: 6px">All games in 2026<span style="font-size: 12px; color: #9AA6BD">2,994</span></button>
+<sc-for list="{{ games }}" as="g" hint-placeholder-count="8">
+<button style="width: 100%; display: flex; justify-content: space-between; align-items: center; height: 44px; padding: 0 12px; border-radius: 4px; border: 0; background: transparent; color: #F3F5F9; font-size: 14px"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: 0.5px">{{ g.m }}</span><span style="font-size: 13px; color: #9AA6BD">{{ g.d }}</span></button>
+</sc-for>
+</sc-if>
+</div>
+
+<div style="padding: 14px 20px; border-top: 1px solid #1B2438; display: flex; align-items: center; gap: 12px; background: #0A101C">
+<div style="flex-grow: 1; display: flex; flex-direction: column">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; line-height: 1">{{ countLabel }}</span>
+<span style="font-size: 12px; color: #9AA6BD">500 recent · rest as paths</span>
+</div>
+<button style="height: 40px; padding: 0 16px; border-radius: 4px; border: 1px solid #2A3650; background: #131C30; color: #F3F5F9; font-size: 13px; font-weight: 700; letter-spacing: 0.5px">Find at-bats</button>
+</div>
+</aside>
+
+<!-- scene -->
+<main style="flex-grow: 1; position: relative; overflow: hidden; background: #0F1626">
+<img src="/_blob/919acb456528e5f27426f1b2bdb6bfe2" alt="3D pitch scene, catcher view" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+<svg aria-hidden="true" viewBox="0 0 1080 840" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<path d="M512 440 Q654 462 760 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="760" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q667 462 783 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="783" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q680 455 807 478" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="807" cy="478" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q694 465 833 507" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="833" cy="507" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q627 483 783 621" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="783" cy="621" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q646 441 745 438" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="745" cy="438" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q670 442 790 439" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="790" cy="439" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q673 444 795 446" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="795" cy="446" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q710 472 862 527" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="862" cy="527" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q664 433 778 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="778" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q682 458 846 533" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="846" cy="533" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q610 492 753 648" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="753" cy="648" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q666 484 854 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="854" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q692 462 830 498" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="830" cy="498" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q665 484 779 561" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="779" cy="561" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q657 483 765 558" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="765" cy="558" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q696 452 837 469" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="837" cy="469" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q696 420 878 536" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="878" cy="536" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q685 493 851 634" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="851" cy="634" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q679 447 846 614" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="846" cy="614" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q675 495 832 640" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="832" cy="640" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q670 472 790 525" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="790" cy="525" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q665 479 853 610" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="853" cy="610" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q646 484 819 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="819" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q677 433 801 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="801" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q668 463 784 499" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="784" cy="499" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q649 495 786 639" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="786" cy="639" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q581 457 668 642" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="668" cy="642" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q695 476 835 538" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="835" cy="538" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q678 482 804 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="804" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q675 470 798 520" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="798" cy="520" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q636 517 799 719" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="799" cy="719" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q639 471 775 684" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="775" cy="684" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q656 449 763 459" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="763" cy="459" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q638 439 731 433" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="731" cy="433" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q644 477 741 540" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="741" cy="540" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q655 508 762 630" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="762" cy="630" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q669 465 787 506" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="787" cy="506" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q669 464 786 504" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="786" cy="504" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q667 462 784 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="784" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q643 471 740 523" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="740" cy="523" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q663 440 777 435" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="777" cy="435" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q699 475 842 534" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="842" cy="534" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q656 477 805 699" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="805" cy="699" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q664 480 778 549" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="778" cy="549" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q654 482 760 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="760" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+</svg>
+
+<!-- active filter strip -->
+<div style="position: absolute; top: 16px; left: 16px; right: 16px; display: flex; align-items: flex-start; gap: 12px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; flex-grow: 1">
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="3">
+<span style="display: flex; align-items: center; gap: 2px; height: 34px; padding-left: 12px; background: rgba(7,11,20,0.86); border: 1px solid #2A3650; border-radius: 17px; font-size: 13px; font-weight: 600"><span style="color: #9AA6BD; font-weight: 500; margin-right: 4px">{{ c.k }}</span>{{ c.v }}<button aria-label="Remove filter" style="width: 32px; height: 32px; border: 0; background: transparent; color: #C4CCDB; font-size: 16px">×</button></span>
+</sc-for>
+<button style="height: 34px; padding: 0 14px; border-radius: 17px; border: 1px dashed #5A6A88; background: rgba(7,11,20,0.6); color: #F3F5F9; font-size: 13px; font-weight: 600" onClick="{{ goFilters }}">+ Add filter</button>
+</div>
+<div style="background: rgba(7,11,20,0.88); border: 1px solid #2A3650; border-radius: 6px; padding: 12px 14px; width: 200px; display: flex; flex-direction: column; gap: 8px">
+<div role="group" aria-label="Color pitches by" style="display: flex; background: #0F1626; border-radius: 3px; padding: 2px">
+<button onClick="{{ byType }}" style="{{ byTypeStyle }}">Pitch type</button>
+<button onClick="{{ byOutcome }}" style="{{ byOutcomeStyle }}">Outcome</button>
+</div>
+<sc-for list="{{ legend }}" as="l" hint-placeholder-count="5">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px"><span style="{{ l.dot }}"></span>{{ l.label }}</span>
+</sc-for>
+</div>
+</div>
+
+<!-- bottom controls -->
+<div style="position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px">
+<div style="background: rgba(7,11,20,0.88); border-left: 4px solid #E8364F; padding: 8px 14px; display: flex; flex-direction: column">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">MIL · RHP · 2026</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px">J. MISIOROWSKI</span>
+</div>
+<div style="display: flex; gap: 8px; align-items: center">
+<div role="group" aria-label="Camera" style="display: flex; background: rgba(7,11,20,0.88); border: 1px solid #2A3650; border-radius: 4px; padding: 4px; font-family: 'Barlow Condensed', sans-serif">
+<sc-for list="{{ views }}" as="v" hint-placeholder-count="5">
+<button aria-pressed="{{ v.sel }}" onClick="{{ v.pick }}" style="{{ v.style }}">{{ v.label }}</button>
+</sc-for>
+</div>
+<button aria-pressed="false" style="height: 44px; padding: 0 14px; border-radius: 4px; border: 1px solid #2A3650; background: rgba(7,11,20,0.88); color: #F3F5F9; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 1px">HEAT</button>
+<button aria-label="Scene settings" style="width: 44px; height: 44px; border-radius: 4px; border: 1px solid #2A3650; background: rgba(7,11,20,0.88); color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg></button>
+</div>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tab: 'arsenal', hidden: {}, colorBy: 'type', view: 'FRONT' }; }
+  renderVals() {
+    const s = this.state;
+    const tabBase = 'height: 46px; padding: 0 12px; border: 0; background: transparent; font-size: 14px; display: flex; align-items: center; margin-bottom: -1px;';
+    const tabs = [['arsenal', 'Arsenal', null], ['filters', 'Filters', '2'], ['games', 'Games', null]].map(([id, label, badge]) => ({
+      label, badge, sel: s.tab === id ? 'true' : 'false',
+      style: tabBase + (s.tab === id ? 'color: #F3F5F9; font-weight: 700; border-bottom: 3px solid #E8364F' : 'color: #9AA6BD; font-weight: 600; border-bottom: 3px solid transparent'),
+      pick: () => this.setState({ tab: id })
+    }));
+    const raw = [['Four-Seam', '#F0505A', '100.6', 64, 1904], ['Cutter', '#F5A524', '95.8', 14, 420], ['Slider', '#B392F0', '91.8', 11, 325], ['Curveball', '#4C8DF6', '88.0', 10, 313], ['Changeup', '#2DD4BF', '92.5', 1, 28], ['Sinker', '#FB7C3C', '100.6', 0, 3]];
+    let shown = 0;
+    const arsenal = raw.map(([name, c, mph, pct, n]) => {
+      const on = !s.hidden[name]; if (on) shown += n;
+      return {
+        name, mph, use: pct + '% · ' + n.toLocaleString(), on: on ? 'true' : 'false',
+        toggle: () => this.setState({ hidden: Object.assign({}, s.hidden, { [name]: on }) }),
+        rowStyle: 'width: 100%; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 8px; border: 0; border-radius: 4px; background: transparent; color: #F3F5F9; opacity: ' + (on ? '1' : '0.4'),
+        boxStyle: 'width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; ' + (on ? 'background: ' + c : 'border: 2px solid ' + c + '; background: transparent'),
+        barStyle: 'display: block; height: 4px; width: ' + Math.max(pct, 1) + '%; background: ' + c
+      };
+    });
+    const chip = (on, extra) => 'height: 34px; padding: 0 12px; border-radius: 17px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; ' + (on ? 'background: #F3F5F9; color: #070B14; border: 1px solid #F3F5F9' : 'background: transparent; color: #C4CCDB; border: 1px solid #2A3650') + (extra || '');
+    const outcomes = [['Swinging strike', '#F0505A', true], ['Called strike', '#F5A524', true], ['Ball', '#4C8DF6', false], ['Foul', '#9AA6BD', false], ['In play', '#22C55E', false]].map(([label, c, on]) => ({ label, on: on ? 'true' : 'false', style: chip(on), dot: 'width: 8px; height: 8px; border-radius: 50%; background: ' + c }));
+    const results = ['Strikeout', 'Walk', 'Hit', 'Home run', 'Out', 'HBP'].map((label) => ({ label, on: 'false', style: chip(false) }));
+    const games = [['MIL @ TB', 'Oct 28'], ['TB @ MIL', 'Oct 23'], ['LAD @ MIL', 'Oct 11'], ['SD @ MIL', 'Oct 3'], ['STL @ MIL', 'Sep 27'], ['MIL @ BAL', 'Sep 20'], ['MIL @ PIT', 'Sep 15'], ['CHC @ MIL', 'Sep 8'], ['MIL @ CHC', 'Sep 2'], ['MIL @ NYM', 'Aug 27']].map(([m, d]) => ({ m, d }));
+    const seg = (on) => 'flex: 1; height: 28px; border: 0; border-radius: 2px; font-size: 12px; font-weight: 600; ' + (on ? 'background: #F3F5F9; color: #070B14' : 'background: transparent; color: #C4CCDB');
+    const dot = (c) => 'width: 10px; height: 10px; border-radius: 50%; background: ' + c;
+    const legend = s.colorBy === 'type'
+      ? raw.slice(0, 5).map(([label, c]) => ({ label, dot: dot(c) }))
+      : [['Swinging strike', '#F0505A'], ['Called strike', '#F5A524'], ['Ball', '#4C8DF6'], ['Foul', '#9AA6BD'], ['In play', '#22C55E']].map(([label, c]) => ({ label, dot: dot(c) }));
+    const views = ['FRONT', 'BACK', 'TOP', 'SIDE', 'TUNNEL'].map((label) => ({
+      label, sel: s.view === label ? 'true' : 'false', pick: () => this.setState({ view: label }),
+      style: 'height: 36px; padding: 0 12px; border: 0; border-radius: 2px; font-family: inherit; font-weight: 700; font-size: 16px; letter-spacing: 1px; ' + (s.view === label ? 'background: #F3F5F9; color: #070B14' : 'background: transparent; color: #C4CCDB')
+    }));
+    return {
+      tabs, arsenal, outcomes, results, games, legend, views,
+      isArsenal: s.tab === 'arsenal', isFilters: s.tab === 'filters', isGames: s.tab === 'games',
+      bug: [{ k: 'K', v: '252' }, { k: 'WHIFF%', v: '17.1' }, { k: 'CSW%', v: '33.4' }, { k: 'FB MPH', v: '100.6' }],
+      chips: [{ k: 'Season', v: '2026' }, { k: 'Batter', v: 'vs LHB' }, { k: 'Outcome', v: 'Strikes' }],
+      countLabel: shown.toLocaleString() + ' PITCHES',
+      goFilters: () => this.setState({ tab: 'filters' }),
+      byType: () => this.setState({ colorBy: 'type' }), byOutcome: () => this.setState({ colorBy: 'outcome' }),
+      byTypeStyle: seg(s.colorBy === 'type'), byOutcomeStyle: seg(s.colorBy === 'outcome')
+    };
+  }
+}
+</script>
+</body>
+</html>

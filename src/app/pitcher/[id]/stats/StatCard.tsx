@@ -21,19 +21,17 @@ export function StatCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg bg-white/[0.03] border border-white/10 p-4 space-y-3">
-      <div className="flex items-baseline justify-between gap-3">
+    <section className="bg-surface border border-line rounded-control overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-[18px] py-3 bg-surface-2 border-b border-line">
         <div className="flex items-center gap-2 min-w-0">
-          <h3 className="text-xs uppercase tracking-[0.14em] text-white/75 font-medium">
+          <h3 className="m-0 font-display font-bold text-lg uppercase leading-none text-ink">
             {title}
           </h3>
           {help ? <HelpButton title={title}>{help}</HelpButton> : null}
         </div>
-        {hint ? (
-          <span className="text-[10px] text-white/40">{hint}</span>
-        ) : null}
+        {hint ? <span className="text-xs text-muted">{hint}</span> : null}
       </div>
-      {children}
+      <div className="p-4 space-y-3">{children}</div>
     </section>
   );
 }

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Explore mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+input,select{font-family:Inter,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+.xchip{height:40px;padding:0 14px;border-radius:20px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;background:transparent;color:#C4CCDB;border:1px solid #2A3650}
+.xchip[aria-pressed="true"]{background:#F3F5F9;color:#070B14;border-color:#F3F5F9}
+.cbtn{height:44px;border-radius:4px;border:1px solid #2A3650;background:transparent;color:#C4CCDB;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px}
+.cbtn[aria-pressed="true"]{background:#F3F5F9;color:#070B14;border-color:#F3F5F9}
+.zbtn{border:1px solid #2A3650;background:#0F1626;color:#9AA6BD;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px}
+.zbtn[aria-pressed="true"]{background:#E8364F;color:#FFFFFF;border-color:#E8364F}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif">
+<header style="height: 56px; padding: 0 4px 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1B2438; background: #0A101C">
+<a href="HomeMobile.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 24px">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<div style="display: flex">
+<button aria-label="Search" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg></button>
+<button aria-label="Menu" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button>
+</div>
+</header>
+<div style="padding: 12px 16px; display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid #1B2438">
+<span style="flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 16px; background: #1E2A40; font-size: 13px; font-weight: 600; display: flex; align-items: center">Misiorowski</span>
+<span style="flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 16px; background: #1E2A40; font-size: 13px; font-weight: 600; display: flex; align-items: center">Slider, Sweeper</span>
+<span style="flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 16px; background: #1E2A40; font-size: 13px; font-weight: 600; display: flex; align-items: center">2-strike</span>
+<span style="flex-shrink: 0; height: 32px; padding: 0 12px; border-radius: 16px; background: #1E2A40; font-size: 13px; font-weight: 600; display: flex; align-items: center">Whiff</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid #1B2438">
+<div style="padding: 10px 16px; display: flex; flex-direction: column"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCHES</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">{{ count }}</span></div>
+<div style="padding: 10px 16px; display: flex; flex-direction: column; border-left: 1px solid #1B2438"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">AVG MPH</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">91.8</span></div>
+<div style="padding: 10px 16px; display: flex; flex-direction: column; border-left: 1px solid #1B2438"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">AVG SPIN</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px">2,530</span></div>
+</div>
+<div style="position: relative; height: 420px; overflow: hidden">
+<img src="/_blob/6232af7d81a694a91e21900a4a3e99a4" alt="3D scene of matching pitches" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+<svg aria-hidden="true" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<path d="M195 446 Q198 440 192 424" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="192" cy="424" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q183 427 201 525" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="201" cy="525" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q159 472 120 516" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="120" cy="516" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q201 460 228 524" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="228" cy="524" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q200 482 195 546" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="195" cy="546" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q212 466 217 498" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="217" cy="498" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q225 453 241 461" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="241" cy="461" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q203 457 200 474" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="200" cy="474" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q201 465 196 497" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="196" cy="497" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q189 486 240 611" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="240" cy="611" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q196 450 225 592" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="225" cy="592" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q158 454 156 601" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="156" cy="601" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q225 457 240 473" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="240" cy="473" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q198 451 228 595" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="228" cy="595" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q205 472 203 515" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="203" cy="515" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q192 483 181 547" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="181" cy="547" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q193 453 182 462" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="182" cy="462" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q208 450 210 453" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="210" cy="453" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q173 467 145 503" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="145" cy="503" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q204 464 201 494" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="201" cy="494" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q197 462 220 529" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="220" cy="529" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q170 490 204 623" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="204" cy="623" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q210 467 214 503" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="214" cy="503" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q196 481 225 680" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="225" cy="680" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q202 454 235 603" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="235" cy="603" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q170 461 140 484" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="140" cy="484" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q199 440 194 423" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="194" cy="423" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q230 484 314 606" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="314" cy="606" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q187 481 171 542" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="171" cy="542" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q163 486 165 693" stroke="#4C8DF6" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="165" cy="693" r="3.0" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M195 446 Q194 476 184 528" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="184" cy="528" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q209 469 210 506" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="210" cy="506" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q204 464 234 535" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="234" cy="535" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q221 463 233 491" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="233" cy="491" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q202 484 198 549" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="198" cy="549" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q167 481 200 595" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="200" cy="595" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M195 446 Q204 463 202 490" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="202" cy="490" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q205 459 203 477" stroke="#F0505A" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="203" cy="477" r="3.0" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M195 446 Q216 458 255 518" stroke="#F5A524" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="255" cy="518" r="3.0" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M195 446 Q202 486 262 610" stroke="#B392F0" stroke-width="1.6" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="262" cy="610" r="3.0" fill="#B392F0" fill-opacity="0.9"></circle>
+</svg>
+</div>
+<button onClick="{{ openSheet }}" style="position: absolute; left: 16px; right: 16px; bottom: 24px; height: 56px; border-radius: 8px; border: 0; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.5)">EDIT FILTERS <span style="background: rgba(0,0,0,0.25); border-radius: 12px; padding: 0 9px; font-size: 16px">6</span></button>
+
+<sc-if value="{{ sheet }}" hint-placeholder-val="{{ true }}">
+<div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(7,11,20,0.6)"></div>
+<section aria-label="Filters" style="position: absolute; left: 0; right: 0; top: 120px; bottom: 0; background: #0A101C; border-top: 1px solid #2A3650; border-radius: 16px 16px 0 0; display: flex; flex-direction: column">
+<button onClick="{{ closeSheet }}" aria-label="Close filters" style="height: 24px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><span style="width: 40px; height: 4px; border-radius: 2px; background: #5A6A88"></span></button>
+<div role="tablist" aria-label="Filter groups" style="display: flex; padding: 0 8px; border-bottom: 1px solid #1B2438; flex-shrink: 0">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4"><button role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+</div>
+<div style="flex-grow: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 20px; min-height: 0">
+<sc-if value="{{ isWhen }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">COUNT · BALLS ACROSS, STRIKES DOWN</span>
+<div style="display: flex; gap: 6px; overflow-x: auto"><button class="xchip" aria-pressed="false">Ahead</button><button class="xchip" aria-pressed="false">Even</button><button class="xchip" aria-pressed="false">Behind</button><button class="xchip" aria-pressed="true">2 strikes</button><button class="xchip" aria-pressed="false">3 balls</button></div>
+<div style="display: grid; grid-template-columns: 24px repeat(4, minmax(0, 1fr)); gap: 6px; align-items: center">
+<span></span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">0</span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">1</span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">2</span><span style="text-align: center; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">3</span>
+<sc-for list="{{ countRows }}" as="r" hint-placeholder-count="3"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600; text-align: center">{{ r.s }}</span><sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="4"><button class="cbtn" aria-pressed="{{ c.on }}" onClick="{{ c.toggle }}">{{ c.label }}</button></sc-for></sc-for>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">SEASONS</span><div style="display: flex; gap: 6px; overflow-x: auto"><button class="xchip" aria-pressed="true">2026</button><button class="xchip" aria-pressed="false">2025</button><button class="xchip" aria-pressed="false">2024</button><button class="xchip" aria-pressed="false">2023</button></div></div>
+</sc-if>
+<sc-if value="{{ isOutcome }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 10px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCH RESULT</span><div style="display: flex; flex-wrap: wrap; gap: 6px"><button class="xchip" aria-pressed="true">Whiff</button><button class="xchip" aria-pressed="false">Called strike</button><button class="xchip" aria-pressed="false">Foul</button><button class="xchip" aria-pressed="false">Ball</button><button class="xchip" aria-pressed="false">In play</button></div></div>
+<div style="display: flex; flex-direction: column; gap: 10px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">ZONE · CATCHER VIEW</span>
+<div role="group" aria-label="Strike zone picker" style="position: relative; width: 240px; height: 290px; align-self: center">
+<sc-for list="{{ chase }}" as="z" hint-placeholder-count="4"><button class="zbtn" aria-pressed="{{ z.on }}" aria-label="Zone {{ z.n }}" onClick="{{ z.toggle }}" style="{{ z.pos }}">{{ z.n }}</button></sc-for>
+<div style="position: absolute; left: 40px; top: 48px; width: 160px; height: 194px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; background: #070B14; padding: 2px; box-sizing: border-box; border: 2px solid #C4CCDB">
+<sc-for list="{{ zones }}" as="z" hint-placeholder-count="9"><button class="zbtn" aria-pressed="{{ z.on }}" aria-label="Zone {{ z.n }}" onClick="{{ z.toggle }}" style="border: 0">{{ z.n }}</button></sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isOther }}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; font-size: 14px; color: #9AA6BD">Same controls as desktop, stacked: pitcher and batter name search, hand toggles, grouped pitch-type chips with "Select all" per group.</p>
+</sc-if>
+</div>
+<div style="flex-shrink: 0; display: flex; gap: 10px; padding: 12px 20px 24px; border-top: 1px solid #1B2438">
+<button style="height: 52px; padding: 0 18px; border-radius: 4px; border: 1px solid #2A3650; background: transparent; color: #F3F5F9; font-size: 15px; font-weight: 600">Clear</button>
+<button onClick="{{ closeSheet }}" style="flex-grow: 1; height: 52px; border-radius: 4px; border: 0; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: 1px">SHOW {{ count }} PITCHES</button>
+</div>
+</section>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { sheet: true, tab: 'when', counts: { '0-2': true, '1-2': true, '2-2': true, '3-2': true }, zones: { 13: true, 14: true } }; }
+  renderVals() {
+    const s = this.state, self = this;
+    const tog = (k, key) => () => self.setState({ [k]: Object.assign({}, self.state[k], { [key]: !self.state[k][key] }) });
+    const tabs = [['who', 'Who'], ['what', 'What'], ['when', 'When'], ['outcome', 'Outcome']].map(([id, label]) => ({ label, sel: s.tab === id ? 'true' : 'false', pick: () => self.setState({ tab: id }),
+      style: 'flex: 1; height: 46px; border: 0; background: transparent; font-size: 14px; margin-bottom: -1px; ' + (s.tab === id ? 'color: #F3F5F9; font-weight: 700; border-bottom: 3px solid #E8364F' : 'color: #9AA6BD; font-weight: 600; border-bottom: 3px solid transparent') }));
+    const countRows = [0, 1, 2].map((st) => ({ s: st, cells: [0, 1, 2, 3].map((b) => { const k = b + '-' + st; return { label: k, on: s.counts[k] ? 'true' : 'false', toggle: tog('counts', k) }; }) }));
+    const zones = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ n, on: s.zones[n] ? 'true' : 'false', toggle: tog('zones', n) }));
+    const cpos = { 11: 'left: 0; top: 0; border-radius: 6px 0 0 0', 12: 'right: 0; top: 0; border-radius: 0 6px 0 0', 13: 'left: 0; bottom: 0; border-radius: 0 0 0 6px', 14: 'right: 0; bottom: 0; border-radius: 0 0 6px 0' };
+    const chase = [11, 12, 13, 14].map((n) => ({ n, on: s.zones[n] ? 'true' : 'false', toggle: tog('zones', n), pos: 'position: absolute; width: 120px; height: 145px; display: flex; padding: 8px; ' + (n % 2 ? 'justify-content: flex-start; ' : 'justify-content: flex-end; ') + (n < 13 ? 'align-items: flex-start; ' : 'align-items: flex-end; ') + cpos[n] }));
+    const nc = Object.keys(s.counts).filter((k) => s.counts[k]).length, nz = Object.keys(s.zones).filter((k) => s.zones[k]).length;
+    const count = Math.max(1, Math.round(2994 * 0.22 * 0.42 * (nc ? nc / 12 : 1) * 0.17 * (nz ? nz / 13 : 1) * 40)).toLocaleString();
+    return { tabs, countRows, zones, chase, count, sheet: s.sheet, isWhen: s.tab === 'when', isOutcome: s.tab === 'outcome', isOther: s.tab === 'who' || s.tab === 'what',
+      openSheet: () => self.setState({ sheet: true }), closeSheet: () => self.setState({ sheet: false }) };
+  }
+}
+</script>
+</body>
+</html>

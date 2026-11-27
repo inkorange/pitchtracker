@@ -29,6 +29,8 @@ interface RibbonProps {
   // When set, picks the pitcher A vs B palette variant; otherwise uses
   // the default semantic color.
   side?: CompareSide;
+  /** Overrides the pitch-type color (e.g. "color by outcome"). */
+  color?: string;
   opacity?: number;
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
@@ -41,6 +43,7 @@ export function Ribbon({
   radius = 0.09,
   drawProgress = 1,
   side,
+  color: colorOverride,
   opacity = 1,
   onPointerOver,
   onPointerOut,
@@ -77,7 +80,7 @@ export function Ribbon({
   );
   geometry.setDrawRange(0, visibleSegments * INDICES_PER_SEGMENT);
 
-  const color = side ? getPitchColorForSide(pitchType, side) : getPitchColor(pitchType);
+  const color = colorOverride ?? (side ? getPitchColorForSide(pitchType, side) : getPitchColor(pitchType));
 
   // Material is always transparent so toggling opacity at runtime works
   // without needing material.needsUpdate. depthWrite is gated on near-

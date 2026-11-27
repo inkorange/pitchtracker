@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { effectiveSeasonType, isPostseasonGameType, matchesSeasonType } from "@/lib/pitcher/season-type";
 import { createClient } from "@/lib/supabase/server";
 import { botIdGuard } from "@/lib/botid-guard";
 import { categorizeDescription, type OutcomeCategory } from "@/lib/viz/colors";
@@ -100,10 +101,14 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // batter-agnostic scene and the batter-scoped stats view.
   type PitchRow = SavantSeasonPitchRow;
   const season_data = await loadSavantSeason(pitcherId, season);
+  // ?seasonType (default regular season; a selected game overrides it).
+  // Seasons without postseason games ignore it, like the page server.
+  const hasPostseason = season_data.pitches.some((p) => isPostseasonGameType(p.pitch_games?.game_type));
+  const seasonType = hasPostseason ? effectiveSeasonType(sp.get("seasonType"), game) : "all";
   const pitchesRaw: PitchRow[] = filterSeasonPitches(season_data.pitches, {
     hand,
     gamePk: game ? Number(game) : null,
-  });
+  }).filter((p) => matchesSeasonType(p.pitch_games?.game_type, seasonType));
 
   const { data: pitcher } = await pitcherPromise;
 

@@ -19,6 +19,8 @@ export interface FilterSummaryInput {
   game: { game_date: string; opponentName: string | null } | null;
   veloMin: number | null;
   veloMax: number | null;
+  /** Season type when the season has postseason games; omitted = plain "in {season}". */
+  seasonType?: "reg" | "post" | "all" | null;
   /** Resolved name for `?vsBatter=<id>`. When present, the summary
    *  injects "vs <batter>" so the user knows the view is narrowed
    *  to that matchup. Hand and game filters still render normally. */
@@ -138,7 +140,13 @@ export function buildFilterSummary(input: FilterSummaryInput): string {
     const opp = input.game.opponentName ? ` vs ${input.game.opponentName}` : "";
     parts.push(`from ${input.game.game_date}${opp}`);
   } else {
-    parts.push(`in ${input.season}`);
+    parts.push(
+      input.seasonType === "reg"
+        ? `in the ${input.season} regular season`
+        : input.seasonType === "post"
+          ? `in the ${input.season} postseason`
+          : `in ${input.season}`,
+    );
   }
 
   return parts.join(" ");

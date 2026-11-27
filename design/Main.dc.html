@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Homepage</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+.num{font-variant-numeric:tabular-nums}
+.crawl{animation:ptcrawl 45s linear infinite}
+.crawl-wrap:hover .crawl{animation-play-state:paused}
+@keyframes ptcrawl{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion: reduce){.crawl{animation:none}.crawl-wrap{overflow-x:auto}}
+.draw{stroke-dasharray:100;stroke-dashoffset:100;animation:ptdraw 4.5s ease-out infinite}
+.draw:nth-of-type(3n+1){animation-delay:.25s}
+.draw:nth-of-type(3n+2){animation-delay:.5s}
+.pop{opacity:0;animation:ptpop 4.5s ease-out infinite}
+.fadein{animation:ptfade .35s ease .18s both}
+@keyframes ptfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes ptdraw{0%{stroke-dashoffset:100;opacity:1}35%{stroke-dashoffset:0}85%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+@keyframes ptpop{0%,30%{opacity:0}42%,85%{opacity:.9}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){.fadein{animation:none}.draw{animation:none;stroke-dashoffset:0}.pop{animation:none;opacity:.9}}
+</style>
+</helmet>
+<div style="background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; min-height: 100%">
+
+<!-- NAV -->
+<header style="border-bottom: 1px solid #1B2438; background: #0A101C">
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 32px; flex-wrap: wrap">
+<a href="#" style="display: flex; align-items: baseline; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.5px; color: #F3F5F9">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<nav aria-label="Primary" style="display: flex; gap: 28px; font-size: 14px; font-weight: 500; flex-grow: 1">
+<a href="Pitchers.dc.html" style="color: #C4CCDB">Pitchers</a>
+<a href="Teams.dc.html" style="color: #C4CCDB">Teams</a>
+<a href="AtBatReplays.dc.html" style="color: #C4CCDB">At-bat replays</a>
+<a href="Explore.dc.html" style="color: #C4CCDB">Explore</a>
+<a href="#" style="color: #C4CCDB">Ask PitchTracker</a>
+</nav>
+<a href="Pitchers.dc.html" style="height: 40px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 10px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 14px; font-weight: 600">Find a pitcher<span style="font-size: 12px; padding: 2px 6px; border-radius: 3px; background: rgba(0,0,0,0.25)">⌘K</span></a>
+</div>
+</header>
+
+<!-- HERO -->
+<section style="position: relative; overflow: hidden; isolation: isolate; border-bottom: 1px solid #1B2438; background: #070B14">
+<div aria-hidden="true" style="position: absolute; inset: 0; z-index: -1">
+<img src="/_blob/faff1a5efdb390bedbe70b3e69b0ce88" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 45%">
+<div style="position: absolute; inset: 0; background: linear-gradient(90deg, rgba(7,11,20,0.95) 0%, rgba(7,11,20,0.82) 42%, rgba(7,11,20,0.45) 100%)"></div>
+<div style="position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: linear-gradient(180deg, rgba(7,11,20,0) 0%, rgba(7,11,20,0.85) 100%)"></div>
+</div>
+<div style="max-width: 1240px; margin: 0 auto; padding: 72px 32px 64px; display: flex; flex-wrap: wrap; gap: 56px; align-items: center">
+<div style="flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; padding: 4px 14px 4px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">STATCAST IN 3D</span>
+<span style="font-size: 13px; color: #9AA6BD; letter-spacing: 0.5px">2025 &amp; 2026 seasons</span>
+</div>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 92px; line-height: 0.9; letter-spacing: -0.5px; text-transform: uppercase">See the pitch<br><span style="color: #E8364F">the hitter saw.</span></h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.55; color: #C4CCDB; max-width: 520px">PitchTracker rebuilds every MLB pitch as a full 3D flight path from Statcast tracking. Study tunnels, break and approach angle from any camera — by pitcher, by count side, by at-bat.</p>
+<form style="display: flex; gap: 8px; max-width: 520px">
+<label for="hero-search" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Search a pitcher</label>
+<input id="hero-search" type="search" placeholder="Search a pitcher — try “Misiorowski”" style="flex: 1 1 auto; min-width: 0; height: 52px; padding: 0 18px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 16px; font-family: Inter, sans-serif">
+<button type="submit" style="height: 52px; padding: 0 22px; border: 0; border-radius: 4px; background: #F3F5F9; color: #070B14; font-weight: 700; font-size: 15px; font-family: Inter, sans-serif; cursor: pointer">Search</button>
+</form>
+<div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; font-weight: 600">
+<a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px">Browse all 30 teams <span aria-hidden="true">→</span></a>
+<a href="#" style="display: flex; align-items: center; gap: 8px; min-height: 44px">Replay an at-bat <span aria-hidden="true">→</span></a>
+</div>
+</div>
+
+<!-- broadcast monitor -->
+<figure style="flex: 1 1 560px; min-width: 0; margin: 0; position: relative; aspect-ratio: 16 / 10.5; border-radius: 6px; overflow: hidden; border: 1px solid #2A3650; background: #0F1626">
+<img src="/_blob/919acb456528e5f27426f1b2bdb6bfe2" alt="PitchTracker 3D scene from behind the catcher, showing a season of pitch paths converging on the strike zone" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+<svg aria-hidden="true" viewBox="0 0 1080 840" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<path d="M512 440 Q654 462 760 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="760" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q667 462 783 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="783" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q680 455 807 478" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="807" cy="478" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q694 465 833 507" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="833" cy="507" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q627 483 783 621" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="783" cy="621" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q646 441 745 438" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="745" cy="438" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q670 442 790 439" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="790" cy="439" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q673 444 795 446" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="795" cy="446" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q710 472 862 527" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="862" cy="527" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q664 433 778 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="778" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q682 458 846 533" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="846" cy="533" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q610 492 753 648" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="753" cy="648" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q666 484 854 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="854" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q692 462 830 498" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="830" cy="498" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q665 484 779 561" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="779" cy="561" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q657 483 765 558" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="765" cy="558" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q696 452 837 469" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="837" cy="469" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q696 420 878 536" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="878" cy="536" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q685 493 851 634" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="851" cy="634" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q679 447 846 614" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="846" cy="614" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q675 495 832 640" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="832" cy="640" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q670 472 790 525" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="790" cy="525" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q665 479 853 610" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="853" cy="610" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q646 484 819 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="819" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q677 433 801 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="801" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q668 463 784 499" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="784" cy="499" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q649 495 786 639" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="786" cy="639" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path d="M512 440 Q581 457 668 642" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="668" cy="642" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q695 476 835 538" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="835" cy="538" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q678 482 804 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="804" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q675 470 798 520" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="798" cy="520" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q636 517 799 719" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="799" cy="719" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path d="M512 440 Q639 471 775 684" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="775" cy="684" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q656 449 763 459" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="763" cy="459" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q638 439 731 433" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="731" cy="433" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q644 477 741 540" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="741" cy="540" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q655 508 762 630" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="762" cy="630" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q669 465 787 506" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="787" cy="506" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q669 464 786 504" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="786" cy="504" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q667 462 784 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="784" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q643 471 740 523" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="740" cy="523" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q663 440 777 435" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="777" cy="435" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q699 475 842 534" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="842" cy="534" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q656 477 805 699" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="805" cy="699" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path d="M512 440 Q664 480 778 549" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="778" cy="549" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path d="M512 440 Q654 482 760 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle cx="760" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+</svg>
+<div style="position: absolute; top: 16px; left: 16px; display: flex; align-items: stretch; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 1px; box-shadow: 0 4px 16px rgba(0,0,0,0.35)">
+<span style="background: #0A101C; color: #FFFFFF; padding: 6px 12px; font-size: 18px">MIL</span>
+<span style="background: #F3F5F9; color: #070B14; padding: 6px 14px; font-size: 18px">J. MISIOROWSKI</span>
+<span style="background: #E8364F; color: #FFFFFF; padding: 6px 12px; font-size: 18px">RHP</span>
+</div>
+<div style="position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+<div style="background: rgba(7,11,20,0.88); border-left: 4px solid #E8364F; padding: 10px 16px; display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 11px; letter-spacing: 1.5px; color: #9AA6BD; font-weight: 600">2026 SEASON · ALL PITCHES</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; letter-spacing: 0.5px">2,994 PITCHES · 6-PITCH MIX</span>
+</div>
+<div style="display: flex; background: rgba(7,11,20,0.88); border-radius: 4px; padding: 4px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1px">
+<span style="padding: 6px 12px; background: #F3F5F9; color: #070B14; border-radius: 2px">FRONT</span>
+<span style="padding: 6px 12px; color: #C4CCDB">BACK</span>
+<span style="padding: 6px 12px; color: #C4CCDB">TOP</span>
+<span style="padding: 6px 12px; color: #C4CCDB">SIDE</span>
+<span style="padding: 6px 12px; color: #C4CCDB">TUNNEL</span>
+</div>
+</div>
+</figure>
+</div>
+</section>
+
+<!-- TICKER -->
+<div style="background: #E8364F; color: #FFFFFF; overflow: hidden">
+<div style="display: flex; align-items: center; height: 48px; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: 0.5px">
+<span style="position: relative; z-index: 1; flex-shrink: 0; background: #070B14; height: 100%; display: flex; align-items: center; padding: 0 28px 0 32px; letter-spacing: 1.5px; clip-path: polygon(0 0, 100% 0, 90% 100%, 0 100%)">2026 LEADERS</span>
+<div class="crawl-wrap" style="flex-grow: 1; min-width: 0; height: 100%; overflow: hidden; display: flex; align-items: center">
+<div class="crawl" style="display: flex; align-items: center; width: max-content">
+<sc-for list="{{ tickerLoop }}" as="t" hint-placeholder-count="12">
+<span style="padding: 0 22px; display: flex; gap: 8px; align-items: baseline; border-right: 1px solid rgba(255,255,255,0.35)"><span style="opacity: 0.8; font-size: 15px">{{ t.k }}</span><span>{{ t.name }}</span><span class="num">{{ t.v }}</span></span>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+
+<!-- WHAT IT DOES: approved interactive feature cards -->
+<dc-import name="FeatureExpand" hint-size="100%,760px"></dc-import>
+
+<!-- HIGHLIGHTS -->
+<section style="max-width: 1240px; margin: 0 auto; padding: 56px 32px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; gap: 16px; flex-wrap: wrap">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 32px; letter-spacing: 0.5px; text-transform: uppercase">Daily picks</h2>
+<a href="#" style="font-size: 14px; font-weight: 600; min-height: 44px; display: flex; align-items: center">All daily picks →</a>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{ picks }}" as="p" hint-placeholder-count="2">
+<a href="#" style="display: flex; align-items: stretch; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; overflow: hidden">
+<div style="width: 200px; flex-shrink: 0; position: relative; background: #0A101C">
+<img src="/_blob/919acb456528e5f27426f1b2bdb6bfe2" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 66% 60%; opacity: 0.85">
+<span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center"><span style="width: 52px; height: 52px; border-radius: 50%; background: #E8364F; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M7 4l13 8-13 8z"></path></svg></span></span>
+</div>
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; color: #F6C344">{{ p.label }} · {{ p.date }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 30px; line-height: 1">{{ p.name }}</span>
+<span style="font-size: 15px; color: #C4CCDB">{{ p.desc }}</span>
+<span style="font-size: 13px; color: #9AA6BD">{{ p.vs }}</span>
+</div>
+</a>
+</sc-for>
+</div>
+</section>
+
+<!-- LEADERS -->
+<section style="max-width: 1240px; margin: 0 auto; padding: 40px 32px 72px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; gap: 16px; flex-wrap: wrap">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 32px; letter-spacing: 0.5px; text-transform: uppercase">Leaderboards <span style="color: #9AA6BD; font-weight: 600; font-size: 20px">· 2026 regular season</span></h2>
+<a href="#" style="font-size: 14px; font-weight: 600; min-height: 44px; display: flex; align-items: center">Full leaderboards →</a>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<sc-for list="{{ boards }}" as="b" hint-placeholder-count="6">
+<article style="background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; overflow: hidden">
+<header style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: #131C30; border-bottom: 1px solid #1B2438">
+<div style="display: flex; flex-direction: column">
+<h3 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.5px; text-transform: uppercase">{{ b.title }}</h3>
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">{{ b.sub }}</span>
+</div>
+<button aria-label="What is this stat?" style="width: 32px; height: 32px; border-radius: 50%; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 14px; cursor: pointer">?</button>
+</header>
+<ol style="list-style: none; margin: 0; padding: 6px 0">
+<sc-for list="{{ b.rows }}" as="r" hint-placeholder-count="5">
+<li style="display: flex; align-items: center; gap: 12px; padding: 9px 18px">
+<span style="width: 16px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; color: #9AA6BD">{{ r.rank }}</span>
+<span style="width: 30px; height: 30px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #C4CCDB">{{ r.ini }}</span>
+<span style="flex-grow: 1; font-size: 15px; font-weight: 500">{{ r.name }}</span>
+<span class="num" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px">{{ r.v }}<span style="font-size: 14px; color: #9AA6BD; margin-left: 3px">{{ b.unit }}</span></span>
+</li>
+</sc-for>
+</ol>
+</article>
+</sc-for>
+</div>
+</section>
+
+<!-- FILM ROOM -->
+<section style="background: #0F1626; border-top: 1px solid #1B2438; border-bottom: 1px solid #1B2438">
+<div style="max-width: 1240px; margin: 0 auto; padding: 88px 32px; display: flex; flex-wrap: wrap; gap: 56px; align-items: center">
+<div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; color: #F6C344">FOR COACHES &amp; PLAYER DEVELOPMENT</span>
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 56px; line-height: 0.95; text-transform: uppercase">Built for the film room.</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #C4CCDB">Put a pitcher’s whole arsenal on one screen and show him where his slider peels off the fastball. Scout tomorrow’s starter by what he throws to lefties. Step through the at-bat that got away, one pitch at a time.</p>
+<ul style="margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; font-size: 15px">
+<li style="display: flex; gap: 10px"><span aria-hidden="true" style="color: #E8364F; font-weight: 700">▸</span>Front, back, top &amp; side cameras</li>
+<li style="display: flex; gap: 10px"><span aria-hidden="true" style="color: #E8364F; font-weight: 700">▸</span>Tunnel view across the arsenal</li>
+<li style="display: flex; gap: 10px"><span aria-hidden="true" style="color: #E8364F; font-weight: 700">▸</span>Location heat maps</li>
+<li style="display: flex; gap: 10px"><span aria-hidden="true" style="color: #E8364F; font-weight: 700">▸</span>Split by batter side &amp; outcome</li>
+<li style="display: flex; gap: 10px"><span aria-hidden="true" style="color: #E8364F; font-weight: 700">▸</span>Filter by at-bat result &amp; game</li>
+<li style="display: flex; gap: 10px"><span aria-hidden="true" style="color: #E8364F; font-weight: 700">▸</span>Side-by-side pitcher compare</li>
+</ul>
+</div>
+<figure style="flex: 1 1 520px; min-width: 0; margin: 0; background: #070B14; border: 1px solid #2A3650; border-radius: 6px; padding: 24px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 1px; font-size: 15px; color: #9AA6BD"><span>TUNNEL · SIDE VIEW</span><span>RELEASE → PLATE</span></div>
+<svg role="img" aria-label="Side-view diagram: four-seam, slider and curveball share one path out of the hand, then separate after the decision point" viewBox="0 0 560 260" style="width: 100%; height: auto">
+<line x1="20" y1="230" x2="540" y2="230" stroke="#2A3650" stroke-width="1"></line>
+<line x1="330" y1="20" x2="330" y2="230" stroke="#F6C344" stroke-width="1.5" stroke-dasharray="5 5"></line>
+<text x="336" y="34" fill="#F6C344" font-family="Inter, sans-serif" font-size="12" font-weight="600">DECISION POINT</text>
+<path d="M30 70 C 200 78, 360 90, 530 108" stroke="#F0505A" stroke-width="4" fill="none" stroke-linecap="round"></path>
+<path d="M30 70 C 200 80, 360 104, 530 160" stroke="#B392F0" stroke-width="4" fill="none" stroke-linecap="round"></path>
+<path d="M30 70 C 200 76, 360 118, 530 205" stroke="#4C8DF6" stroke-width="4" fill="none" stroke-linecap="round"></path>
+<circle cx="30" cy="70" r="7" fill="#F3F5F9"></circle>
+<text x="22" y="52" fill="#C4CCDB" font-family="Inter, sans-serif" font-size="12">Release</text>
+<rect x="520" y="95" width="14" height="120" fill="none" stroke="#C4CCDB" stroke-width="1"></rect>
+</svg>
+<div style="display: flex; gap: 20px; font-size: 13px; color: #C4CCDB; flex-wrap: wrap">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #F0505A"></span>Four-Seam</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #B392F0"></span>Slider</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #4C8DF6"></span>Curveball</span>
+<span style="color: #9AA6BD">Illustrative</span>
+</div>
+</figure>
+</div>
+</section>
+
+<!-- ASK -->
+<section style="max-width: 1240px; margin: 0 auto; padding: 88px 32px 40px">
+<div style="background: #0F1626; border: 1px solid #1B2438; border-radius: 6px; padding: 40px; display: flex; flex-wrap: wrap; gap: 32px; align-items: center">
+<div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 44px; line-height: 0.95; text-transform: uppercase">Ask it like you’d ask your analyst.</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.55; color: #C4CCDB">Ask PitchTracker answers natural-language questions by voice or text and drops you into the matching pitches.</p>
+</div>
+<div style="flex: 1 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{ asks }}" as="q" hint-placeholder-count="3">
+<a href="#" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 18px; border: 1px solid #2A3650; border-radius: 4px; font-size: 15px; color: #F3F5F9">“{{ q }}”<span aria-hidden="true" style="color: #E8364F">→</span></a>
+</sc-for>
+</div>
+</div>
+</section>
+
+<!-- FEATURED -->
+<section style="max-width: 1240px; margin: 0 auto; padding: 56px 32px 96px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; gap: 16px; flex-wrap: wrap">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 32px; letter-spacing: 0.5px; text-transform: uppercase">Featured pitchers</h2>
+<a href="#" style="font-size: 14px; font-weight: 600; min-height: 44px; display: flex; align-items: center">Browse by team →</a>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ featured }}" as="p" hint-placeholder-count="6">
+<a href="#" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<span style="width: 48px; height: 48px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #C4CCDB">{{ p.ini }}</span>
+<span style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px; line-height: 1.1">{{ p.name }}</span>
+<span style="font-size: 13px; color: #9AA6BD">{{ p.meta }}</span>
+</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; padding: 4px 8px; border: 1px solid #2A3650; border-radius: 3px; color: #C4CCDB">{{ p.team }}</span>
+</a>
+</sc-for>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer style="border-top: 1px solid #1B2438; background: #0A101C">
+<div style="max-width: 1240px; margin: 0 auto; padding: 40px 32px; display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 1.6; color: #9AA6BD">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 24px; color: #F3F5F9">PITCH<span style="color: #E8364F">TRACKER</span></span>
+<p style="margin: 0">Not affiliated with or endorsed by Major League Baseball, MLB Advanced Media, or any of its clubs. All MLB and Club marks, logos, and player names are trademarks of their respective owners and are used here for identification purposes only.</p>
+<p style="margin: 0">Pitch trajectory and Statcast data: Baseball Savant. Player metadata, schedule, and headshots: MLB Stats API and mlbstatic.com.</p>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":4600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ini = (n) => n.split(' ').map((s) => s[0]).join('').replace('.', '');
+    const mk = (title, sub, unit, rows) => ({ title, sub, unit, rows: rows.map((r, i) => ({ rank: i + 1, name: r[0], v: r[1], ini: ini(r[0]) })) });
+    const ticker = [
+        { k: 'VELO', name: 'M. Miller', v: '101.4' },
+        { k: 'K', name: 'J. Misiorowski', v: '252' },
+        { k: 'WHIFF%', name: 'M. Miller', v: '17.9' },
+        { k: 'CSW%', name: 'M. Miller', v: '36.0' },
+        { k: 'SPIN', name: 'L. Bachar', v: '2713' },
+        { k: 'VAA', name: 'P. Sewald', v: '-3.10°' }
+      ];
+    return {
+      tickerLoop: ticker.concat(ticker, ticker, ticker),
+      features: [
+        { n: '01', title: 'Every pitch in 3D', body: 'Statcast tracking rendered as real flight paths. Orbit the plate or lock to catcher, batter, top or side view.' },
+        { n: '02', title: 'Tunnels you can see', body: 'Overlay the full arsenal and watch where pitches share a lane — and where they split.' },
+        { n: '03', title: 'Arsenal at a glance', body: 'Velocity, usage and counts per pitch type, filtered by outcome, batter side, at-bat result and game.' },
+        { n: '04', title: 'Replay any at-bat', body: 'Step through a plate appearance pitch by pitch, in the order the hitter saw it.' }
+      ],
+      picks: [
+        { label: 'FINAL PITCH OF THE SEASON', date: 'OCT 28', name: 'Jacob Misiorowski', desc: '102.8 mph fastball, swing & miss', vs: 'vs Jonathan Aranda' },
+        { label: 'FINAL WHIFF OF THE SEASON', date: 'OCT 28', name: 'Jacob Misiorowski', desc: '102.8 mph fastball, swing & miss', vs: 'vs Jonathan Aranda' }
+      ],
+      boards: [
+        mk('Top velocity', '4-SEAM AVG', 'mph', [['M. Miller', '101.4'], ['E. Henriquez', '100.7'], ['J. Misiorowski', '100.6'], ['J. Duran', '100.5'], ['A. Muñoz', '99.8']]),
+        mk('Strikeouts', 'SEASON TOTAL', 'K', [['J. Misiorowski', '252'], ['G. Williams', '248'], ['C. Schlittler', '239'], ['D. Cease', '239'], ['C. Sánchez', '231']]),
+        mk('Whiff rate', 'SWINGS & MISSES', '%', [['M. Miller', '17.9'], ['J. Misiorowski', '17.1'], ['D. Lee', '16.1'], ['A. Morejon', '15.7'], ['J. Webb', '15.6']]),
+        mk('CSW rate', 'CALLED + SWINGING', '%', [['M. Miller', '36.0'], ['J. Misiorowski', '33.4'], ['C. Smith', '31.6'], ['G. Williams', '31.6'], ['T. Glasnow', '31.4']]),
+        mk('Spin rate', '4-SEAM AVG', 'rpm', [['L. Bachar', '2713'], ['E. Pérez', '2681'], ['J. Misiorowski', '2635'], ['C. Burns', '2634'], ['M. Meyer', '2614']]),
+        mk('Flattest VAA', '4-SEAM APPROACH', '°', [['P. Sewald', '-3.10'], ['C. Kimbrel', '-3.11'], ['C. Legumina', '-3.22'], ['J. Ryan', '-3.23'], ['G. Sheehan', '-3.29']])
+      ],
+      asks: [
+        'Misiorowski’s sliders to lefties with two strikes',
+        'Who threw the hardest curveball in September?',
+        'Show Cease’s strikeouts from his last start'
+      ],
+      featured: [
+        { name: 'Jacob Misiorowski', meta: 'RHP · 252 K', team: 'MIL', ini: 'JM' },
+        { name: 'Gavin Williams', meta: 'RHP · 248 K', team: 'CLE', ini: 'GW' },
+        { name: 'Dylan Cease', meta: 'RHP · 239 K', team: 'TOR', ini: 'DC' },
+        { name: 'Cam Schlittler', meta: 'RHP · 239 K', team: 'NYY', ini: 'CS' },
+        { name: 'Cristopher Sánchez', meta: 'LHP · 231 K', team: 'PHI', ini: 'CS' },
+        { name: 'Jesús Luzardo', meta: 'LHP', team: 'PHI', ini: 'JL' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

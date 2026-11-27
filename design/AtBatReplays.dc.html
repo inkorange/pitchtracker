@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — At-bat replays</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+input,select{font-family:Inter,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; min-height: 100%">
+<header style="border-bottom: 1px solid #1B2438; background: #0A101C">
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 32px">
+<a href="Main.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 30px; letter-spacing: 0.5px; color: #F3F5F9">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<nav aria-label="Primary" style="display: flex; gap: 28px; font-size: 14px; font-weight: 500; flex-grow: 1">
+<a href="Pitchers.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Pitchers</a>
+<a href="Teams.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Teams</a>
+<a href="AtBatReplays.dc.html" aria-current="page" style="color: #F3F5F9; font-weight: 600; height: 64px; display: flex; align-items: center; border-bottom: 3px solid #E8364F; box-sizing: border-box; padding-top: 3px">At-bat replays</a>
+<a href="Explore.dc.html" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Explore</a>
+<a href="#" style="color: #C4CCDB; height: 64px; display: flex; align-items: center">Ask PitchTracker</a>
+</nav>
+<a href="Pitchers.dc.html" style="height: 40px; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 10px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 14px; font-weight: 600">Find a pitcher<span style="font-size: 12px; padding: 2px 6px; border-radius: 3px; background: rgba(0,0,0,0.25)">⌘K</span></a>
+</div>
+</header>
+<section style="max-width: 1240px; margin: 0 auto; padding: 48px 32px 24px; display: flex; flex-direction: column; gap: 14px">
+<span style="align-self: flex-start; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1.5px; padding: 3px 16px 3px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">AT-BAT REPLAYS</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 64px; line-height: 0.92; text-transform: uppercase">Replay any matchup.</h1>
+<p style="margin: 0; font-size: 17px; line-height: 1.55; color: #C4CCDB; max-width: 680px">Pick a pitcher and a batter to see every plate appearance between them, then step through each one pitch by pitch in 3D. Or browse a game day.</p>
+</section>
+
+<section style="max-width: 1240px; margin: 0 auto; padding: 0 32px; display: flex; flex-direction: column; gap: 18px">
+<div role="tablist" aria-label="Find at-bats by" style="align-self: flex-start; display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 4px">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2"><button role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.pick }}" style="{{ t.style }}">{{ t.label }}</button></sc-for>
+</div>
+
+<sc-if value="{{ isMatch }}" hint-placeholder-val="{{ true }}">
+<form style="display: grid; grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr) 180px auto; gap: 12px; align-items: end; padding: 20px; background: #0F1626; border: 1px solid #1B2438; border-top: 3px solid #E8364F; border-radius: 4px">
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">PITCHER</span>
+<span style="display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C"><span style="width: 32px; height: 32px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #C4CCDB">JM</span><input value="Jacob Misiorowski" aria-label="Pitcher" style="flex-grow: 1; min-width: 0; border: 0; background: transparent; color: #F3F5F9; font-size: 16px; font-weight: 600"><span style="font-size: 12px; color: #9AA6BD">MIL · RHP</span></span></label>
+<span style="height: 52px; display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 26px; color: #E8364F">VS</span>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">BATTER</span>
+<span style="display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C"><span style="width: 32px; height: 32px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #C4CCDB">PC</span><input value="Pete Crow-Armstrong" aria-label="Batter" style="flex-grow: 1; min-width: 0; border: 0; background: transparent; color: #F3F5F9; font-size: 16px; font-weight: 600"><span style="font-size: 12px; color: #9AA6BD">CHC · LHB</span></span></label>
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">SEASONS</span><select style="height: 52px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 15px"><option>All seasons</option><option>2026</option><option>2025</option></select></label>
+<button type="button" style="height: 52px; padding: 0 22px; border-radius: 4px; border: 0; background: #E8364F; color: #FFFFFF; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: 1px">FIND AT-BATS</button>
+</form>
+<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: #9AA6BD">Leave batter empty to see everyone he faced · Try:
+<button style="height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px">Cease vs Ohtani</button>
+<button style="height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px">Sánchez vs Judge</button>
+<button style="height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px">Miller vs Soto</button>
+</div>
+
+<div style="display: flex; align-items: stretch; flex-wrap: wrap; gap: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.5px">
+<span style="background: #0A101C; border: 1px solid #2A3650; padding: 8px 14px; font-size: 20px">J. MISIOROWSKI</span>
+<span style="background: #E8364F; padding: 8px 12px; font-size: 20px">VS</span>
+<span style="background: #F3F5F9; color: #070B14; padding: 8px 14px; font-size: 20px">P. CROW-ARMSTRONG</span>
+<span style="padding: 8px 14px; font-size: 16px; color: #F6C344; display: flex; align-items: center">SAMPLE RESULTS</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<sc-for list="{{ line }}" as="s" hint-placeholder-count="7"><div style="padding: 12px 14px; border-right: 1px solid #1B2438; display: flex; flex-direction: column"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">{{ s.k }}</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; line-height: 1.05">{{ s.v }}</span></div></sc-for>
+</div>
+<div style="background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; overflow: hidden">
+<div style="display: grid; grid-template-columns: 120px 150px 70px minmax(0, 1fr) 160px 120px; gap: 12px; padding: 12px 18px; background: #131C30; font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600"><span>DATE</span><span>GAME</span><span>INN</span><span>PITCH SEQUENCE</span><span>RESULT</span><span></span></div>
+<sc-for list="{{ abs }}" as="a" hint-placeholder-count="5">
+<a href="AtBat.dc.html" style="display: grid; grid-template-columns: 120px 150px 70px minmax(0, 1fr) 160px 120px; gap: 12px; align-items: center; min-height: 56px; padding: 0 18px; border-top: 1px solid #1B2438; font-size: 14px">
+<span style="color: #C4CCDB">{{ a.d }}</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px">{{ a.g }}</span><span style="color: #9AA6BD">{{ a.i }}</span>
+<span style="display: flex; gap: 4px; align-items: center"><sc-for list="{{ a.seq }}" as="c" hint-placeholder-count="5"><span style="{{ c }}"></span></sc-for><span style="margin-left: 8px; font-size: 12px; color: #9AA6BD">{{ a.n }} pitches</span></span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px">{{ a.r }}</span>
+<span style="justify-self: end; height: 36px; padding: 0 14px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 13px; font-weight: 700; display: flex; align-items: center">Replay ▶</span>
+</a>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ isDate }}" hint-placeholder-val="{{ false }}">
+<form style="display: flex; gap: 12px; align-items: end; flex-wrap: wrap; padding: 20px; background: #0F1626; border: 1px solid #1B2438; border-top: 3px solid #E8364F; border-radius: 4px">
+<label style="display: flex; flex-direction: column; gap: 8px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">DATE</span><input type="date" value="2026-10-28" style="height: 52px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 15px; color-scheme: dark"></label>
+<label style="display: flex; flex-direction: column; gap: 8px; flex: 0 1 280px"><span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">TEAM (OPTIONAL)</span><select style="height: 52px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0A101C; color: #F3F5F9; font-size: 15px"><option>All teams</option><option>Milwaukee Brewers</option></select></label>
+<span style="flex-grow: 1; font-size: 13px; color: #9AA6BD; padding-bottom: 16px">Off-season: defaults to the last day with games (Oct 28, 2026), not “yesterday”.</span>
+</form>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<a href="AtBat.dc.html" style="display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">FINAL · OCT 28</span>
+<span style="display: flex; justify-content: space-between; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px"><span>MIL @ TB</span><span style="color: #9AA6BD">[score]</span></span>
+<span style="font-size: 13px; color: #C4CCDB">Starters: J. Misiorowski vs [TB starter] · [n] at-bats</span>
+<span style="font-size: 13px; font-weight: 600; color: #FF6B7A">Pick an at-bat →</span>
+</a>
+</div>
+</sc-if>
+</section>
+<footer style="border-top: 1px solid #1B2438; background: #0A101C; margin-top: 64px">
+<div style="max-width: 1240px; margin: 0 auto; padding: 32px; font-size: 12px; line-height: 1.6; color: #9AA6BD">
+<p style="margin: 0">Not affiliated with or endorsed by Major League Baseball, MLB Advanced Media, or any of its clubs. All MLB and Club marks, logos, and player names are trademarks of their respective owners and are used here for identification purposes only. Pitch trajectory and Statcast data: Baseball Savant. Player metadata, schedule, and headshots: MLB Stats API and mlbstatic.com.</p>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tab: 'match' }; }
+  renderVals() {
+    const s = this.state;
+    const tabs = [['match', 'Matchup'], ['date', 'By game date']].map(([id, label]) => ({ label, sel: s.tab === id ? 'true' : 'false', pick: () => this.setState({ tab: id }),
+      style: 'height: 42px; padding: 0 18px; border: 0; border-radius: 3px; font-size: 14px; ' + (s.tab === id ? 'background: #F3F5F9; color: #070B14; font-weight: 700' : 'background: transparent; color: #C4CCDB; font-weight: 600') }));
+    const C = { f: '#F0505A', s: '#B392F0', c: '#4C8DF6', t: '#F5A524' };
+    const dot = (c) => 'width: 12px; height: 12px; border-radius: 50%; display: inline-block; background: ' + c;
+    const abs = [['May 19, 2026', 'MIL @ CHC', '4th', 'fsfcft', 'Strikeout'], ['May 19, 2026', 'MIL @ CHC', '1st', 'ffs', 'Groundout'], ['Sep 2, 2026', 'MIL @ CHC', '3rd', 'fcfsf', 'Single'], ['Sep 8, 2026', 'CHC @ MIL', '6th', 'sfff', 'Strikeout'], ['Jun 26, 2026', 'CHC @ MIL', '2nd', 'fftsc', 'Walk']]
+      .map(([d, g, i, q, r]) => ({ d, g, i, r, n: q.length, seq: q.split('').map((k) => dot(C[k])) }));
+    const line = [['PA', '[n]'], ['AB', '[n]'], ['H', '[n]'], ['K', '[n]'], ['BB', '[n]'], ['PITCHES', '[n]'], ['WHIFF%', '[n]']].map(([k, v]) => ({ k, v }));
+    return { tabs, abs, line, isMatch: s.tab === 'match', isDate: s.tab === 'date' };
+  }
+}
+</script>
+</body>
+</html>

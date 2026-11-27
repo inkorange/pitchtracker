@@ -12,3 +12,9 @@ export const personHeadshotUrl = pitcherHeadshotUrl;
 export function teamLogoUrl(teamId: number): string {
   return `https://www.mlbstatic.com/team-logos/${teamId}.svg`;
 }
+
+// Club mark drawn for dark backgrounds (no white coin needed). Used by
+// the redesigned Teams pages, which place logos on --surface.
+export function teamLogoOnDarkUrl(teamId: number): string {
+  return `https://www.mlbstatic.com/team-logos/team-cap-on-dark/${teamId}.svg`;
+}

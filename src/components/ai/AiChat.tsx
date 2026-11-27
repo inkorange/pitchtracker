@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { AI_OPEN_EVENT, type AiOpenDetail } from "@/lib/ai/open-chat";
 import { isScreenshotRoute } from "@/lib/url/screenshot-routes";
 
 interface ChatMessage {
@@ -149,6 +150,22 @@ export function AiChat() {
     };
   }, [send]);
 
+  // Open (and optionally ask) from anywhere on the page:
+  //   window.dispatchEvent(new CustomEvent(AI_OPEN_EVENT, { detail: { q } }))
+  // See openAiChat() in src/lib/ai/open-chat.ts.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<AiOpenDetail>).detail ?? {};
+      setOpen(true);
+      if (detail.q) {
+        if (detail.autoSend) sendRef.current(detail.q);
+        else setInput(detail.q);
+      }
+    };
+    window.addEventListener(AI_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(AI_OPEN_EVENT, onOpen);
+  }, []);
+
   const toggleRecording = useCallback(() => {
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) return;
@@ -228,7 +245,9 @@ export function AiChat() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/30 transition hover:scale-105 active:scale-95"
+        // Pitcher pages put "Ask" in their header (top bar / mobile
+        // header) instead; the floating button would sit on the drawer.
+        className={`${pathname.startsWith("/pitcher/") ? "hidden " : ""}fixed bottom-4 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/30 transition hover:scale-105 active:scale-95`}
         aria-label={open ? "Close AI chat" : "Open AI chat"}
       >
         <SparkleIcon />

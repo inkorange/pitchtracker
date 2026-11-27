@@ -25,34 +25,37 @@ export function SiteFooter() {
   const pathname = usePathname();
   if (isScreenshotRoute(pathname)) return null;
   return (
-    <footer className="border-t border-white/[0.06] px-6 py-6 text-[10px] leading-relaxed tracking-[0.04em] text-white/40">
-      <div className="max-w-3xl mx-auto space-y-2">
+    <footer className="border-t border-line bg-bg-raised">
+      <div className="container-page py-8 md:py-10 flex flex-col gap-2.5 md:gap-3 text-xs md:text-[13px] leading-relaxed text-muted">
+        <span className="font-display font-extrabold italic text-2xl text-ink" aria-hidden="true">
+          PITCH<span className="text-accent">TRACKER</span>
+        </span>
         {/* Crawlable link to the AI landing page. Necessary because the
             chat lives behind a floating icon + JS, which Google can't
             see — the link in the footer is what makes the /ai route
             discoverable to search crawlers. */}
-        <p className="text-[11px] text-white/55">
+        <p className="m-0">
           <a
             href="/ai"
-            className="hover:text-white/85 underline-offset-2 hover:underline transition-colors"
+            className="text-ink-2 hover:text-accent-hover underline-offset-2 hover:underline"
           >
             Ask PitchTracker
           </a>{" "}
           — natural-language pitch analysis (voice or text).
         </p>
-        <p>
+        <p className="m-0">
           Not affiliated with or endorsed by Major League Baseball, MLB
           Advanced Media, or any of its clubs. All MLB and Club marks,
           logos, and player names are trademarks of their respective owners
           and are used here for identification purposes only.
         </p>
-        <p>
+        <p className="m-0">
           Pitch trajectory and Statcast data:{" "}
           <a
             href="https://baseballsavant.mlb.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:text-white/70 underline-offset-2 hover:underline transition-colors"
+            className="text-ink-2 hover:text-accent-hover underline-offset-2 hover:underline"
           >
             Baseball Savant
           </a>
@@ -62,7 +65,7 @@ export function SiteFooter() {
             href="https://statsapi.mlb.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:text-white/70 underline-offset-2 hover:underline transition-colors"
+            className="text-ink-2 hover:text-accent-hover underline-offset-2 hover:underline"
           >
             MLB Stats API
           </a>{" "}
@@ -71,7 +74,7 @@ export function SiteFooter() {
             href="https://www.mlbstatic.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="hover:text-white/70 underline-offset-2 hover:underline transition-colors"
+            className="text-ink-2 hover:text-accent-hover underline-offset-2 hover:underline"
           >
             mlbstatic.com
           </a>

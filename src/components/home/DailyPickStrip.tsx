@@ -2,44 +2,41 @@ import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPersonsCached } from "@/lib/statsapi/client";
-import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { atBatPath } from "@/lib/url/pitcher-slug";
+import { SectionHeader } from "./SectionHeader";
 
-// Staleness framing for the picks.
+// Daily picks — design/Main.dc.html "HIGHLIGHTS".
 //
-// The query below takes the newest row with no recency bound, which is
-// right — a pick should never vanish because the cron ran late — but it
-// meant the heading "Today" sat above a pick that was weeks old. Once
-// the postseason ends there is nothing newer to find until Opening Day,
-// so the honest move is to relabel rather than hide: the content is
-// still worth showing, it just isn't "today".
-//
-// The clock read lives here rather than in the component body to keep
-// the render pure (see the react-hooks/purity rule).
+// Staleness framing: the query takes the newest row with no recency
+// bound — a pick should never vanish because the cron ran late — but
+// once the postseason ends there's nothing newer until Opening Day.
+// So the labels switch from "Pitch of the Day" to "Final pitch of the
+// season" rather than hiding the content. The clock read lives here,
+// outside the component body, to keep the render pure.
 const STALE_AFTER_DAYS = 4;
 
-function framePicks(gameDates: Array<string | null>): {
-  isStale: boolean;
-  heading: string;
-} {
+function isStalePick(gameDates: Array<string | null>): boolean {
   const newest = gameDates
     .filter((d): d is string => typeof d === "string" && d.length > 0)
     .sort()
     .pop();
-  if (!newest) return { isStale: false, heading: "Today" };
+  if (!newest) return false;
   // Midday UTC so a date-only value doesn't land on the wrong side of
   // a timezone boundary.
-  const ageDays =
-    (Date.now() - Date.parse(`${newest}T12:00:00Z`)) / 86_400_000;
-  const isStale = ageDays > STALE_AFTER_DAYS;
-  return {
-    isStale,
-    heading: isStale ? `${newest.slice(0, 4)} season` : "Today",
-  };
+  const ageDays = (Date.now() - Date.parse(`${newest}T12:00:00Z`)) / 86_400_000;
+  return ageDays > STALE_AFTER_DAYS;
 }
 
-// Compact strip of the latest two daily picks. Renders nothing (without
-// breaking the page) when the cron hasn't been run yet.
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+/** "2026-10-28" → "OCT 28". */
+export function formatPickDate(iso: string | null): string {
+  if (!iso) return "";
+  const [, m, d] = iso.split("-").map(Number);
+  if (!m || !d) return iso;
+  return `${MONTHS[m - 1]} ${d}`;
+}
+
 export async function DailyPickStrip() {
   const supabase = await createClient();
   const { data: rows } = await supabase
@@ -72,112 +69,81 @@ export async function DailyPickStrip() {
       : Promise.resolve({ data: [] }),
     fetchPersonsCached(Array.from(playerIds)),
   ]);
-  const pitcherById = new Map(
-    (pitcherRows ?? []).map((p) => [p.mlb_id, p.full_name]),
-  );
+  const pitcherById = new Map((pitcherRows ?? []).map((p) => [p.mlb_id, p.full_name]));
   const resolveName = (id: number | null) => {
     if (!id) return "—";
-    return (
-      pitcherById.get(id) ?? batterMap.get(id)?.fullName ?? `Player #${id}`
-    );
+    return pitcherById.get(id) ?? batterMap.get(id)?.fullName ?? `Player #${id}`;
   };
 
-  const { isStale, heading } = framePicks(items.map((f) => f.game_date));
+  const isStale = isStalePick(items.map((f) => f.game_date));
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[10px] uppercase tracking-[0.18em] text-white/55">
-          {heading}
-        </h2>
-        <Link
-          href="/daily"
-          className="text-[10px] uppercase tracking-[0.14em] text-white/45 hover:text-white/80 transition-colors"
-        >
-          All daily picks →
-        </Link>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <section className="container-page py-8 md:py-14" aria-labelledby="picks-h">
+      <SectionHeader
+        id="picks-h"
+        title="Daily picks"
+        aside={
+          <Link
+            href="/daily"
+            className="text-sm font-semibold min-h-11 flex items-center text-ink hover:text-accent-hover"
+          >
+            <span className="md:hidden">All →</span>
+            <span className="hidden md:inline">All daily picks →</span>
+          </Link>
+        }
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map((f) => {
-          const pitcherName = f.pitcher_id
-            ? pitcherById.get(f.pitcher_id) ?? null
-            : null;
-          const batterName = f.batter_id
-            ? batterMap.get(f.batter_id)?.fullName ?? null
-            : null;
+          const pitcherName = f.pitcher_id ? (pitcherById.get(f.pitcher_id) ?? null) : null;
+          const batterName = f.batter_id ? (batterMap.get(f.batter_id)?.fullName ?? null) : null;
           const href = pitcherName
             ? `${atBatPath(f.game_pk, f.at_bat_number, pitcherName, batterName)}?pitch=${f.pitch_number}`
             : `/at-bat/${f.game_pk}/${f.at_bat_number}?pitch=${f.pitch_number}`;
+          const label =
+            f.feature_kind === "pitch_of_the_day"
+              ? isStale
+                ? "Final pitch of the season"
+                : "Pitch of the Day"
+              : isStale
+                ? "Final whiff of the season"
+                : "Whiff of the Week";
           return (
-          <Link
-            key={`${f.feature_kind}-${f.game_date}`}
-            href={href}
-            className="group flex items-center gap-3 px-4 py-3 rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 transition-colors"
-          >
-            {f.pitcher_id ? (
-              <div className="relative w-12 h-12 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+            <Link
+              key={`${f.feature_kind}-${f.game_date}`}
+              href={href}
+              className="group flex flex-col md:flex-row items-stretch bg-surface border border-line rounded-control overflow-hidden text-ink hover:text-ink hover:border-line-strong transition-colors"
+            >
+              <div className="relative h-[150px] md:h-auto md:w-[200px] shrink-0 bg-bg-raised overflow-hidden">
                 <Image
-                  src={pitcherHeadshotUrl(f.pitcher_id, 120)}
+                  src="/field-background.jpg"
                   alt=""
                   fill
-                  sizes="48px"
-                  className="object-cover"
-                  unoptimized
+                  sizes="(min-width: 768px) 200px, 100vw"
+                  className="object-cover object-[50%_45%] opacity-60 transition-transform duration-300 group-hover:scale-105"
                 />
-              </div>
-            ) : null}
-            <div className="flex-1 min-w-0">
-              {/* Show the game date alongside the label. Without it a
-                  frozen pick is indistinguishable from a fresh one on
-                  the homepage — which is exactly how a stale Pitch of
-                  the Day went unnoticed until it was nearly reposted. */}
-              <div className="flex items-baseline gap-2 text-[10px] uppercase tracking-[0.14em] text-white/45">
-                <span>
-                  {f.feature_kind === "pitch_of_the_day"
-                    ? isStale
-                      ? "Final pitch of the season"
-                      : "Pitch of the Day"
-                    : isStale
-                      ? "Final whiff of the season"
-                      : "Whiff of the Week"}
-                </span>
-                <span className="text-white/30 tabular-nums tracking-normal">
-                  {f.game_date}
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="size-[52px] rounded-full bg-accent flex items-center justify-center shadow-lg transition-transform group-hover:scale-110">
+                    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#fff">
+                      <path d="M7 4l13 8-13 8z" />
+                    </svg>
+                  </span>
                 </span>
               </div>
-              <div className="text-sm text-white/95 font-medium truncate">
-                {resolveName(f.pitcher_id)}
+              <div className="px-[18px] py-4 md:px-6 md:py-5 flex flex-col gap-1 md:gap-1.5 min-w-0">
+                {/* Date beside the label: without it a frozen pick is
+                    indistinguishable from a fresh one. */}
+                <span className="font-display font-bold text-sm md:text-[15px] tracking-[1.5px] uppercase text-highlight">
+                  {label} · {formatPickDate(f.game_date)}
+                </span>
+                <span className="font-display font-extrabold text-[26px] md:text-[30px] leading-none">
+                  {resolveName(f.pitcher_id)}
+                </span>
+                {f.reason ? <span className="text-sm md:text-[15px] text-ink-2">{f.reason}</span> : null}
+                {f.batter_id ? (
+                  <span className="text-[13px] text-muted">vs {resolveName(f.batter_id)}</span>
+                ) : null}
               </div>
-              {f.reason ? (
-                <div className="text-[11px] text-white/55 truncate">
-                  {f.reason}
-                </div>
-              ) : null}
-              {/* Batter line as a separate row — adds matchup
-                  narrative without crowding the pitch description. */}
-              {f.batter_id ? (
-                <div className="text-[11px] text-white/40 truncate">
-                  vs {resolveName(f.batter_id)}
-                </div>
-              ) : null}
-            </div>
-            {/* Play-button affordance: circular button with a play
-                triangle, scales + brightens on parent card hover.
-                More clearly says "video / replay" than the prior
-                text link, and reads as the primary call-to-action
-                without competing with the pitcher name above. */}
-            <div
-              aria-hidden
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-white/[0.08] border border-white/15 flex items-center justify-center transition-all duration-200 group-hover:scale-110 group-hover:bg-white/[0.18] group-hover:border-white/30"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="w-4 h-4 fill-white/85 ml-[2px] transition-colors group-hover:fill-white"
-              >
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-          </Link>
+            </Link>
           );
         })}
       </div>

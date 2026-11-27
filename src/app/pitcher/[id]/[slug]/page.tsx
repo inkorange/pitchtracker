@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
 import { absoluteUrl } from "@/lib/url/site";
@@ -17,32 +16,19 @@ import {
   loadSavantSeason,
   type SavantSeasonPitchRow,
 } from "@/lib/cache/savant-season";
-import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
-import { TeamLogo } from "@/components/team/TeamLogo";
+import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import {
   categorizeDescription,
   getPitchLabel,
-  getPitchColor,
   type OutcomeCategory,
 } from "@/lib/viz/colors";
-import { PitcherSearchPopover } from "@/components/chrome/PitcherSearchPopover";
-import { SeasonPicker } from "@/components/filters/SeasonPicker";
 import { HelpButton } from "../stats/HelpButton";
-import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
-import { TOPNAV_BUTTON_CLS, TopNav } from "@/components/chrome/TopNav";
-import { FiltersGate } from "../FiltersGate";
 import { MatchupsPanel } from "../MatchupsPanel";
-import { PitcherCardCollapse } from "../PitcherCardCollapse";
-import {
-  HidablePanel,
-  HiddenWhenCollapsed,
-} from "@/components/chrome/HidablePanel";
-import { AtBatHeader } from "../AtBatHeader";
-import { PitcherBody } from "../PitcherBody";
-import { StatsModeToggle } from "../StatsModeToggle";
-import { PitcherFilters } from "@/components/filters/PitcherFilters";
+import { AtBatOverlays } from "../atbat/AtBatOverlays";
+import { AtBatRail, RailSwitch } from "../atbat/AtBatRail";
 import { PitcherStatsArea } from "../PitcherStatsArea";
-import { PitcherOutcomeLegendGate } from "../PitcherOutcomeLegendGate";
+import type { StatsAtBat } from "../stats/StatsSummary";
+import { groupPlateAppearances } from "@/lib/at-bat/plate-appearances";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
 import { buildPitcherBio, buildPitcherKeywords } from "@/lib/pitcher/bio";
@@ -53,6 +39,19 @@ import {
   type MlbPitcherGameLine,
 } from "@/lib/statsapi/client";
 import { PitcherGameStats } from "../PitcherGameStats";
+import { seasonLine } from "@/lib/pitcher/season-line";
+import { effectiveSeasonType, isPostseasonGameType, matchesSeasonType } from "@/lib/pitcher/season-type";
+import { PitcherTopBar } from "../rail/PitcherTopBar";
+import { RailTabs } from "../rail/RailTabs";
+import { ArsenalToggles } from "../rail/ArsenalToggles";
+import { RailFilters } from "../rail/RailFilters";
+import { RailGames } from "../rail/RailGames";
+import { SeasonSegment } from "../rail/SeasonSegment";
+import { SeasonTypeToggle } from "../rail/SeasonTypeToggle";
+import { SceneChrome } from "../rail/SceneChrome";
+import { MobilePitcherShell } from "../rail/MobilePitcherShell";
+import { ArsenalCards } from "../rail/ArsenalCards";
+import { CommandPalette } from "@/components/chrome/CommandPalette";
 
 interface PageProps {
   params: Promise<{ id: string; slug: string }>;
@@ -77,6 +76,8 @@ interface PageProps {
     // also consumed client-side by AtBatHeader / MatchupsPanel /
     // PitcherStatsView for narrowing and playback.
     vsBatter?: string;
+    // reg (default) | post | all — see lib/pitcher/season-type.ts.
+    seasonType?: string;
     abGame?: string;
     abNum?: string;
   }>;
@@ -424,13 +425,22 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // too: it existed only to populate rows this page no longer reads,
   // and its write-through was a large share of the database's WAL.
   const season_data = await loadSavantSeason(pitcherId, season);
+  // Season type (?seasonType) narrows every pitch-derived surface on the
+  // page; a selected game overrides it. Seasons without postseason games
+  // don't offer the toggle, so "post" there would only empty the page.
+  const postGamePks = new Set(
+    season_data.pitches.filter((p) => isPostseasonGameType(p.pitch_games?.game_type)).map((p) => p.game_pk),
+  );
+  const hasPostseason = postGamePks.size > 0;
+  const seasonType = hasPostseason ? effectiveSeasonType(sp.seasonType, sp.game) : "all";
+  const seasonPitches = season_data.pitches.filter((p) => matchesSeasonType(p.pitch_games?.game_type, seasonType));
 
   // Row-level filters are applied in memory now that the whole season
   // is in hand. filterSeasonPitches is the single definition of what
   // ?hand=, ?game= and ?vsBatter= mean.
   type PitchPageRow = SavantSeasonPitchRow;
   const cachedPitchesAcc: PitchPageRow[] = filterSeasonPitches(
-    season_data.pitches,
+    seasonPitches,
     {
       hand: sp.hand ?? null,
       gamePk: sp.game ? Number(sp.game) : null,
@@ -686,6 +696,65 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     ).length;
   }
 
+  // Stats view: at-bat list for a single game (?game) or a batter
+  // (?vsBatter) — season-wide would be hundreds of rows. Names resolved
+  // here so the client list doesn't need a lookup per batter.
+  let statsAtBats: StatsAtBat[] | null = null;
+  if (sp.game || vsBatterId != null) {
+    const scoped = seasonPitches.filter(
+      (p) =>
+        (!sp.game || p.game_pk === Number(sp.game)) &&
+        (vsBatterId == null || p.batter_id === vsBatterId),
+    );
+    const pas = groupPlateAppearances(
+      scoped.map((p) => ({
+        game_pk: p.game_pk,
+        at_bat_number: p.at_bat_number,
+        pitch_number: p.pitch_number,
+        pitch_type: p.pitch_type,
+        batter_id: p.batter_id,
+        description: p.description,
+        events: p.events,
+        inning: p.inning,
+        inning_topbot: p.inning_topbot,
+        game_date: p.pitch_games?.game_date ?? null,
+      })),
+    ).reverse(); // chronological within the scope
+    const people = await fetchPersonsCached([...new Set(pas.map((x) => x.batterId))]).catch(
+      () => new Map<number, { fullName: string }>(),
+    );
+    statsAtBats = pas.map((x) => ({
+      gamePk: x.gamePk,
+      atBat: x.atBat,
+      date: x.date,
+      inning: x.inning,
+      half: x.half,
+      batterId: x.batterId,
+      batterName: people.get(x.batterId)?.fullName ?? `#${x.batterId}`,
+      sequence: x.sequence,
+      count: x.count,
+      event: x.event,
+    }));
+  }
+  const statsGame =
+    gameLine && activeGameInfo
+      ? {
+          line: gameLine,
+          xbh: xbhInGame,
+          date: activeGameInfo.game_date,
+          opponent: activeGameInfo.opponentName,
+          teamAbbr: team?.abbreviation ?? null,
+        }
+      : null;
+
+  // Rail stat strip — homepage leaderboard definitions, regular season.
+  // Without a game it follows the season type; with one, the rail keeps
+  // the season's regular-season line (the game line shows separately).
+  const line = seasonLine(
+    season_data.pitches.map((p) => ({ ...p, game_type: p.pitch_games?.game_type ?? null })),
+    sp.game ? "reg" : seasonType,
+  );
+
   const filterSummary = buildFilterSummary({
     season,
     pitchTypes,
@@ -695,6 +764,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     game: activeGameInfo,
     veloMin,
     veloMax,
+    seasonType: hasPostseason ? seasonType : null,
     batterName,
     atBat: atBatInfo,
   });
@@ -744,233 +814,143 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
-      <PitcherOutcomeLegendGate>
-        <OutcomeLegend />
-      </PitcherOutcomeLegendGate>
-
-      <TopNav
-        title="Pitcher"
-        summary={filterSummary}
-        rightSlot={
-          <div className="flex items-center gap-1">
-            <Link
-              href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
-              className={TOPNAV_BUTTON_CLS}
-            >
-              Compare
-            </Link>
-            <PitcherSearchPopover />
-          </div>
-        }
-      />
-
-      {/* Card column. Absolute wrapper that holds the pitcher card AND
-          the mobile-only summary banner stacked below it. Flex-col so
-          the summary sits right beneath the card regardless of whether
-          the card is collapsed (short) or expanded (tall + scrolling).
-          `data-pitcher-card-column` marks the wrapper so PitcherStatsArea
-          can anchor below the WHOLE column (card + summary), not just
-          the card section — otherwise the summary banner overlaps the
-          stat cards on mobile in stats mode. */}
-      <HidablePanel
-        positionClass="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
-        panelName="pitcher panel"
-        dataAttribute="data-pitcher-card-column"
+      {/* ── Desktop (lg+): top bar · docked rail · scene overlays ── */}
+      <PitcherTopBar name={pitcher.full_name} season={season} compareHref={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`} />
+      <aside
+        aria-label="Pitcher controls"
+        className="hidden lg:flex flex-col absolute left-0 top-14 bottom-0 w-[384px] z-20 bg-bg-raised border-r border-line"
       >
-      <section
-        data-pitcher-card
-        className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 overflow-y-auto min-h-0"
-      >
-        <PitcherCardCollapse
-          header={
-            <>
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                  <Image
-                    src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
-                    alt=""
-                    fill
-                    sizes="56px"
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  {/* H1 is the pitcher's name; the SEO-friendly
-                      keyword extension ("MLB Statcast data") sits in
-                      a visually-hidden span so the card still reads
-                      as a name + stats line, but Google sees the
-                      full target phrase as the page's heading. */}
-                  <h1 className="text-base font-medium text-white truncate">
-                    {pitcher.full_name}
-                    <span className="sr-only"> MLB Statcast data</span>
-                  </h1>
-                  <div className="text-[11px] text-white/55 tabular-nums flex items-center gap-1.5">
-                    <span>
-                      {pitcher.throws ? `${pitcher.throws}HP` : "—"}
-                      {team ? ` · ${team.abbreviation}` : ""}
-                      {pitcher.debut_year
-                        ? ` · debut ${pitcher.debut_year}`
-                        : ""}
-                    </span>
-                    {bioParagraphs.length > 0 ? (
-                      <HelpButton title="About">
-                        {bioParagraphs.map((p, i) => (
-                          <p key={i}>{p}</p>
-                        ))}
-                      </HelpButton>
-                    ) : null}
-                  </div>
-                </div>
-                {team ? (
-                  <TeamLogo
-                    teamId={team.mlb_id}
-                    size={56}
-                    alt={team.name}
-                    className="hidden sm:block"
-                  />
+        <RailSwitch
+          atBat={<AtBatRail pitcherName={pitcher.full_name} pitcherMeta={[team?.abbreviation, pitcher.throws ? `${pitcher.throws}HP` : null].filter(Boolean).join(" · ")} season={season} />}
+        >
+        <div className="px-5 pt-5 pb-4 flex flex-col gap-4 border-b border-line shrink-0">
+          <div className="flex items-center gap-3.5">
+            <span className="relative size-14 shrink-0 rounded-full bg-avatar overflow-hidden">
+              <Image src={pitcherHeadshotUrl(pitcher.mlb_id, 120)} alt="" fill sizes="56px" className="object-cover" unoptimized />
+            </span>
+            <div className="flex flex-col grow min-w-0">
+              <p role="heading" aria-level={1} className="m-0 font-display font-extrabold text-[30px] leading-none uppercase text-ink truncate">
+                {pitcher.full_name}
+                <span className="sr-only"> MLB Statcast data</span>
+              </p>
+              <span className="mt-1 text-[13px] text-muted flex items-center gap-1.5">
+                {[pitcher.throws ? `${pitcher.throws}HP` : null, team?.name ?? null, pitcher.debut_year ? `debut ${pitcher.debut_year}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {bioParagraphs.length > 0 ? (
+                  <HelpButton title="About">
+                    {bioParagraphs.map((p, i) => (
+                      <p key={i}>{p}</p>
+                    ))}
+                  </HelpButton>
                 ) : null}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <SeasonSegment season={season} available={availableSeasons.length ? availableSeasons : [season]} />
+            <span className="text-xs text-muted">MLB Statcast</span>
+          </div>
+          {hasPostseason && !sp.game ? <SeasonTypeToggle /> : null}
+          <dl className="m-0 grid grid-cols-4 border border-line rounded-control overflow-hidden">
+            {(
+              [
+                ["K", String(line.strikeouts)],
+                ["Whiff%", line.whiffPct != null ? line.whiffPct.toFixed(1) : "—"],
+                ["CSW%", line.cswPct != null ? line.cswPct.toFixed(1) : "—"],
+                ["FB mph", line.fbMph != null ? line.fbMph.toFixed(1) : "—"],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="px-2.5 py-2 flex flex-col bg-surface border-r border-line last:border-r-0 min-w-0">
+                <dt className="text-[10px] tracking-[1px] text-muted font-semibold uppercase">{k}</dt>
+                <dd className="m-0 font-display font-bold text-2xl leading-[1.05] num">{v}</dd>
               </div>
-
-              <SeasonPicker
-                pitcherId={pitcher.mlb_id}
-                season={season}
-                available={availableSeasons.length ? availableSeasons : [season]}
-              />
-
-              {/* Arsenal / Stats mode toggle. Rendered OUTSIDE
-                  FiltersGate — the view toggle is not a per-side
-                  filter and must stay reachable in at-bat playback so
-                  the user can flip over to the batter-scoped stats
-                  view without losing the AB context. Wrapped in
-                  HiddenWhenCollapsed so the panel's compact summary
-                  view (pitcher row + season picker only) doesn't
-                  carry the mode toggle. */}
-              <HiddenWhenCollapsed>
-                <StatsModeToggle />
-              </HiddenWhenCollapsed>
-            </>
+            ))}
+          </dl>
+        </div>
+        <RailTabs
+          countLabel={`${renderable.length.toLocaleString()} pitch${renderable.length === 1 ? "" : "es"}`}
+          countSub={
+            renderable.length > RECENT_RIBBON_CAP
+              ? `${RECENT_RIBBON_CAP.toLocaleString()} recent · rest as paths`
+              : (cachedPitches ?? []).length === 0
+                ? "No pitch data for these filters"
+                : null
           }
-          body={
-            <HiddenWhenCollapsed>
-            <PitcherBody
-              arsenal={
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
-                  {(aggregates ?? []).length === 0 ? (
-                    <div className="text-xs text-white/55 leading-relaxed">
-                      No arsenal data for {season}.
-                    </div>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {aggregates!.map((a) => (
-                        <li key={a.pitch_type} className="space-y-0.5">
-                          <div className="flex items-center gap-2 text-xs tabular-nums">
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ background: getPitchColor(a.pitch_type) }}
-                            />
-                            <span className="text-white/85 flex-1 truncate">
-                              {getPitchLabel(a.pitch_type)}
-                            </span>
-                            <span className="text-white/55">
-                              {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
-                            </span>
-                            <span className="text-white/45 w-16 text-right">
-                              {a.usage_pct != null
-                                ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
-                                : "—"}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              }
-              filters={
-                /* Per-side filters live inside the FiltersGate so they
-                   collapse out of the way when at-bat mode is active. */
-                <FiltersGate>
-                  <div className="border-t border-white/[0.08] pt-3">
-                    <PitcherFilters
-                      arsenal={(aggregates ?? []).map((a) => ({
-                        pitch_type: a.pitch_type,
-                        pitch_count: a.pitch_count,
-                      }))}
-                      games={games}
-                      season={season}
-                      gameStatsSlot={
-                        gameLine ? (
-                          <PitcherGameStats
-                            line={gameLine}
-                            xbh={xbhInGame}
-                            gameDate={activeGameInfo?.game_date ?? null}
-                            opponentName={activeGameInfo?.opponentName ?? null}
-                          />
-                        ) : null
-                      }
-                    />
-                  </div>
-
-                  {renderable.length > 0 && (
-                    <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05] space-y-0.5">
-                      <div>
-                        Rendering {renderable.length} pitch
-                        {renderable.length === 1 ? "" : "es"}
-                      </div>
-                      {renderable.length > RECENT_RIBBON_CAP && (
-                        <div className="text-white/40 text-[10px]">
-                          {RECENT_RIBBON_CAP.toLocaleString()} recent ·{" "}
-                          {(renderable.length - RECENT_RIBBON_CAP).toLocaleString()}{" "}
-                          historical as paths
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {(cachedPitches ?? []).length === 0 && (
-                    <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-                      No pitch trajectory data available for this filter.
-                    </div>
-                  )}
-                </FiltersGate>
-              }
-              matchups={
-                /* Pitcher-vs-batter matchups: typeahead → at-bat list → playback. */
-                <div className="border-t border-white/[0.08] pt-3 space-y-2">
-                  <MatchupsPanel
-                    season={season}
-                    defaultTeamId={defaultMatchupTeamId}
+          arsenal={<ArsenalToggles rows={aggregates} season={season} />}
+          filters={<RailFilters />}
+          games={
+            <RailGames
+              games={games.map((g) => ({ ...g, post: postGamePks.has(g.game_pk) }))}
+              season={season}
+              totalPitches={seasonPitches.length}
+              gameLine={
+                gameLine ? (
+                  <PitcherGameStats
+                    line={gameLine}
+                    xbh={xbhInGame}
+                    gameDate={activeGameInfo?.game_date ?? null}
+                    opponentName={activeGameInfo?.opponentName ?? null}
                   />
-                </div>
+                ) : null
               }
             />
-            </HiddenWhenCollapsed>
+          }
+          matchups={
+            <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
           }
         />
+        </RailSwitch>
+      </aside>
+      <SceneChrome
+        pitchTypes={aggregates.map((a) => a.pitch_type)}
+        gameLabels={Object.fromEntries(games.map((g) => [String(g.game_pk), `${g.away} @ ${g.home} · ${g.game_date}`]))}
+        batterName={batterName}
+        lowerLabel={[team?.abbreviation, pitcher.throws ? `${pitcher.throws}HP` : null, String(season)].filter(Boolean).join(" · ")}
+        lowerValue={pitcher.full_name}
+      />
 
-        {/* At-bat info card: lives outside the collapsing body so it
-            stays on screen on mobile after the auto-collapse. Shows
-            the active matchup's batter, outcome, and game context.
-            Renders nothing when not in at-bat mode. Also collapses
-            with the summary view. */}
-        <HiddenWhenCollapsed>
-          <AtBatHeader season={season} />
-        </HiddenWhenCollapsed>
-      </section>
+      <AtBatOverlays />
 
-      {/* Mobile-only filter-summary banner. Lives in the top nav on
-          desktop. Anchored just below the card via the flex-col
-          wrapper so it tracks the card's bottom edge whether the body
-          is collapsed or expanded. */}
-      <HiddenWhenCollapsed>
-        {filterSummary ? (
-          <div className="sm:hidden flex-shrink-0 text-[12px] leading-snug text-white/85 italic bg-[#081a32]/70 backdrop-blur-md border border-white/10 rounded-md px-3 py-1.5 shadow-lg">
-            {filterSummary}
+      {/* ── Below lg: header · chips · drawer (design/MobileSheetPeek) ── */}
+      <MobilePitcherShell
+        pitcherName={pitcher.full_name}
+        shortName={pitcher.first_name && pitcher.last_name ? `${pitcher.first_name[0]}. ${pitcher.last_name}` : pitcher.full_name}
+        meta={[pitcher.throws ? `${pitcher.throws}HP` : null, team?.abbreviation ?? null, String(season)].filter(Boolean).join(" · ")}
+        pitchCount={renderable.length}
+        totalPitches={seasonPitches.length}
+        season={season}
+        gameLabels={Object.fromEntries(games.map((g) => [String(g.game_pk), `${g.away} @ ${g.home} · ${g.game_date}`]))}
+        batterName={batterName}
+        arsenalCards={<ArsenalCards rows={aggregates} />}
+        arsenalList={<ArsenalToggles rows={aggregates} season={season} />}
+        filters={<RailFilters showReset={false} />}
+        games={
+          <div className="flex flex-col gap-4">
+            <SeasonSegment season={season} available={availableSeasons.length ? availableSeasons : [season]} />
+            {hasPostseason && !sp.game ? <SeasonTypeToggle /> : null}
+            <RailGames
+              games={games.map((g) => ({ ...g, post: postGamePks.has(g.game_pk) }))}
+              season={season}
+              totalPitches={seasonPitches.length}
+              gameLine={
+                gameLine ? (
+                  <PitcherGameStats
+                    line={gameLine}
+                    xbh={xbhInGame}
+                    gameDate={activeGameInfo?.game_date ?? null}
+                    opponentName={activeGameInfo?.opponentName ?? null}
+                  />
+                ) : null
+              }
+            />
           </div>
-        ) : null}
-      </HiddenWhenCollapsed>
-      </HidablePanel>
+        }
+        matchups={
+          <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
+        }
+      />
+      <CommandPalette />
 
       {/* Stats analytics view — sibling of the pitcher card, NOT
           inside it. Renders nothing in arsenal mode. The
@@ -978,7 +958,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           scope banner mirrors the TopNav title and reflects every
           active URL filter (game / pitch type / outcome / event /
           hand / velo / batter / at-bat). */}
-      <PitcherStatsArea filterSummary={filterSummary} />
+      <PitcherStatsArea filterSummary={filterSummary} game={statsGame} atBats={statsAtBats} season={season} hasPostseason={hasPostseason} />
     </>
   );
 }

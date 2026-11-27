@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Stats view mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif}
+</style>
+</helmet>
+<div style="width: 390px; min-height: 1500px; background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif">
+<header style="height: 56px; display: flex; align-items: center; gap: 4px; padding: 0 4px; background: #0A101C; border-bottom: 1px solid #1B2438">
+<a href="MobileSheetPeek.dc.html" aria-label="Back" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<div style="flex-grow: 1; display: flex; flex-direction: column">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 22px; line-height: 1">J. MISIOROWSKI</span>
+<span style="font-size: 12px; color: #9AA6BD">RHP · MIL · 2026</span>
+</div>
+</header>
+<div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid #1B2438">
+<div role="group" aria-label="View" style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 3px">
+<a href="MobileSheetPeek.dc.html" style="flex: 1; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #C4CCDB">3D scene</a>
+<span aria-current="page" style="flex: 1; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 2px; background: #F3F5F9; color: #070B14; font-size: 14px; font-weight: 700">Stats</span>
+</div>
+<label for="sm-game" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Game</label>
+<select id="sm-game" style="height: 48px; padding: 0 12px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 15px; font-family: Inter, sans-serif"><option>Oct 11 · LAD @ MIL</option><option>All games in 2026</option></select>
+</div>
+
+<section style="padding: 20px 16px 0">
+<div style="display: flex; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 10px">
+<span style="background: #F3F5F9; color: #070B14; padding: 4px 12px; font-size: 17px">VS LOS ANGELES</span>
+<span style="background: #E8364F; padding: 4px 10px; font-size: 17px">OCT 11</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #0F1626; border: 1px solid #1B2438; border-top: 3px solid #E8364F; border-radius: 4px">
+<sc-for list="{{ line }}" as="s" hint-placeholder-count="12">
+<div style="padding: 10px; display: flex; flex-direction: column; border-right: 1px solid #1B2438; border-bottom: 1px solid #1B2438">
+<span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">{{ s.k }}</span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.05">{{ s.v }}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section style="padding: 24px 16px 0; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 24px; text-transform: uppercase">By pitch type</h2>
+<span style="font-size: 11px; color: #9AA6BD">sample values</span>
+</div>
+<sc-for list="{{ types }}" as="t" hint-placeholder-count="4">
+<article style="background: #0F1626; border: 1px solid #1B2438; border-left: 4px solid {{ t.c }}; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<h3 style="margin: 0; font-size: 16px; font-weight: 700">{{ t.name }}</h3>
+<span style="font-size: 13px; color: #9AA6BD">{{ t.n }} pitches · {{ t.use }}</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+<div style="display: flex; flex-direction: column"><span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">MPH</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px">{{ t.mph }}</span></div>
+<div style="display: flex; flex-direction: column"><span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">SPIN</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px">{{ t.spin }}</span></div>
+<div style="display: flex; flex-direction: column"><span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">STRIKE%</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px">{{ t.str }}</span></div>
+<div style="display: flex; flex-direction: column"><span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">CSW%</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 22px">{{ t.csw }}</span></div>
+</div>
+</article>
+</sc-for>
+</section>
+
+<section style="padding: 24px 16px 0; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 24px; text-transform: uppercase">Pitch outcomes</h2>
+<div role="img" aria-label="Outcome mix bar" style="display: flex; height: 14px; border-radius: 3px; overflow: hidden">
+<span style="width: 17%; background: #F0505A"></span><span style="width: 18%; background: #F5A524"></span><span style="width: 36%; background: #4C8DF6"></span><span style="width: 17%; background: #9AA6BD"></span><span style="width: 12%; background: #22C55E"></span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 14px">
+<sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="5">
+<span style="display: flex; align-items: center; gap: 8px"><span style="{{ o.dot }}"></span><span style="flex-grow: 1">{{ o.label }}</span><span style="font-weight: 700">{{ o.n }}</span></span>
+</sc-for>
+</div>
+</section>
+
+<section style="padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 0">
+<h2 style="margin: 0 0 10px; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 24px; text-transform: uppercase">At-bats · 19 BF</h2>
+<sc-for list="{{ abs }}" as="a" hint-placeholder-count="4">
+<a href="AtBatMobile.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 56px; border-top: 1px solid #1B2438; font-size: 14px">
+<span style="width: 32px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 16px; color: #9AA6BD">{{ a.inn }}</span>
+<span style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px"><span style="font-weight: 600">{{ a.batter }}</span><span style="display: flex; gap: 3px"><sc-for list="{{ a.seq }}" as="c" hint-placeholder-count="5"><span style="{{ c }}"></span></sc-for></span></span>
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 17px">{{ a.res }}</span>
+<span aria-hidden="true" style="color: #E8364F">▶</span>
+</a>
+</sc-for>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dot = (c, s) => 'width: ' + (s || 10) + 'px; height: ' + (s || 10) + 'px; border-radius: 50%; display: inline-block; background: ' + c;
+    const C = { FF: '#F0505A', SL: '#B392F0', CU: '#4C8DF6', FC: '#F5A524' };
+    const line = [['IP', '4.1'], ['K', '5'], ['BB', '3'], ['H', '5'], ['HR', '0'], ['XBH', '0'], ['ER', '1'], ['BF', '19'], ['PITCHES', '94'], ['STRIKES', '60'], ['BALLS', '34'], ['STRIKE %', '64%']].map(([k, v]) => ({ k, v }));
+    const types = [['Four-Seam', C.FF, 58, '62%', '100.4', '2,610', '68%', '34%'], ['Slider', C.SL, 15, '16%', '91.6', '2,480', '60%', '33%'], ['Curveball', C.CU, 12, '13%', '87.9', '2,890', '58%', '25%'], ['Cutter', C.FC, 9, '10%', '95.5', '2,540', '67%', '22%']].map(([name, c, n, use, mph, spin, str, csw]) => ({ name, c, n, use, mph, spin, str, csw }));
+    const outcomes = [['Swinging strike', '#F0505A', 16], ['Called strike', '#F5A524', 17], ['Ball', '#4C8DF6', 34], ['Foul', '#9AA6BD', 16], ['In play', '#22C55E', 11]].map(([label, c, n]) => ({ label, n, dot: dot(c) }));
+    const seq = (s) => s.split('').map((k) => dot({ f: C.FF, s: C.SL, c: C.CU, t: C.FC }[k], 10));
+    const abs = [['1st', '[Batter 1]', 'fsfcf', 'K'], ['1st', '[Batter 2]', 'ftf', 'Groundout'], ['1st', '[Batter 3]', 'ffsfcf', 'Walk'], ['2nd', '[Batter 4]', 'fcsf', 'K']].map(([inn, batter, s, res]) => ({ inn, batter, res, seq: seq(s) }));
+    return { line, types, outcomes, abs };
+  }
+}
+</script>
+</body>
+</html>

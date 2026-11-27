@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { MlbGameResult } from "@/lib/statsapi/client";
-import { TeamLogo } from "@/components/team/TeamLogo";
+import Image from "next/image";
+import { teamLogoOnDarkUrl } from "@/lib/viz/headshot";
 import { teamNickname } from "@/lib/teams/nicknames";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 
 // Shared game-result card used by:
-//   - the homepage YesterdayGamesStrip
+//   - (formerly) the homepage YesterdayGamesStrip, removed in the redesign
 //   - the /at-bat date listing
 //
 // The team rows are a click target that opens the at-bat browser
@@ -28,93 +29,56 @@ export function GameCard({ game }: GameCardProps) {
   const hasScores = game.away.score != null && game.home.score != null;
   const awayWon = hasScores && awayScore > homeScore;
   const homeWon = hasScores && homeScore > awayScore;
-  const showStatusNote =
-    game.status.detailedState !== "Final" && game.status.detailedState.length > 0;
   const hasDecisions =
     game.decisions.winner || game.decisions.loser || game.decisions.save;
 
+  const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const [, m, d] = game.officialDate.split("-").map(Number);
+  const dateLabel = m && d ? `${MONTHS[m - 1]} ${d}` : game.officialDate;
+  const statusLabel = game.status.detailedState || game.status.abstractGameState;
+
   return (
-    <div className="rounded-lg bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 hover:border-white/20 transition-colors px-3.5 py-3 space-y-2.5">
-      {/* Team rows are the game-link click target. space-y-2 keeps
-          the two 28px team-logo rows from stacking edge-to-edge. */}
-      <Link href={`/at-bat/${game.gamePk}`} className="block space-y-2">
-        <TeamScoreRow
-          teamId={game.away.teamId}
-          score={hasScores ? awayScore : null}
-          won={awayWon}
-          statusChip={showStatusNote ? game.status.detailedState : null}
-        />
-        <TeamScoreRow
-          teamId={game.home.teamId}
-          score={hasScores ? homeScore : null}
-          won={homeWon}
-        />
+    <div className="flex flex-col gap-2.5 px-[18px] py-4 bg-surface border border-line rounded-control hover:border-line-strong transition-colors">
+      <span className="label-caps">
+        {statusLabel} · {dateLabel}
+      </span>
+      {/* Team rows are the game-link click target. */}
+      <Link href={`/at-bat/${game.gamePk}`} className="flex flex-col gap-1.5 text-ink hover:text-ink">
+        <TeamScoreRow teamId={game.away.teamId} score={hasScores ? awayScore : null} won={awayWon} />
+        <TeamScoreRow teamId={game.home.teamId} score={hasScores ? homeScore : null} won={homeWon} />
       </Link>
       {hasDecisions ? (
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] tabular-nums pt-2.5 border-t border-white/[0.06]">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px] num pt-2.5 border-t border-line">
           {game.decisions.winner ? (
-            <DecisionLink
-              color="text-emerald-300/90"
-              tag="W"
-              id={game.decisions.winner.id}
-              name={game.decisions.winner.fullName}
-            />
+            <DecisionLink color="text-[#22c55e]" tag="W" id={game.decisions.winner.id} name={game.decisions.winner.fullName} />
           ) : null}
           {game.decisions.loser ? (
-            <DecisionLink
-              color="text-red-300/90"
-              tag="L"
-              id={game.decisions.loser.id}
-              name={game.decisions.loser.fullName}
-            />
+            <DecisionLink color="text-accent-hover" tag="L" id={game.decisions.loser.id} name={game.decisions.loser.fullName} />
           ) : null}
           {game.decisions.save ? (
-            <DecisionLink
-              color="text-amber-300/90"
-              tag="SV"
-              id={game.decisions.save.id}
-              name={game.decisions.save.fullName}
-            />
+            <DecisionLink color="text-highlight" tag="SV" id={game.decisions.save.id} name={game.decisions.save.fullName} />
           ) : null}
         </div>
       ) : null}
+      <Link href={`/at-bat/${game.gamePk}`} className="text-[13px] font-semibold text-accent-hover hover:text-ink">
+        Pick an at-bat →
+      </Link>
     </div>
   );
 }
 
-function TeamScoreRow({
-  teamId,
-  score,
-  won,
-  statusChip,
-}: {
-  teamId: number;
-  score: number | null;
-  won: boolean;
-  statusChip?: string | null;
-}) {
+function TeamScoreRow({ teamId, score, won }: { teamId: number; score: number | null; won: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <TeamLogo teamId={teamId} size={28} />
+      <span className="relative size-7 shrink-0">
+        <Image src={teamLogoOnDarkUrl(teamId)} alt="" fill sizes="28px" className="object-contain" unoptimized />
+      </span>
       <span
-        className={
-          "text-[14px] flex-1 truncate " +
-          (won ? "text-white font-semibold" : "text-white/75")
-        }
+        className={`flex-1 truncate font-display font-bold text-[22px] leading-tight uppercase ${won ? "text-ink" : "text-ink-2"}`}
       >
         {teamNickname(teamId)}
       </span>
-      {statusChip ? (
-        <span className="text-[9px] uppercase tracking-[0.12em] text-white/40">
-          {statusChip}
-        </span>
-      ) : null}
-      <span
-        className={
-          "text-[16px] tabular-nums w-6 text-right " +
-          (won ? "text-white font-semibold" : "text-white/55")
-        }
-      >
+      <span className={`font-display font-bold text-[24px] num w-8 text-right ${won ? "text-ink" : "text-muted"}`}>
         {score ?? "—"}
       </span>
     </div>
@@ -135,7 +99,7 @@ function DecisionLink({
   return (
     <Link
       href={pitcherPagePath(id, name)}
-      className="inline-flex items-baseline gap-1 hover:underline underline-offset-2 decoration-white/30"
+      className="inline-flex items-baseline gap-1 text-ink-2 hover:text-ink hover:underline underline-offset-2"
     >
       <span className={`${color} font-semibold uppercase tracking-[0.08em]`}>
         {tag}

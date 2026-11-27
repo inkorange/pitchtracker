@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 
@@ -21,6 +22,9 @@ interface PitcherSearchProps {
   placeholder?: string;
   // Custom destination for a result click. Default: /pitcher/[id].
   resultHref?: (pitcherId: number) => string;
+  // "hero": homepage hero styling (52px input + Search button). The
+  // button / Enter opens the top match.
+  variant?: "default" | "hero";
 }
 
 export function PitcherSearch({
@@ -28,7 +32,9 @@ export function PitcherSearch({
   autoFocus = false,
   placeholder = "Search a pitcher…",
   resultHref,
+  variant = "default",
 }: PitcherSearchProps) {
+  const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<PitcherResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -80,8 +86,22 @@ export function PitcherSearch({
   );
   const showDropdown = open && query.trim().length >= 2;
 
+  const hrefFor = (p: PitcherResult) =>
+    resultHref ? resultHref(p.mlb_id) : pitcherPagePath(p.mlb_id, p.full_name);
+  const isHero = variant === "hero";
+
   return (
     <div ref={containerRef} className="relative w-full">
+      <form
+        role="search"
+        className={isHero ? "flex gap-2" : "contents"}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const top = visibleResults[0];
+          if (top) router.push(hrefFor(top));
+          else setOpen(true);
+        }}
+      >
       <input
         type="text"
         role="combobox"
@@ -90,17 +110,34 @@ export function PitcherSearch({
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => visibleResults.length > 0 && setOpen(true)}
         placeholder={placeholder}
-        className="w-full px-4 py-3 rounded-md bg-[#081a32]/80 backdrop-blur-md border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/25 transition-colors"
+        className={
+          isHero
+            ? "flex-auto min-w-0 h-[52px] px-4 md:px-[18px] rounded-control bg-surface border border-line-strong text-ink text-base placeholder:text-muted focus:outline-none focus:border-ink-2 transition-colors"
+            : "w-full px-4 py-3 rounded-md bg-[#081a32]/80 backdrop-blur-md border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:border-white/25 transition-colors"
+        }
         aria-label="Search pitchers"
         aria-expanded={showDropdown}
         aria-controls="pitcher-search-listbox"
         aria-autocomplete="list"
       />
+      {isHero ? (
+        <button
+          type="submit"
+          className="hidden md:block h-[52px] px-[22px] rounded-control bg-ink text-bg font-bold text-[15px] hover:bg-white"
+        >
+          Search
+        </button>
+      ) : null}
+      </form>
       {showDropdown && (
         <ul
           id="pitcher-search-listbox"
           role="listbox"
-          className="absolute z-10 mt-2 w-full rounded-md bg-[#11161e] border border-white/10 shadow-2xl overflow-hidden"
+          className={
+            isHero
+              ? "absolute z-30 mt-2 w-full rounded-control bg-surface border border-line-strong shadow-2xl overflow-hidden"
+              : "absolute z-10 mt-2 w-full rounded-md bg-[#11161e] border border-white/10 shadow-2xl overflow-hidden"
+          }
         >
           {loading && visibleResults.length === 0 && (
             <li className="px-4 py-3 text-sm text-white/45" role="option" aria-selected={false}>
@@ -115,7 +152,7 @@ export function PitcherSearch({
           {visibleResults.map((p) => (
             <li key={p.mlb_id} role="option" aria-selected={false}>
               <Link
-                href={resultHref ? resultHref(p.mlb_id) : pitcherPagePath(p.mlb_id, p.full_name)}
+                href={hrefFor(p)}
                 className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.04] transition-colors"
                 onClick={() => setOpen(false)}
               >

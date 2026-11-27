@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+import { SiteHeader } from "@/components/chrome/SiteHeader";
+import { EyebrowTag } from "@/components/broadcast";
 import { createClient } from "@/lib/supabase/server";
-import { teamLogoUrl } from "@/lib/viz/headshot";
-import { TeamLogo } from "@/components/team/TeamLogo";
-import { TopNav } from "@/components/chrome/TopNav";
+import { getCachedDisplaySeason } from "@/lib/pitcher/cached-reads";
+import { getLeaderBadges } from "@/lib/teams/leader-badges";
+import { TeamsGrid, type GridTeam } from "./TeamsGrid";
 
 export const metadata: Metadata = {
   title: "Browse pitchers by team · PitchTracker",
@@ -13,70 +14,71 @@ export const metadata: Metadata = {
   alternates: { canonical: "/browse" },
 };
 
-const DIVISION_ORDER = [
-  "AL East",
-  "AL Central",
-  "AL West",
-  "NL East",
-  "NL Central",
-  "NL West",
-];
+// Teams grid — design/Teams.dc.html.
+export default async function BrowsePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ season?: string }>;
+}) {
+  const displaySeason = await getCachedDisplaySeason();
+  const seasons = [displaySeason, displaySeason - 1];
+  const requested = Number((await searchParams).season);
+  const season = seasons.includes(requested) ? requested : displaySeason;
 
-export default async function BrowsePage() {
   const supabase = await createClient();
-  const { data: teams } = await supabase
-    .from("pitch_teams")
-    .select("mlb_id, name, abbreviation, division, league")
-    .order("name");
-
-  const byDivision = new Map<string, typeof teams>();
-  for (const t of teams ?? []) {
-    const list = byDivision.get(t.division) ?? [];
-    list.push(t);
-    byDivision.set(t.division, list);
-  }
+  const [{ data: teamRows }, badges] = await Promise.all([
+    supabase.from("pitch_teams").select("mlb_id, name, abbreviation, division, league").order("name"),
+    getLeaderBadges(season),
+  ]);
+  const teams: GridTeam[] = (teamRows ?? []).map((t) => ({
+    id: t.mlb_id,
+    abbr: t.abbreviation,
+    name: t.name,
+    league: t.league,
+    division: t.division,
+    badge: badges.get(t.mlb_id) ?? null,
+  }));
 
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 px-6 pt-20 pb-12">
-      <TopNav title="Browse" />
-      <div className="max-w-5xl mx-auto space-y-10">
-        <header className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Browse by team</h1>
-          <p className="text-sm text-white/50">
-            Pick a team, then a season, then a pitcher.
-          </p>
-        </header>
-
-        {DIVISION_ORDER.map((division) => {
-          const list = byDivision.get(division);
-          if (!list || list.length === 0) return null;
-          return (
-            <section key={division} className="space-y-3">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/45">
-                {division}
-              </div>
-              <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                {list.map((t) => (
-                  <li key={t.mlb_id}>
-                    <Link
-                      href={`/browse/${t.mlb_id}`}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] hover:border-white/15 transition-colors"
-                    >
-                      <TeamLogo teamId={t.mlb_id} size={36} alt={t.name} />
-                      <div className="min-w-0">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/45">
-                          {t.abbreviation}
-                        </div>
-                        <div className="text-sm text-white/90 truncate">{t.name}</div>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+    <main className="min-h-screen bg-bg text-ink">
+      <SiteHeader active="teams" />
+      <section className="container-page pt-6 pb-4 md:pt-12 md:pb-6 flex flex-col gap-3 md:gap-3.5">
+        <EyebrowTag className="self-start">Teams</EyebrowTag>
+        <h1 className="m-0 font-display font-extrabold italic uppercase text-[46px] md:text-[64px] leading-[0.92]">
+          Pick a staff.
+        </h1>
+        <p className="m-0 text-base md:text-[17px] leading-[1.55] text-ink-2 max-w-[680px]">
+          Every club’s pitching staff by season. Open a team to compare its arms side by side, then
+          drop into any pitcher in 3D.
+        </p>
+      </section>
+      <div className="container-page pb-16 flex gap-3 flex-wrap items-start">
+        <TeamsGrid
+          teams={teams}
+          season={season}
+          seasonControl={
+            <nav aria-label="Season" className="flex bg-surface border border-line rounded-control p-1">
+              {seasons.map((s) => (
+                <SeasonLink key={s} season={s} active={s === season} href={s === displaySeason ? "/browse" : `/browse?season=${s}`} />
+              ))}
+            </nav>
+          }
+        />
       </div>
     </main>
+  );
+}
+
+function SeasonLink({ season, active, href }: { season: number; active: boolean; href: string }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`h-[42px] px-4 flex items-center rounded-[3px] text-sm num ${
+        active ? "bg-ink text-bg font-bold hover:text-bg" : "text-ink-2 font-semibold hover:text-ink"
+      }`}
+    >
+      {season}
+    </Link>
   );
 }

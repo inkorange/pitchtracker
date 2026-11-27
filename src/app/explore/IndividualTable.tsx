@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { NavPendingOverlay } from "@/components/feedback/NavPendingOverlay";
 import type { SavantPitchRow } from "@/lib/savant/client";
 import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
 
@@ -68,18 +69,18 @@ export function IndividualTable({ rows }: IndividualTableProps) {
   }
 
   return (
-    <div className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg overflow-hidden">
+    <div className="rounded-panel bg-surface border border-line overflow-hidden">
       {rows.length > RENDER_CAP ? (
-        <div className="px-4 py-2 text-[11px] text-white/55 border-b border-white/[0.08]">
+        <div className="px-4 py-2 text-[11px] text-muted border-b border-line">
           Showing the first {RENDER_CAP.toLocaleString()} of{" "}
           {rows.length.toLocaleString()} matched pitches. Sort to surface
           other ends of the distribution.
         </div>
       ) : null}
       <div className="overflow-x-auto">
-        <table className="w-full text-[11px] tabular-nums">
+        <table className="w-full text-[13px] num">
           <thead>
-            <tr className="text-left text-white/55 uppercase tracking-[0.12em] text-[10px]">
+            <tr className="text-left bg-surface-2 text-muted uppercase tracking-[1.2px] text-[11px] font-semibold">
               <Th onClick={() => setOrToggle("date")} active={sort.key === "date"} dir={sort.direction}>
                 Date
               </Th>
@@ -113,19 +114,19 @@ export function IndividualTable({ rows }: IndividualTableProps) {
                   // unique across the 5k cap (rare repeats from join
                   // shapes), so the index keeps keys stable.
                   key={`${p.game_pk}-${p.at_bat_number}-${p.pitch_number}-${i}`}
-                  className="border-t border-white/[0.04] hover:bg-white/[0.04] transition-colors"
+                  className="border-t border-line hover:bg-surface-2/60 transition-colors"
                 >
-                  <td className="px-3 py-1.5 text-white/65 whitespace-nowrap">
+                  <td className="px-3 py-2 text-ink-2 whitespace-nowrap">
                     {p.game_date ?? "—"}
                   </td>
-                  <td className="px-3 py-1.5">
+                  <td className="px-3 py-2">
                     <span className="inline-flex items-center gap-1.5">
                       <span
                         className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ background: color }}
                         aria-hidden
                       />
-                      <span className="text-white/95">
+                      <span className="text-ink">
                         {p.pitch_type
                           ? getPitchLabel(p.pitch_type)
                           : "Unknown"}
@@ -136,18 +137,25 @@ export function IndividualTable({ rows }: IndividualTableProps) {
                   <Td>{fmt0(p.release_spin_rate)}</Td>
                   <Td>{fmtBreak(p.pfx_x)}</Td>
                   <Td>{fmtBreak(p.pfx_z)}</Td>
-                  <td className="px-3 py-1.5 text-white/85 whitespace-nowrap">
+                  <td className="px-3 py-2 text-ink-2 whitespace-nowrap">
                     {p.balls ?? 0}-{p.strikes ?? 0}
                   </td>
-                  <td className="px-3 py-1.5 text-white/85 whitespace-nowrap max-w-[14rem] truncate">
+                  <td className="px-3 py-2 text-ink-2 whitespace-nowrap max-w-[14rem] truncate">
                     {labelOutcome(p.events ?? p.description ?? null)}
                   </td>
-                  <td className="px-3 py-1.5">
+                  <td className="px-3 py-2">
+                    {/* Round play button, same as the /pitchers table. */}
                     <Link
                       href={replayHref}
-                      className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white"
+                      // Hundreds of rows: don't prefetch them all.
+                      prefetch={false}
+                      aria-label={`Replay this ${getPitchLabel(p.pitch_type ?? "UN")} from ${p.game_date ?? "this game"}`}
+                      className="size-9 rounded-full bg-accent hover:bg-accent-hover inline-flex items-center justify-center"
                     >
-                      Replay →
+                      <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="#fff">
+                        <path d="M7 4l13 8-13 8z" />
+                      </svg>
+                      <NavPendingOverlay label="Loading replay…" />
                     </Link>
                   </td>
                 </tr>
@@ -179,7 +187,7 @@ function Th({
         type="button"
         onClick={onClick}
         className={`flex items-center gap-1 ${numeric ? "ml-auto" : ""} ${
-          active ? "text-white/85" : "text-white/55 hover:text-white/85"
+          active ? "text-ink-2" : "text-muted hover:text-ink-2"
         } transition-colors`}
       >
         <span>{children}</span>
@@ -193,7 +201,7 @@ function Th({
 
 function Td({ children }: { children: React.ReactNode }) {
   return (
-    <td className="px-3 py-1.5 text-white/85 text-right whitespace-nowrap">
+    <td className="px-3 py-2 text-ink-2 text-right whitespace-nowrap">
       {children}
     </td>
   );

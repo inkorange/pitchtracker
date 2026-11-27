@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Homepage feature cards — expand on hover</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+.draw{stroke-dasharray:100;stroke-dashoffset:100;animation:ptdraw 4.5s ease-out infinite}
+.draw:nth-of-type(3n+1){animation-delay:.25s}
+.draw:nth-of-type(3n+2){animation-delay:.5s}
+.pop{opacity:0;animation:ptpop 4.5s ease-out infinite}
+@keyframes ptdraw{0%{stroke-dashoffset:100;opacity:1}35%{stroke-dashoffset:0}85%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+@keyframes ptpop{0%,30%{opacity:0}42%,85%{opacity:.9}100%{opacity:0}}
+.fadein{animation:ptfade .35s ease .18s both}
+@keyframes ptfade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.fadein{animation:none}.draw{animation:none;stroke-dashoffset:0}.pop{animation:none;opacity:.9}}
+</style>
+</helmet>
+<section style="width: 100%; max-width: 1304px; margin: 0 auto; box-sizing: border-box; padding: 96px 32px 40px; background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif; display: flex; flex-direction: column; gap: 32px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+<h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 56px; line-height: 0.95; text-transform: uppercase">A pitch lab, not a stat table.</h2>
+<p style="margin: 0; font-size: 14px; color: #9AA6BD; max-width: 320px">Hover a card (or Tab to it) and it widens in place: the preview grows and the how-to fades in.</p>
+</div>
+
+<div style="display: flex; gap: 16px; height: 540px">
+<sc-for list="{{ cards }}" as="f" hint-placeholder-count="4">
+<article onMouseEnter="{{ f.open }}" style="{{ f.wrap }}">
+<!-- visual: same element idle and open, it only widens -->
+<div style="position: relative; height: 250px; flex-shrink: 0; overflow: hidden; background: #0A101C; border-bottom: 1px solid #1B2438">
+<sc-if value="{{ f.vScene }}" hint-placeholder-val="{{ true }}">
+<img src="/_blob/919acb456528e5f27426f1b2bdb6bfe2" alt="3D scene preview from behind the catcher" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+<svg aria-hidden="true" viewBox="0 0 1080 840" preserveAspectRatio="xMidYMid slice" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<path class="draw" pathLength="100" d="M512 440 Q654 462 760 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="760" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q667 462 783 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="783" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q680 455 807 478" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="807" cy="478" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q694 465 833 507" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="833" cy="507" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q627 483 783 621" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="783" cy="621" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q646 441 745 438" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="745" cy="438" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q670 442 790 439" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="790" cy="439" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q673 444 795 446" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="795" cy="446" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q710 472 862 527" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="862" cy="527" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q664 433 778 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="778" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q682 458 846 533" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="846" cy="533" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q610 492 753 648" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="753" cy="648" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q666 484 854 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="854" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q692 462 830 498" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="830" cy="498" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q665 484 779 561" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="779" cy="561" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q657 483 765 558" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="765" cy="558" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q696 452 837 469" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="837" cy="469" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q696 420 878 536" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="878" cy="536" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q685 493 851 634" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="851" cy="634" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q679 447 846 614" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="846" cy="614" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q675 495 832 640" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="832" cy="640" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q670 472 790 525" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="790" cy="525" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q665 479 853 610" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="853" cy="610" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q646 484 819 625" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="819" cy="625" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q677 433 801 415" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="801" cy="415" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q668 463 784 499" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="784" cy="499" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q649 495 786 639" stroke="#F5A524" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="786" cy="639" r="3.8" fill="#F5A524" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q581 457 668 642" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="668" cy="642" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q695 476 835 538" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="835" cy="538" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q678 482 804 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="804" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q675 470 798 520" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="798" cy="520" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q636 517 799 719" stroke="#B392F0" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="799" cy="719" r="3.8" fill="#B392F0" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q639 471 775 684" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="775" cy="684" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q656 449 763 459" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="763" cy="459" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q638 439 731 433" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="731" cy="433" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q644 477 741 540" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="741" cy="540" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q655 508 762 630" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="762" cy="630" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q669 465 787 506" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="787" cy="506" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q669 464 786 504" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="786" cy="504" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q667 462 784 496" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="784" cy="496" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q643 471 740 523" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="740" cy="523" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q663 440 777 435" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="777" cy="435" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q699 475 842 534" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="842" cy="534" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q656 477 805 699" stroke="#4C8DF6" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="805" cy="699" r="3.8" fill="#4C8DF6" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q664 480 778 549" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="778" cy="549" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+<path class="draw" pathLength="100" d="M512 440 Q654 482 760 554" stroke="#F0505A" stroke-width="2" stroke-opacity="0.55" fill="none" stroke-linecap="round"></path>
+<circle class="pop" cx="760" cy="554" r="3.8" fill="#F0505A" fill-opacity="0.9"></circle>
+</svg>
+<sc-if value="{{ f.isOpen }}" hint-placeholder-val="{{ true }}">
+<div class="fadein" style="position: absolute; left: 12px; bottom: 12px; display: flex; background: rgba(7,11,20,0.9); border-radius: 4px; padding: 3px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1px">
+<span style="padding: 4px 10px; background: #F3F5F9; color: #070B14; border-radius: 2px">FRONT</span><span style="padding: 4px 10px; color: #C4CCDB">BACK</span><span style="padding: 4px 10px; color: #C4CCDB">TOP</span><span style="padding: 4px 10px; color: #C4CCDB">SIDE</span>
+</div>
+</sc-if>
+</sc-if>
+<sc-if value="{{ f.vTunnel }}" hint-placeholder-val="{{ false }}">
+<svg role="img" aria-label="Four-seam, slider and curveball share a path, then split after the decision point" viewBox="0 0 560 260" preserveAspectRatio="xMidYMid meet" style="position: absolute; inset: 16px; width: calc(100% - 32px); height: calc(100% - 32px)">
+<line x1="330" y1="20" x2="330" y2="230" stroke="#F6C344" stroke-width="2" stroke-dasharray="5 5"></line>
+<text x="338" y="36" fill="#F6C344" font-family="Inter, sans-serif" font-size="15" font-weight="600">DECISION POINT</text>
+<path class="draw" pathLength="100" d="M30 70 C 200 78, 360 90, 530 108" stroke="#F0505A" stroke-width="5" fill="none" stroke-linecap="round"></path>
+<path class="draw" pathLength="100" d="M30 70 C 200 80, 360 104, 530 160" stroke="#B392F0" stroke-width="5" fill="none" stroke-linecap="round"></path>
+<path class="draw" pathLength="100" d="M30 70 C 200 76, 360 118, 530 205" stroke="#4C8DF6" stroke-width="5" fill="none" stroke-linecap="round"></path>
+<circle cx="30" cy="70" r="9" fill="#F3F5F9"></circle>
+<rect x="520" y="95" width="14" height="120" fill="none" stroke="#C4CCDB"></rect>
+</svg>
+</sc-if>
+<sc-if value="{{ f.vArsenal }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: center; gap: 6px">
+<sc-for list="{{ arsenal }}" as="p" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 10px; height: 30px">
+<span style="{{ p.dot }}"></span>
+<span style="width: 74px; flex-shrink: 0; font-size: 13px; font-weight: 600; white-space: nowrap">{{ p.name }}</span>
+<span style="flex-grow: 1; height: 6px; background: #1B2438; border-radius: 3px; display: block; min-width: 20px"><span style="{{ p.bar }}"></span></span>
+<sc-if value="{{ f.isOpen }}" hint-placeholder-val="{{ false }}"><span class="fadein" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; width: 48px; text-align: right">{{ p.mph }}</span><span class="fadein" style="font-size: 12px; color: #9AA6BD; width: 72px; text-align: right">{{ p.use }}</span></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ f.vAtbat }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; inset: 0; padding: 14px 18px; display: flex; align-items: center; justify-content: center; gap: 24px">
+<svg role="img" aria-label="Strike zone with six numbered pitch locations" viewBox="0 0 172 200" style="height: 220px; width: 190px; flex-shrink: 0">
+<rect x="36" y="30" width="100" height="130" fill="none" stroke="#C4CCDB" stroke-width="1.5"></rect>
+<sc-for list="{{ zone }}" as="d" hint-placeholder-count="6">
+<circle class="pop" cx="{{ d.x }}" cy="{{ d.y }}" r="11" fill="{{ d.c }}"></circle>
+<text x="{{ d.x }}" y="{{ d.ty }}" text-anchor="middle" font-family="Barlow Condensed, sans-serif" font-weight="700" font-size="14" fill="#070B14">{{ d.n }}</text>
+</sc-for>
+</svg>
+<sc-if value="{{ f.isOpen }}" hint-placeholder-val="{{ false }}">
+<div class="fadein" style="flex-grow: 1; max-width: 240px; display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 11px; letter-spacing: 1.2px; color: #9AA6BD; font-weight: 600">VS P. CROW-ARMSTRONG · SAMPLE</span>
+<sc-for list="{{ seq }}" as="p" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span style="{{ p.badge }}">{{ p.n }}</span><span style="flex-grow: 1">{{ p.type }}</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 17px">{{ p.mph }}</span></div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+
+<!-- text: header is shared; idle shows teaser, open swaps in body + steps + CTA -->
+<div style="flex-grow: 1; min-height: 0; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: flex-start; gap: 10px">
+<span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 36px; color: #E8364F; line-height: 0.9; flex-shrink: 0">{{ f.n }}</span>
+<h3 style="margin: 0; padding-top: 3px; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 24px; line-height: 1; text-transform: uppercase">{{ f.title }}</h3>
+</div>
+<sc-if value="{{ f.closed }}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #B4BDCE">{{ f.teaser }}</p>
+<button aria-expanded="false" onClick="{{ f.open }}" onFocus="{{ f.open }}" style="margin-top: auto; align-self: flex-start; height: 36px; padding: 0 12px 0 6px; border-radius: 18px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px"><span aria-hidden="true" style="width: 24px; height: 24px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center">+</span>Preview</button>
+</sc-if>
+<sc-if value="{{ f.isOpen }}" hint-placeholder-val="{{ true }}">
+<p class="fadein" style="margin: 0; font-size: 14px; line-height: 1.5; color: #C4CCDB">{{ f.body }}</p>
+<ol class="fadein" style="margin: 4px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{ f.steps }}" as="s" hint-placeholder-count="3">
+<li style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.4; color: #C4CCDB"><span style="width: 22px; height: 22px; border-radius: 50%; background: #E8364F; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px">{{ s.i }}</span><span>{{ s.t }}</span></li>
+</sc-for>
+</ol>
+<a class="fadein" href="{{ f.href }}" style="margin-top: auto; align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 4px; background: #E8364F; color: #FFFFFF; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px">{{ f.cta }} <span aria-hidden="true">→</span></a>
+</sc-if>
+</div>
+</article>
+</sc-for>
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":780}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { open: 0 }; }
+  renderVals() {
+    const s = this.state;
+    const F = [
+      { n: '01', title: 'Every pitch in 3D', teaser: 'A whole season of pitches as real flight paths, from any camera.', v: 'scene', body: 'Statcast tracking rebuilt as real flight paths — every pitch a pitcher threw this season, on one field.', cta: 'Open Misiorowski in 3D', href: 'Pitcher.dc.html',
+        steps: ['Search any pitcher from the top bar.', 'Pick a camera: Front, Back, Top or Side.', 'Color the paths by pitch type or by outcome.'] },
+      { n: '02', title: 'Tunnels you can see', teaser: 'See where pitches share a lane out of the hand, and where they split.', v: 'tunnel', body: 'Overlay the arsenal and see where pitches share a lane out of the hand — and where they split.', cta: 'See his tunnel', href: 'Pitcher.dc.html',
+        steps: ['Open a pitcher and switch the camera to Tunnel.', 'Turn pitch types on and off from the Arsenal list.', 'Watch where the paths separate before the plate.'] },
+      { n: '03', title: 'Arsenal at a glance', teaser: 'Velocity, usage and counts per pitch, and the list filters the scene.', v: 'arsenal', body: 'Velocity, usage and pitch counts for every pitch type, and the list doubles as the scene filter.', cta: 'Explore the arsenal', href: 'Pitcher.dc.html',
+        steps: ['The Arsenal tab lists each pitch with velo and usage.', 'Tap a pitch to show or hide it in the scene.', 'Narrow further by batter side, outcome or game.'] },
+      { n: '04', title: 'Replay any at-bat', teaser: 'Step through a plate appearance in the order the hitter saw it.', v: 'atbat', body: 'Step through a plate appearance pitch by pitch, in the order the hitter saw it.', cta: 'Watch an at-bat', href: 'AtBat.dc.html',
+        steps: ['Open the Games tab and pick a start.', 'Choose an at-bat from the list.', 'Step pitch by pitch with the zone map and count.'] }
+    ];
+    const cards = F.map((f, i) => {
+      const isOpen = s.open === i;
+      return Object.assign({}, f, {
+        isOpen, closed: !isOpen, vScene: f.v === 'scene', vTunnel: f.v === 'tunnel', vArsenal: f.v === 'arsenal', vAtbat: f.v === 'atbat',
+        steps: f.steps.map((t, k) => ({ i: k + 1, t })),
+        open: () => { if (this.state.open !== i) this.setState({ open: i }); },
+        wrap: 'flex: ' + (isOpen ? '2.6' : '1') + ' 1 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; border-radius: 6px; background: #0F1626; transition: flex-grow 0.4s cubic-bezier(.2,.7,.2,1), border-color 0.3s; ' + (isOpen ? 'border: 1px solid #2A3650; border-top: 3px solid #E8364F' : 'border: 1px solid #1B2438; border-top: 3px solid #2A3650')
+      });
+    });
+    const arsenal = [['Four-Seam', '#F0505A', '100.6', 64, 1904], ['Cutter', '#F5A524', '95.8', 14, 420], ['Slider', '#B392F0', '91.8', 11, 325], ['Curveball', '#4C8DF6', '88.0', 10, 313], ['Changeup', '#2DD4BF', '92.5', 1, 28], ['Sinker', '#FB7C3C', '100.6', 0, 3]]
+      .map(([name, c, mph, pct, n]) => ({ name, mph, use: pct + '% · ' + n.toLocaleString(), dot: 'width: 12px; height: 12px; border-radius: 50%; background: ' + c, bar: 'display: block; height: 6px; border-radius: 3px; background: ' + c + '; width: ' + Math.max(pct, 1) + '%' }));
+    const C = { 'Four-Seam': '#F0505A', 'Slider': '#B392F0', 'Curveball': '#4C8DF6', 'Cutter': '#F5A524' };
+    const sq = [['Four-Seam', '100.9', 0.62, 0.30], ['Slider', '92.4', 1.15, 0.85], ['Four-Seam', '101.3', 0.40, 0.12], ['Curveball', '88.6', 0.55, 1.18], ['Four-Seam', '101.8', 0.75, 0.05], ['Cutter', '96.1', 0.95, 0.55]];
+    const zone = sq.map((d, i) => { const x = 36 + d[2] * 100, y = 30 + d[3] * 130; return { n: i + 1, x: x.toFixed(0), y: y.toFixed(0), ty: (y + 5).toFixed(0), c: C[d[0]] }; });
+    const seq = sq.map((d, i) => ({ n: i + 1, type: d[0], mph: d[1], badge: 'width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: Barlow Condensed, sans-serif; font-weight: 700; font-size: 13px; color: #070B14; background: ' + C[d[0]] }));
+    return { cards, arsenal, zone, seq, keep: () => {} };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,34 +1,29 @@
-// Shared placeholder for the homepage strips while their Supabase
-// queries resolve. Renders the same section heading + a row of
-// skeleton blocks so the page doesn't reflow when the real component
-// streams in.
+import { SectionHeader } from "./SectionHeader";
+
+// Placeholder for homepage sections while their queries resolve.
+// Same heading + roughly the same block heights so the page doesn't
+// reflow when the real section streams in.
 export function StripFallback({
   title,
   rows = 3,
-  grid = false,
+  cols = 2,
+  rowHeight = "h-[76px]",
 }: {
-  title: string;
+  title?: string;
   rows?: number;
-  grid?: boolean;
+  cols?: 2 | 3;
+  rowHeight?: string;
 }) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[10px] uppercase tracking-[0.18em] text-white/55">
-          {title}
-        </h2>
-      </div>
+    <section className="container-page py-8 md:py-14" aria-busy="true">
+      {title ? <SectionHeader title={title} /> : null}
       <div
-        className={
-          grid
-            ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-            : "grid grid-cols-1 sm:grid-cols-2 gap-3"
-        }
+        className={`grid grid-cols-1 gap-4 ${cols === 3 ? "md:grid-cols-2 lg:grid-cols-3" : "md:grid-cols-2"}`}
       >
         {Array.from({ length: rows }).map((_, i) => (
           <div
             key={i}
-            className="h-16 rounded-lg bg-white/[0.04] border border-white/10 animate-pulse"
+            className={`${rowHeight} rounded-control bg-surface border border-line motion-safe:animate-pulse`}
           />
         ))}
       </div>

@@ -1,4 +1,6 @@
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fetchPitcherSeasonPitches,
@@ -220,16 +222,35 @@ function shapeSavantSeason(
   return { pitches, arsenal, games };
 }
 
-const cachedSavantSeason = unstable_cache(
-  async (pitcherId: number, season: number): Promise<SavantSeason> => {
+// Stored gzip-compressed. A heavy starter's season is ~2.3 MB of JSON,
+// over Next's 2 MB data-cache item limit — uncompressed, the write
+// failed silently and every pitcher-page view (page + arsenal API, so
+// twice) re-read the whole season from Savant. Compressed it's a few
+// hundred KB. The key changed with the format so old entries aren't
+// misread.
+const cachedSavantSeasonZ = unstable_cache(
+  async (pitcherId: number, season: number): Promise<string> => {
     const [rows, teamIdByAbbrev] = await Promise.all([
       fetchPitcherSeasonPitches(pitcherId, season),
       loadTeamIdByAbbrev(),
     ]);
-    return shapeSavantSeason(rows, season, teamIdByAbbrev);
+    return packSeason(shapeSavantSeason(rows, season, teamIdByAbbrev));
   },
-  ["savant-season"],
+  ["savant-season-gz-v1"],
   { revalidate: SEASON_REVALIDATE_S, tags: ["savant-season"] },
+);
+
+export function packSeason(s: SavantSeason): string {
+  return gzipSync(Buffer.from(JSON.stringify(s))).toString("base64");
+}
+
+export function unpackSeason(z: string): SavantSeason {
+  return JSON.parse(gunzipSync(Buffer.from(z, "base64")).toString("utf8")) as SavantSeason;
+}
+
+// One decompress per request even when several components ask.
+const cachedSavantSeason = cache(async (pitcherId: number, season: number) =>
+  unpackSeason(await cachedSavantSeasonZ(pitcherId, season)),
 );
 
 /**

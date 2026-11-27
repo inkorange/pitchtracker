@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Sphere } from "@react-three/drei";
 import { Scene } from "@/components/scene/Scene";
+import { statcastToThree } from "@/lib/viz/coords";
+import { getOutcomeColor } from "@/lib/viz/colors";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { CameraPad } from "@/components/controls/CameraPad";
 import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
@@ -32,6 +35,10 @@ interface PreparedRibbon {
   path: Array<[number, number, number]>;
   pitchType: string;
   subset: Subset;
+  /** Where the ball crosses the plate (Three.js coords), colored by
+   *  outcome — same treatment as the pitcher page. */
+  platePosition: [number, number, number] | null;
+  outcomeColor: string;
 }
 
 // Trajectory inputs the Pitch class actually needs. Accepting the
@@ -131,7 +138,8 @@ function sampleEvenly<T>(arr: T[], cap: number): T[] {
 }
 
 export function VisualizationPanel({ rows }: VisualizationPanelProps) {
-  const [preset, setPreset] = useState<CameraPreset>("side");
+  // Front camera by default, like the pitcher page.
+  const [preset, setPreset] = useState<CameraPreset>("front");
   const [presetTick, setPresetTick] = useState(0);
   const [splitMode, setSplitMode] = useState<SplitMode>("none");
   const handlePresetChange = (next: CameraPreset) => {
@@ -150,6 +158,10 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
         path,
         pitchType: row.pitch_type ?? "UN",
         subset: classifyForSplit(row, splitMode),
+        // Anchor the ball at the tube's own end point (not Statcast's
+        // reported plate_x/z) so the two never visibly separate.
+        platePosition: path.length ? statcastToThree(path[path.length - 1]) : null,
+        outcomeColor: getOutcomeColor(row.description),
       });
     }
     return out;
@@ -175,6 +187,8 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
       path,
       pitchType: meanRow.pitch_type ?? "UN",
       subset: null,
+      platePosition: null,
+      outcomeColor: "#ffffff",
     };
   }, [rows]);
 
@@ -193,10 +207,8 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
   return (
     <div className="space-y-3">
       {/* Split-mode toggle */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-white/55 mr-1">
-          Split
-        </span>
+      <div className="flex flex-wrap items-center gap-2 rounded-panel bg-surface border border-line p-3">
+        <span className="label-caps mr-1">Split</span>
         {(
           [
             { key: "none", label: "Off" },
@@ -211,10 +223,10 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
               type="button"
               onClick={() => setSplitMode(opt.key)}
               aria-pressed={active}
-              className={`px-2.5 py-1 rounded-full text-[11px] uppercase tracking-[0.12em] border transition-colors ${
+              className={`h-11 md:h-9 px-3 rounded-full text-[13px] font-semibold border transition-colors ${
                 active
-                  ? "bg-white/[0.18] border-white/30 text-white"
-                  : "bg-white/[0.04] border-white/10 text-white/65 hover:bg-white/[0.1] hover:text-white"
+                  ? "bg-ink text-bg border-ink"
+                  : "text-ink-2 border-line-strong hover:text-ink"
               }`}
             >
               {opt.label}
@@ -222,29 +234,38 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
           );
         })}
         {subsetCounts ? (
-          <span className="text-[11px] text-white/55 tabular-nums ml-auto">
+          <span className="text-[13px] text-muted num ml-auto">
             <span className="text-rose-300">A {subsetCounts.a}</span>{" "}
-            <span className="text-white/35">/</span>{" "}
+            <span className="text-muted">/</span>{" "}
             <span className="text-cyan-300">B {subsetCounts.b}</span>
           </span>
         ) : null}
       </div>
 
-      <div className="relative h-[60vh] min-h-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg overflow-hidden">
+      <div className="relative isolate h-[420px] md:h-[480px] rounded-panel bg-surface border border-line overflow-hidden">
         <Scene preset={preset} presetTick={presetTick}>
           {prepared.map((p) => {
-            // In split mode, pitches not in either subset fade to near-zero
-            // so the contrast between a/b clusters is the visual story.
+            // Same ribbon + plate-ball treatment as the pitcher page. In
+            // split mode, pitches outside both subsets fade right down so
+            // the a/b contrast is the visual story.
             const dimmed = splitMode !== "none" && p.subset === null;
+            const opacity = dimmed ? 0.05 : 1;
             return (
-              <Ribbon
-                key={p.id}
-                path={p.path}
-                pitchType={p.pitchType}
-                radius={0.04}
-                opacity={dimmed ? 0.02 : 0.18}
-                side={p.subset ?? undefined}
-              />
+              <group key={p.id}>
+                <Ribbon path={p.path} pitchType={p.pitchType} radius={0.06} opacity={opacity} side={p.subset ?? undefined} />
+                {p.platePosition ? (
+                  <Sphere args={[0.1, 16, 16]} position={p.platePosition}>
+                    <meshStandardMaterial
+                      color={p.outcomeColor}
+                      roughness={0.4}
+                      metalness={0.05}
+                      transparent
+                      opacity={opacity}
+                      depthWrite={opacity >= 0.95}
+                    />
+                  </Sphere>
+                ) : null}
+              </group>
             );
           })}
 
@@ -259,7 +280,7 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
           ) : null}
         </Scene>
 
-        <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-[#081a32]/80 backdrop-blur-md border border-white/10 text-[10px] uppercase tracking-[0.14em] text-white/85 pointer-events-none">
+        <div className="absolute top-3 left-3 px-3 py-1.5 bg-overlay border-l-4 border-accent font-display font-bold text-sm tracking-[1px] uppercase text-ink pointer-events-none">
           {prepared.length.toLocaleString()} of{" "}
           {rows.length.toLocaleString()} rendered
           {averageRibbon && splitMode === "none"

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   filterSeasonPitches,
+  packSeason,
+  unpackSeason,
   __testables,
   type SavantSeasonPitchRow,
 } from "../savant-season";
@@ -220,5 +222,22 @@ describe("filterSeasonPitches", () => {
         vsBatterId: null,
       }),
     ).toHaveLength(3);
+  });
+});
+
+describe("packSeason / unpackSeason", () => {
+  it("round-trips and compresses well below the raw JSON", () => {
+    const pitches = Array.from({ length: 2000 }, (_, i) => ({
+      game_pk: 1000 + (i % 30),
+      at_bat_number: i,
+      pitch_number: 1,
+      pitch_type: "FF",
+      release_speed: 95 + (i % 7) / 10,
+      description: "ball",
+    }));
+    const season = { pitches, arsenal: [], games: [] } as unknown as Parameters<typeof packSeason>[0];
+    const z = packSeason(season);
+    expect(unpackSeason(z)).toEqual(season);
+    expect(z.length).toBeLessThan(JSON.stringify(season).length / 4);
   });
 });

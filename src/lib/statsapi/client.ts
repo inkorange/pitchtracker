@@ -484,3 +484,46 @@ export async function fetchGameResultByPk(
   }
   return null;
 }
+
+export interface SeasonPitchingLine {
+  playerId: number;
+  teamId: number | null;
+  strikeouts: number;
+  gamesStarted: number;
+  gamesPitched: number;
+}
+
+interface RawSeasonPitchingResponse {
+  stats: Array<{
+    splits: Array<{
+      player: { id: number };
+      team?: { id: number };
+      stat: { strikeOuts?: number; gamesStarted?: number; gamesPitched?: number };
+    }>;
+  }>;
+}
+
+// Every MLB pitcher's season line in one request (~900 rows). One row
+// per player: traded pitchers come back combined across teams.
+// Uncached here; callers wrap it (see lib/pitchers/directory.ts).
+export async function fetchSeasonPitchingLines(season: number): Promise<SeasonPitchingLine[]> {
+  const data = await fetchJson<RawSeasonPitchingResponse>(
+    `${BASE}/stats?stats=season&group=pitching&season=${season}&sportId=1&playerPool=ALL&limit=3000`,
+  );
+  return (data.stats[0]?.splits ?? []).map((s) => ({
+    playerId: s.player.id,
+    teamId: s.team?.id ?? null,
+    strikeouts: s.stat.strikeOuts ?? 0,
+    gamesStarted: s.stat.gamesStarted ?? 0,
+    gamesPitched: s.stat.gamesPitched ?? 0,
+  }));
+}
+
+// A team's season pitching strikeouts (one small request).
+export async function fetchTeamSeasonStrikeouts(teamId: number, season: number): Promise<number | null> {
+  const data = await fetchJson<{ stats: Array<{ splits: Array<{ stat: { strikeOuts?: number } }> }> }>(
+    `${BASE}/teams/${teamId}/stats?stats=season&group=pitching&season=${season}`,
+    { cache: "force-cache", next: { revalidate: 60 * 60 * 6 } },
+  );
+  return data.stats[0]?.splits[0]?.stat.strikeOuts ?? null;
+}

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PitchTracker — Pitchers mobile</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070B14}
+a{color:#F3F5F9;text-decoration:none}a:hover{color:#FF6B7A}
+button{font-family:Inter,sans-serif;cursor:pointer}
+input,select{font-family:Inter,sans-serif}
+.num{font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="width: 390px; min-height: 1400px; background: #070B14; color: #F3F5F9; font-family: Inter, system-ui, sans-serif">
+<header style="height: 56px; padding: 0 4px 0 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1B2438; background: #0A101C">
+<a href="HomeMobile.dc.html" style="font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 24px">PITCH<span style="color: #E8364F">TRACKER</span></a>
+<div style="display: flex">
+<button aria-label="Search" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg></button>
+<button aria-label="Menu" style="width: 44px; height: 44px; border: 0; background: transparent; color: #F3F5F9; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button>
+</div>
+</header>
+<section style="padding: 24px 20px 12px; display: flex; flex-direction: column; gap: 12px">
+<span style="align-self: flex-start; background: #E8364F; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.5px; padding: 2px 14px 2px 10px; clip-path: polygon(0 0, 100% 0, 92% 100%, 0 100%)">PITCHERS · 2026</span>
+<h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 46px; line-height: 0.92; text-transform: uppercase">Find any arm.</h1>
+<input aria-label="Search pitchers" type="search" placeholder="Search by name" style="height: 50px; padding: 0 16px; border-radius: 4px; border: 1px solid #2A3650; background: #0F1626; color: #F3F5F9; font-size: 16px">
+<div role="tablist" aria-label="Mode" style="display: flex; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px; padding: 3px">
+<button role="tab" aria-selected="true" style="flex: 1; height: 40px; border: 0; border-radius: 2px; background: #F3F5F9; color: #070B14; font-weight: 700; font-size: 14px">All pitchers</button>
+<button role="tab" aria-selected="false" style="flex: 1; height: 40px; border: 0; background: transparent; color: #C4CCDB; font-weight: 600; font-size: 14px">Find by pitch</button>
+</div>
+</section>
+<div style="display: flex; gap: 8px; padding: 0 20px 14px; overflow-x: auto">
+<button style="flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #F3F5F9; background: #F3F5F9; color: #070B14; font-size: 13px; font-weight: 700">Sort: {{ sortLabel }} ↓</button>
+<button style="flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px; font-weight: 600">All teams ▾</button>
+<button style="flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px; font-weight: 600">RHP + LHP ▾</button>
+<button style="flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 20px; border: 1px solid #2A3650; background: transparent; color: #C4CCDB; font-size: 13px; font-weight: 600">SP + RP ▾</button>
+</div>
+<div style="padding: 0 20px 8px; display: flex; gap: 6px; overflow-x: auto">
+<sc-for list="{{ sorts }}" as="o" hint-placeholder-count="5"><button aria-pressed="{{ o.on }}" onClick="{{ o.pick }}" style="{{ o.style }}">{{ o.label }}</button></sc-for>
+</div>
+<ol style="list-style: none; margin: 0; padding: 8px 20px 32px; display: flex; flex-direction: column; gap: 8px">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+<li><a href="MobileSheetPeek.dc.html" style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #0F1626; border: 1px solid #1B2438; border-radius: 4px">
+<span style="width: 22px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 18px; color: #9AA6BD">{{ r.rank }}</span>
+<span style="width: 40px; height: 40px; border-radius: 50%; background: #1E2A40; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #C4CCDB; flex-shrink: 0">{{ r.ini }}</span>
+<span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+<span style="font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ r.name }}</span>
+<span style="font-size: 12px; color: #9AA6BD">{{ r.meta }}</span>
+<span style="display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: #1B2438; width: 120px"><sc-for list="{{ r.mix }}" as="m" hint-placeholder-count="3"><span style="{{ m }}"></span></sc-for></span>
+</span>
+<span style="display: flex; flex-direction: column; align-items: flex-end"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; line-height: 1">{{ r.v }}</span><span style="font-size: 10px; letter-spacing: 1px; color: #9AA6BD; font-weight: 600">{{ sortLabel }}</span></span>
+</a></li>
+</sc-for>
+</ol>
+<p style="margin: 0; padding: 0 20px 32px; font-size: 12px; color: #F6C344">Sample values where not from the 2026 leaderboards.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1400}}'>
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { sort: 4 }; }
+  renderVals() {
+    const s = this.state;
+    const C = { FF: '#F0505A', FC: '#F5A524', SL: '#B392F0', ST: '#C084FC', CU: '#4C8DF6', CH: '#2DD4BF', SI: '#FB7C3C', FS: '#38BDF8' };
+    const R = [
+      ['Jacob Misiorowski', 'MIL', 'R', 'SP', 252, 17.1, 33.4, 100.6, 2635, [['FF',64],['FC',14],['SL',11],['CU',10]]],
+      ['Gavin Williams', 'CLE', 'R', 'SP', 248, 14.2, 31.6, 96.4, 2390, [['FF',45],['CU',22],['SL',18],['CH',15]]],
+      ['Cam Schlittler', 'NYY', 'R', 'SP', 239, 13.5, 30.2, 98.1, 2450, [['FF',52],['FC',20],['CU',18],['SI',10]]],
+      ['Dylan Cease', 'TOR', 'R', 'SP', 239, 15.8, 30.9, 96.9, 2550, [['FF',40],['SL',42],['CU',10],['CH',8]]],
+      ['Cristopher Sánchez', 'PHI', 'L', 'SP', 231, 13.1, 30.5, 95.2, 2210, [['SI',45],['CH',35],['SL',20]]],
+      ['Tyler Glasnow', 'LAD', 'R', 'SP', 198, 15.0, 31.4, 96.8, 2480, [['FF',45],['CU',30],['SL',25]]],
+      ['Mason Miller', 'SD', 'R', 'RP', 104, 17.9, 36.0, 101.4, 2480, [['FF',60],['SL',40]]],
+      ['Lake Bachar', 'PIT', 'R', 'RP', 60, 13.0, 29.5, 96.0, 2713, [['FF',55],['ST',45]]]
+    ];
+    const S = [[4, 'K'], [5, 'WHIFF%'], [6, 'CSW%'], [7, 'FB MPH'], [8, 'SPIN']];
+    const sortLabel = S.find((x) => x[0] === s.sort)[1];
+    const rows = R.slice().sort((a, b) => b[s.sort] - a[s.sort]).map((r, i) => ({ rank: i + 1, name: r[0], meta: r[1] + ' · ' + r[2] + 'HP · ' + r[3], ini: r[0].split(' ').map((x) => x[0]).join(''),
+      v: s.sort === 8 ? r[8].toLocaleString() : (s.sort === 4 ? String(r[4]) : r[s.sort].toFixed(1)),
+      mix: r[9].map(([t, p]) => 'display: block; height: 5px; width: ' + p + '%; background: ' + C[t]) }));
+    const sorts = S.map(([k, label]) => ({ label, on: s.sort === k ? 'true' : 'false', pick: () => this.setState({ sort: k }),
+      style: 'flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 4px; font-family: Barlow Condensed, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.5px; ' + (s.sort === k ? 'background: #E8364F; color: #FFFFFF; border: 1px solid #E8364F' : 'background: transparent; color: #C4CCDB; border: 1px solid #2A3650') }));
+    return { rows, sorts, sortLabel };
+  }
+}
+</script>
+</body>
+</html>

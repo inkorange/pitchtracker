@@ -1,18 +1,19 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { BallTracer } from "@/components/ribbon/BallTracer";
-import { BaseballGlyph } from "@/components/icons/BaseballGlyph";
 import { statcastToThree } from "@/lib/viz/coords";
 import {
   categorizeDescription,
+  getPitchColor,
   getPitchLabel,
   OUTCOME_COLORS,
 } from "@/lib/viz/colors";
+import { atBatKeyHandler, SPEEDS } from "./atbat/store";
 import type { ReplayPitch } from "@/app/at-bat/[gamePk]/[atBatNumber]/AtBatReplayScene";
 
 // In-page at-bat playback for the pitcher view. Mirrors the
@@ -100,6 +101,8 @@ interface PlaybackState {
   phase: Phase;
   playing: boolean;
   selectedDetailIdx: number | null;
+  /** Playback speed multiplier (0.5×, 1×, 2×). */
+  speed: number;
 }
 
 interface PlaybackHandlers {
@@ -109,6 +112,7 @@ interface PlaybackHandlers {
   setPhase: (p: Phase) => void;
   selectPitch: (idx: number) => void;
   clearSelection: () => void;
+  setSpeed: (s: number) => void;
   settledTimerRef: React.MutableRefObject<number>;
 }
 
@@ -134,6 +138,7 @@ export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
   const [selectedDetailIdx, setSelectedDetailIdx] = useState<number | null>(
     null,
   );
+  const [speed, setSpeed] = useState(1);
   const settledTimerRef = useRef(0);
 
   // Reset playback to the first pitch whenever the source list flips
@@ -209,6 +214,7 @@ export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
       phase,
       playing,
       selectedDetailIdx,
+      speed,
     },
     handlers: {
       jumpTo,
@@ -217,6 +223,7 @@ export function useAtBatPlayback(pitches: ReplayPitch[] | null): {
       setPhase,
       selectPitch,
       clearSelection,
+      setSpeed,
       settledTimerRef,
     },
   };
@@ -229,7 +236,7 @@ interface AtBatPlaybackLayerProps {
 }
 
 export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps) {
-  const { prepared, currentIdx, intraProgress, phase, playing, selectedDetailIdx } = state;
+  const { prepared, currentIdx, intraProgress, phase, playing, selectedDetailIdx, speed } = state;
   const { setIntraProgress, setPhase, selectPitch, settledTimerRef } = handlers;
 
   // Animation tick — same shape as AtBatReplayScene's ReplayDriver.
@@ -241,7 +248,8 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
   // eslint-disable-next-line
   setCurrentIdxRef.current = handlers.jumpTo;
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = rawDelta * speed;
     if (!playing || phase === "done") return;
     const active = prepared[currentIdx];
     if (!active) return;
@@ -286,7 +294,7 @@ export function AtBatPlaybackLayer({ state, handlers }: AtBatPlaybackLayerProps)
         const isFlying = i === currentIdx && phase === "flying";
         const landed = !isFlying;
         const isSelected = selectedDetailIdx === i;
-        const opacity = i < currentIdx ? 0.55 : 1;
+        const opacity = i < currentIdx ? 0.45 : 1;
         const outcomeColor =
           OUTCOME_COLORS[categorizeDescription(p.raw.description)];
         return (
@@ -441,9 +449,11 @@ function PitchDetailsPanel({
   }
   return (
     <Html position={position} zIndexRange={[10, 0]} style={{ pointerEvents: "none" }}>
-      <div style={{ position: "relative", width: 0, height: 0 }}>
+      {/* Desktop only: below lg the lower third under the scene names
+          the pitch and this card would collide with the camera pad. */}
+      <div className="hidden lg:block" style={{ position: "relative", width: 0, height: 0 }}>
         <div
-          className="absolute whitespace-nowrap px-2 py-1 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-xs text-white/95 tabular-nums shadow-lg"
+          className="absolute whitespace-nowrap px-2 py-1 rounded-control bg-overlay border border-line-strong text-xs text-ink num shadow-lg"
           style={{ left: 0, top: 0, transform: "translate(14px, -120%)" }}
         >
           <span className="font-medium">{label}</span>
@@ -451,7 +461,7 @@ function PitchDetailsPanel({
         </div>
         {rows.length > 0 ? (
           <div
-            className="absolute whitespace-nowrap px-2 py-1.5 rounded bg-black/80 backdrop-blur-sm border border-white/15 text-[11px] text-white/95 tabular-nums shadow-lg"
+            className="absolute whitespace-nowrap px-2 py-1.5 rounded-control bg-overlay border border-line-strong text-[11px] text-ink num shadow-lg"
             style={{ left: 0, top: 0, transform: "translate(14px, 8%)" }}
           >
             <div className="flex flex-col gap-0.5">
@@ -474,151 +484,106 @@ function formatBreakInches(inches: number): string {
   return `${sign}${inches.toFixed(1)}"`;
 }
 
-// ─── Transport bar ───────────────────────────────────────────────
-interface AtBatPlaybackBarProps {
+// ─── Transport bar (desktop) ─────────────────────────────────────
+// design/AtBat.dc.html: prev · play · next, a scrubber of ticks colored
+// by pitch type, speed, and the camera group. Below lg the page renders
+// its own transport under the scene (AtBatMobilePanel) and the regular
+// camera pad stays on the scene.
+export function AtBatTransport({
+  state,
+  handlers,
+  camera,
+}: {
   state: PlaybackState;
   handlers: PlaybackHandlers;
-}
-
-export function AtBatPlaybackBar({ state, handlers }: AtBatPlaybackBarProps) {
-  const { prepared, currentIdx, phase, playing } = state;
-  const { jumpTo, togglePlay } = handlers;
-  const active = prepared[currentIdx];
-  const balls = active?.raw.balls ?? 0;
-  const strikes = active?.raw.strikes ?? 0;
-  const pitchType = active?.raw.pitch_type ?? "";
-  const pitchLabel = pitchType ? getPitchLabel(pitchType) : "—";
-  const velocity = active?.raw.release_speed ?? null;
-
+  camera: ReactNode;
+}) {
+  const { prepared, currentIdx, phase, playing, speed } = state;
+  const { jumpTo, togglePlay, setSpeed } = handlers;
   if (prepared.length === 0) return null;
-
+  const nextSpeed = SPEEDS[(SPEEDS.indexOf(speed as (typeof SPEEDS)[number]) + 1) % SPEEDS.length];
   return (
-    // Mobile: pin above the CameraPad (bottom-6 right-3) so the two
-    // don't overlap. Desktop: classic bottom-center transport.
-    <div className="absolute bottom-20 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-auto">
-      <div className="px-3 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
-        <button
-          type="button"
-          onClick={() => jumpTo(currentIdx - 1, false)}
-          disabled={currentIdx <= 0}
-          className="px-2 py-1 rounded text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white hover:bg-white/[0.08] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-          aria-label="Previous pitch"
-        >
-          ← prev
-        </button>
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="px-3 py-1 rounded text-[11px] uppercase tracking-[0.14em] bg-white/[0.08] hover:bg-white/[0.16] border border-white/15 text-white transition-colors"
-        >
-          {phase === "done" ? "Replay" : playing ? "Pause" : "Play"}
-        </button>
-        <button
-          type="button"
-          onClick={() => jumpTo(currentIdx + 1, false)}
-          disabled={currentIdx >= prepared.length - 1}
-          className="px-2 py-1 rounded text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white hover:bg-white/[0.08] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-          aria-label="Next pitch"
-        >
-          next →
-        </button>
-        <div className="hidden sm:flex border-l border-white/10 pl-3 ml-1 items-center gap-2 text-[11px] tabular-nums">
-          <span className="text-white/55">P{active?.raw.pitch_number ?? 1}</span>
-          <span className="text-white/85">{pitchLabel}</span>
-          <span className="text-white/55">
-            {velocity != null ? `${velocity.toFixed(1)} mph` : ""}
-          </span>
-          <span className="border-l border-white/10 pl-2 ml-1 text-white/60">
-            {balls}-{strikes}
-          </span>
-        </div>
-        <div className="sm:hidden border-l border-white/10 pl-2 ml-1 flex items-center gap-1 text-[11px] tabular-nums text-white/65">
-          <span>P{active?.raw.pitch_number ?? 1}</span>
-          <span>·</span>
-          <span>
-            {balls}-{strikes}
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg">
+    <div
+      role="group"
+      aria-label="At-bat playback"
+      onKeyDown={atBatKeyHandler}
+      className="hidden lg:flex absolute left-4 right-4 bottom-4 h-16 z-40 items-center gap-2.5 px-3 rounded-panel bg-overlay border border-line-strong pointer-events-auto"
+    >
+      <button
+        type="button"
+        aria-label="Previous pitch"
+        disabled={currentIdx <= 0}
+        onClick={() => jumpTo(currentIdx - 1, false)}
+        className="size-11 flex items-center justify-center rounded-control text-ink hover:bg-surface-2 disabled:opacity-35 disabled:hover:bg-transparent"
+      >
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 5h2v14H6zM20 5v14L9 12z" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        aria-label={phase === "done" ? "Replay at-bat" : playing ? "Pause" : "Play at-bat"}
+        onClick={togglePlay}
+        className="size-12 rounded-full bg-accent hover:bg-accent-hover text-white flex items-center justify-center"
+      >
+        {playing && phase !== "done" ? (
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
+          </svg>
+        ) : (
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 4l13 8-13 8z" />
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
+        aria-label="Next pitch"
+        disabled={currentIdx >= prepared.length - 1}
+        onClick={() => jumpTo(currentIdx + 1, false)}
+        className="size-11 flex items-center justify-center rounded-control text-ink hover:bg-surface-2 disabled:opacity-35 disabled:hover:bg-transparent"
+      >
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 5h2v14h-2zM4 5v14l11-7z" />
+        </svg>
+      </button>
+      <ol className="list-none m-0 grow flex items-center gap-1.5 px-2" aria-label="Pitches">
         {prepared.map((p, i) => {
-          const landed =
-            i < currentIdx || (i === currentIdx && phase !== "flying");
-          const isActiveFlying = i === currentIdx && !landed;
-          const cls = landed
-            ? dotColorForOutcome(p.raw.description)
-            : isActiveFlying
-              ? "bg-transparent"
-              : "bg-white/30 hover:bg-white/60";
-          const symbol = landed ? outcomeSymbol(p.raw.description) : null;
+          const cur = i === currentIdx;
+          const reached = i <= currentIdx;
           return (
-            <button
-              key={`dot-${i}`}
-              type="button"
-              onClick={() => jumpTo(i, false)}
-              className={`w-5 h-5 rounded-full overflow-hidden transition-colors flex items-center justify-center text-[10px] font-bold leading-none text-white/95 ${cls}`}
-              aria-label={`Jump to pitch ${i + 1}`}
-            >
-              {isActiveFlying ? (
-                <BaseballGlyph spinning />
-              ) : symbol ? (
+            <li key={i} className="flex-1 flex">
+              <button
+                type="button"
+                aria-label={`Go to pitch ${i + 1}: ${p.raw.pitch_type ? getPitchLabel(p.raw.pitch_type) : "pitch"}`}
+                aria-current={cur ? "step" : undefined}
+                onClick={() => jumpTo(i, false)}
+                className="w-full h-6 flex items-center"
+              >
                 <span
-                  aria-hidden
-                  style={
-                    symbol.mirrored
-                      ? { transform: "scaleX(-1)", display: "inline-block" }
-                      : undefined
-                  }
-                >
-                  {symbol.letter}
-                </span>
-              ) : null}
-            </button>
+                  aria-hidden="true"
+                  className={`block w-full rounded-[3px] ${cur ? "h-2.5" : "h-1.5"}`}
+                  style={{ background: reached ? getPitchColor(p.raw.pitch_type ?? "") : "var(--line-strong)" }}
+                />
+              </button>
+            </li>
           );
         })}
-      </div>
+      </ol>
+      <span className="text-[13px] text-muted" id="ab-speed-label">
+        Speed
+      </span>
+      <button
+        type="button"
+        aria-labelledby="ab-speed-label ab-speed-value"
+        title={`Switch to ${nextSpeed}×`}
+        onClick={() => setSpeed(nextSpeed)}
+        className="h-9 px-2.5 rounded-control border border-line-strong text-ink font-display font-bold text-base num hover:border-ink-2"
+      >
+        <span id="ab-speed-value">{speed}×</span>
+      </button>
+      <span aria-hidden="true" className="w-px h-8 bg-line-strong ml-1" />
+      {camera}
     </div>
   );
 }
-
-function outcomeSymbol(
-  description: string | null,
-): { letter: string; mirrored: boolean } | null {
-  const cat = categorizeDescription(description);
-  switch (cat) {
-    case "ball":
-      return { letter: "B", mirrored: false };
-    case "whiff":
-      return { letter: "K", mirrored: false };
-    case "called":
-      return { letter: "K", mirrored: true };
-    case "foul":
-      return { letter: "F", mirrored: false };
-    case "inplay":
-      return { letter: "P", mirrored: false };
-    default:
-      return null;
-  }
-}
-
-function dotColorForOutcome(description: string | null): string {
-  const cat = categorizeDescription(description);
-  // Tailwind-class strings rather than direct color literals so the
-  // dot picks up the same outcome palette as OUTCOME_COLORS at runtime
-  // even though we pass them as bg-* utilities.
-  switch (cat) {
-    case "whiff":
-      return "bg-red-500";
-    case "called":
-      return "bg-amber-500";
-    case "ball":
-      return "bg-blue-500";
-    case "foul":
-      return "bg-neutral-400";
-    case "inplay":
-      return "bg-emerald-500";
-    default:
-      return "bg-white/30";
-  }
-}
-
