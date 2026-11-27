@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   parseAsArrayOf,
   parseAsInteger,
@@ -190,6 +190,47 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const queryBarRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
+
+  // Land at the top of the page (not a restored mid-page offset).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Publish the sticky query bar's height as --query-h so the filter
+  // panel pins right under it, whatever the sentence wraps to.
+  useEffect(() => {
+    const bar = queryBarRef.current;
+    const layout = layoutRef.current;
+    if (!bar || !layout) return;
+    const ro = new ResizeObserver(() => layout.style.setProperty("--query-h", `${bar.offsetHeight}px`));
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, []);
+
+  // Scroll the page first: until the filter panel has reached its pinned
+  // position under the query bar, wheel-scrolling over it moves the page
+  // instead of the panel's own list (which would otherwise scroll while
+  // most of the panel is still below the fold).
+  useEffect(() => {
+    const aside = asideRef.current;
+    if (!aside) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY <= 0 || e.ctrlKey) return;
+      const pinTop = parseFloat(getComputedStyle(aside).top) || 0;
+      const gap = aside.getBoundingClientRect().top - pinTop;
+      if (gap <= 1) return; // pinned: let the panel scroll
+      const pageLeft = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+      if (pageLeft <= 0) return;
+      e.preventDefault();
+      window.scrollBy({ top: Math.min(e.deltaY, gap, pageLeft) });
+    };
+    aside.addEventListener("wheel", onWheel, { passive: false });
+    return () => aside.removeEventListener("wheel", onWheel);
+  }, []);
+
   // Mobile sheet: lock page scroll and close on Escape.
   useEffect(() => {
     if (!sheet) return;
@@ -326,7 +367,9 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
         </div>
       ) : null}
 
-      {/* Query sentence */}
+      {/* Query sentence — sticks under the header on desktop; its height
+          drives where the filter panel pins (see --query-h). */}
+      <div ref={queryBarRef} className="lg:sticky lg:top-16 z-20 bg-bg lg:pt-3 lg:-mt-3 lg:pb-1">
       <div className="container-page">
         <div
           aria-label="Current query"
@@ -355,12 +398,20 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
           ) : null}
         </div>
       </div>
+      </div>
 
-      <div className="container-page mt-4 flex flex-wrap gap-5 items-start">
+      <div ref={layoutRef} className="container-page mt-4 flex flex-wrap gap-5 items-start">
         {/* Filters (desktop) */}
         <aside
+          ref={asideRef}
           aria-label="Filters"
-          className="hidden lg:flex flex-col flex-[0_1_400px] min-w-[320px] bg-bg-raised border border-line rounded-panel overflow-hidden lg:sticky lg:top-20 max-h-[calc(100dvh-6rem)]"
+          // Pins just below the sticky query bar and always fits the
+          // viewport: top = header (4rem) + query bar + gap.
+          style={{
+            top: "calc(4rem + var(--query-h, 80px) + 12px)",
+            maxHeight: "calc(100dvh - 4rem - var(--query-h, 80px) - 24px)",
+          }}
+          className="hidden lg:flex flex-col flex-[0_1_400px] min-w-[320px] bg-bg-raised border border-line rounded-panel overflow-hidden lg:sticky"
         >
           <div className="grow min-h-0 overflow-y-auto scrollbar-thin">
             {SECTIONS.map((sec) => (
