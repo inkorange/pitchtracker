@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { NavPendingOverlay } from "@/components/feedback/NavPendingOverlay";
 import type { SavantPitchRow } from "@/lib/savant/client";
 import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
 
@@ -146,12 +147,15 @@ export function IndividualTable({ rows }: IndividualTableProps) {
                     {/* Round play button, same as the /pitchers table. */}
                     <Link
                       href={replayHref}
+                      // Hundreds of rows: don't prefetch them all.
+                      prefetch={false}
                       aria-label={`Replay this ${getPitchLabel(p.pitch_type ?? "UN")} from ${p.game_date ?? "this game"}`}
                       className="size-9 rounded-full bg-accent hover:bg-accent-hover inline-flex items-center justify-center"
                     >
                       <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="#fff">
                         <path d="M7 4l13 8-13 8z" />
                       </svg>
+                      <NavPendingOverlay label="Loading replay…" />
                     </Link>
                   </td>
                 </tr>

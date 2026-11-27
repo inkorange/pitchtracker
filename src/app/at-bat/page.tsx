@@ -4,6 +4,7 @@ import { EyebrowTag } from "@/components/broadcast";
 import { ScoreBug } from "@/components/broadcast/ScoreBug";
 import { SiteHeader } from "@/components/chrome/SiteHeader";
 import { GameCard } from "@/components/games/GameCard";
+import { NavPendingOverlay } from "@/components/feedback/NavPendingOverlay";
 import { createClient } from "@/lib/supabase/server";
 import { fetchGameResults, fetchPersonsCached, type MlbGameResult } from "@/lib/statsapi/client";
 import { getCachedDisplaySeason } from "@/lib/pitcher/cached-reads";
@@ -232,6 +233,7 @@ function MatchupResults({
                 <li key={`${pa.gamePk}-${pa.atBat}`} className="border-t border-line first:border-t-0 md:first:border-t">
                   <Link
                     href={href}
+                    prefetch={false}
                     className={`grid grid-cols-[1fr_auto] md:items-center gap-x-3 gap-y-1.5 px-4 md:px-[18px] py-3 md:py-0 md:min-h-14 text-sm text-ink hover:text-ink hover:bg-surface-2/60 ${
                       showBatter
                         ? "md:grid-cols-[110px_110px_minmax(0,1fr)_56px_minmax(0,1.4fr)_150px_110px]"
@@ -272,6 +274,7 @@ function MatchupResults({
                     <span className="hidden md:flex justify-self-end h-9 px-3.5 rounded-control bg-accent text-white text-[13px] font-bold items-center">
                       Replay ▶
                     </span>
+                    <NavPendingOverlay label="Loading replay…" />
                   </Link>
                 </li>
               );

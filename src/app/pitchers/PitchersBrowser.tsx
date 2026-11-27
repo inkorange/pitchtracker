@@ -27,6 +27,7 @@ import { pitcherPagePath } from "@/lib/url/pitcher-slug";
 import { getPitchColor, getPitchLabel } from "@/lib/viz/colors";
 import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import { MixBar } from "@/components/pitch/MixBar";
+import { NavPendingOverlay } from "@/components/feedback/NavPendingOverlay";
 
 // /pitchers — design/Pitchers.dc.html + PitchersMobile.dc.html.
 // All state lives in the URL so any view is shareable.
@@ -409,6 +410,7 @@ function DirectoryTable({
                     <span className="font-semibold truncate">{r.name}</span>
                     <span className="text-xs text-muted">{metaLine(r)}</span>
                   </span>
+                  <NavPendingOverlay label="Loading pitcher…" />
                 </Link>
               </th>
               {SORT_COLUMNS.map((c) => (
@@ -433,6 +435,7 @@ function DirectoryTable({
                   <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="#fff">
                     <path d="M7 4l13 8-13 8z" />
                   </svg>
+                  <NavPendingOverlay label="Loading pitcher…" />
                 </Link>
               </td>
             </tr>
@@ -471,6 +474,7 @@ function DirectoryCards({ rows, sort, offset }: { rows: DirectoryRow[]; sort: So
               <span className="font-display font-bold text-[26px] leading-none num">{CELL[sort](r)}</span>
               <span className="text-[10px] tracking-[1px] text-muted font-semibold uppercase">{col.short}</span>
             </span>
+            <NavPendingOverlay label="Loading pitcher…" />
           </Link>
         </li>
       ))}
@@ -609,6 +613,7 @@ function FindByPitch({
                 <MiniStat k="Whiff/sw" v={fmt1(f.line.whiffPerSwing)} />
                 <MiniStat k="Spin" v={fmtInt(f.line.spin)} />
               </div>
+              <NavPendingOverlay label="Loading pitcher…" />
             </Link>
           </li>
         ))}
