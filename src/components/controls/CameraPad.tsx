@@ -13,38 +13,39 @@ const PRESETS: Array<{ key: CameraPreset; label: string }> = [
 interface CameraPadProps {
   current: CameraPreset;
   onChange: (preset: CameraPreset) => void;
-  // Optional slot rendered to the LEFT of the preset chip, sharing
-  // the same absolute-positioned wrapper. Used to dock a companion
-  // control (e.g. EnvToggleGear) next to the pad without a
-  // hard-coded pixel offset.
+  /** Rendered left of the camera group (e.g. the settings gear). */
   leftSlot?: ReactNode;
+  /** Extra toggles appended inside the camera group (e.g. Tunnel, Heat). */
+  extra?: ReactNode;
 }
 
-export function CameraPad({ current, onChange, leftSlot }: CameraPadProps) {
+/** Bottom-right camera group — broadcast style (design/Pitcher.dc.html). */
+export function CameraPad({ current, onChange, leftSlot, extra }: CameraPadProps) {
   return (
-    // z-40 puts the whole controls row (preset chip + gear + gear
-    // popover) above every other scene overlay (transport bar,
-    // pitch chips, follow-off button — all at z-20). Without this
-    // the gear popover slots BEHIND the transport bar on mobile
-    // where the controls stack tightly.
-    <div className="absolute bottom-6 right-3 sm:right-6 z-40 flex gap-2 items-end">
+    // z-40 keeps the controls row above other scene chrome (labels,
+    // pitch chips) so it's always clickable.
+    <div className="absolute bottom-6 right-3 sm:right-6 lg:bottom-4 lg:right-4 z-40 flex gap-2 items-end">
       {leftSlot}
-      <div className="flex gap-1 p-1 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg">
+      <div
+        role="group"
+        aria-label="Camera"
+        className="flex items-center gap-0.5 p-1 rounded-control bg-overlay border border-line-strong shadow-lg font-display font-bold text-[15px] tracking-[1px] uppercase"
+      >
         {PRESETS.map((p) => (
           <button
             key={p.key}
+            type="button"
             onClick={() => onChange(p.key)}
-            className={`px-3 py-1.5 text-[11px] uppercase tracking-[0.14em] rounded-md transition-colors ${
-              current === p.key
-                ? "bg-white/10 text-white"
-                : "text-white/55 hover:text-white hover:bg-white/[0.04]"
+            className={`h-9 px-3 rounded-[2px] uppercase transition-colors ${
+              current === p.key ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"
             }`}
             aria-pressed={current === p.key}
-            aria-label={`Camera preset: ${p.label}`}
+            aria-label={`Camera: ${p.label}`}
           >
             {p.label}
           </button>
         ))}
+        {extra}
       </div>
     </div>
   );

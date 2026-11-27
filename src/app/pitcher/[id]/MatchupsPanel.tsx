@@ -57,6 +57,10 @@ interface MatchupsPanelProps {
    *  filter in the matchups dialog so opening "Find at-bats" lands
    *  on that game's lineup rather than the season's most-faced. */
   defaultTeamId?: number | null;
+  /** Open the finder dialog as soon as the panel mounts — used when the
+   *  desktop rail's "Find at-bats" button reveals this panel, so one
+   *  click gets you to the finder. Ignored mid at-bat replay. */
+  openOnMount?: boolean;
 }
 
 // Compact "Find at-bats" entry point on the pitcher card. Opens a
@@ -64,7 +68,7 @@ interface MatchupsPanelProps {
 // typeahead dropdown isn't clipped by the pitcher panel's scroll
 // container. URL state survives the dialog closing — `?vsBatter` +
 // `?abGame` + `?abNum` are the source of truth.
-export function MatchupsPanel({ season, defaultTeamId }: MatchupsPanelProps) {
+export function MatchupsPanel({ season, defaultTeamId, openOnMount = false }: MatchupsPanelProps) {
   const params = useParams<{ id?: string }>();
   const pitcherId = params?.id ? Number(params.id) : null;
 
@@ -85,7 +89,7 @@ export function MatchupsPanel({ season, defaultTeamId }: MatchupsPanelProps) {
     { shallow: false },
   );
 
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(openOnMount && atBat.abGame == null && vsBatter == null);
   const [batterName, setBatterName] = useState<string | null>(null);
   const [matchups, setMatchups] = useState<AtBatSummary[]>([]);
   const [matchupsLoading, setMatchupsLoading] = useState(false);

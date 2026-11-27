@@ -53,6 +53,14 @@ import {
   type MlbPitcherGameLine,
 } from "@/lib/statsapi/client";
 import { PitcherGameStats } from "../PitcherGameStats";
+import { seasonLine } from "@/lib/pitcher/season-line";
+import { PitcherTopBar } from "../rail/PitcherTopBar";
+import { RailTabs } from "../rail/RailTabs";
+import { ArsenalToggles } from "../rail/ArsenalToggles";
+import { RailFilters } from "../rail/RailFilters";
+import { RailGames } from "../rail/RailGames";
+import { SeasonSegment } from "../rail/SeasonSegment";
+import { SceneChrome } from "../rail/SceneChrome";
 
 interface PageProps {
   params: Promise<{ id: string; slug: string }>;
@@ -686,6 +694,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     ).length;
   }
 
+  // Rail stat strip — homepage leaderboard definitions, regular season.
+  const line = seasonLine(
+    season_data.pitches.map((p) => ({ ...p, game_type: p.pitch_games?.game_type ?? null })),
+  );
+
   const filterSummary = buildFilterSummary({
     season,
     pitchTypes,
@@ -744,6 +757,102 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
+      {/* ── Desktop (lg+): top bar · docked rail · scene overlays ── */}
+      <PitcherTopBar name={pitcher.full_name} compareHref={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`} />
+      <aside
+        aria-label="Pitcher controls"
+        className="hidden lg:flex flex-col absolute left-0 top-14 bottom-0 w-[384px] z-20 bg-bg-raised border-r border-line"
+      >
+        <div className="px-5 pt-5 pb-4 flex flex-col gap-4 border-b border-line shrink-0">
+          <div className="flex items-center gap-3.5">
+            <span className="relative size-14 shrink-0 rounded-full bg-avatar overflow-hidden">
+              <Image src={pitcherHeadshotUrl(pitcher.mlb_id, 120)} alt="" fill sizes="56px" className="object-cover" unoptimized />
+            </span>
+            <div className="flex flex-col grow min-w-0">
+              <p role="heading" aria-level={1} className="m-0 font-display font-extrabold text-[30px] leading-none uppercase text-ink truncate">
+                {pitcher.full_name}
+                <span className="sr-only"> MLB Statcast data</span>
+              </p>
+              <span className="mt-1 text-[13px] text-muted flex items-center gap-1.5">
+                {[pitcher.throws ? `${pitcher.throws}HP` : null, team?.name ?? null, pitcher.debut_year ? `debut ${pitcher.debut_year}` : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+                {bioParagraphs.length > 0 ? (
+                  <HelpButton title="About">
+                    {bioParagraphs.map((p, i) => (
+                      <p key={i}>{p}</p>
+                    ))}
+                  </HelpButton>
+                ) : null}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <SeasonSegment season={season} available={availableSeasons.length ? availableSeasons : [season]} />
+            <span className="text-xs text-muted">MLB Statcast</span>
+          </div>
+          <dl className="m-0 grid grid-cols-4 border border-line rounded-control overflow-hidden">
+            {(
+              [
+                ["K", String(line.strikeouts)],
+                ["Whiff%", line.whiffPct != null ? line.whiffPct.toFixed(1) : "—"],
+                ["CSW%", line.cswPct != null ? line.cswPct.toFixed(1) : "—"],
+                ["FB mph", line.fbMph != null ? line.fbMph.toFixed(1) : "—"],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="px-2.5 py-2 flex flex-col bg-surface border-r border-line last:border-r-0 min-w-0">
+                <dt className="text-[10px] tracking-[1px] text-muted font-semibold uppercase">{k}</dt>
+                <dd className="m-0 font-display font-bold text-2xl leading-[1.05] num">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <RailTabs
+          countLabel={`${renderable.length.toLocaleString()} pitch${renderable.length === 1 ? "" : "es"}`}
+          countSub={
+            renderable.length > RECENT_RIBBON_CAP
+              ? `${RECENT_RIBBON_CAP.toLocaleString()} recent · rest as paths`
+              : (cachedPitches ?? []).length === 0
+                ? "No pitch data for these filters"
+                : null
+          }
+          arsenal={<ArsenalToggles rows={aggregates} season={season} />}
+          filters={<RailFilters />}
+          games={
+            <RailGames
+              games={games}
+              season={season}
+              totalPitches={season_data.pitches.length}
+              gameLine={
+                gameLine ? (
+                  <PitcherGameStats
+                    line={gameLine}
+                    xbh={xbhInGame}
+                    gameDate={activeGameInfo?.game_date ?? null}
+                    opponentName={activeGameInfo?.opponentName ?? null}
+                  />
+                ) : null
+              }
+            />
+          }
+          matchups={
+            <div className="flex flex-col gap-3">
+              <AtBatHeader season={season} />
+              <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
+            </div>
+          }
+        />
+      </aside>
+      <SceneChrome
+        pitchTypes={aggregates.map((a) => a.pitch_type)}
+        gameLabels={Object.fromEntries(games.map((g) => [String(g.game_pk), `${g.away} @ ${g.home} · ${g.game_date}`]))}
+        batterName={batterName}
+        lowerLabel={[team?.abbreviation, pitcher.throws ? `${pitcher.throws}HP` : null, String(season)].filter(Boolean).join(" · ")}
+        lowerValue={pitcher.full_name}
+      />
+
+      {/* ── Below lg: the previous floating chrome (until the Phase 8 drawer) ── */}
+      <div className="lg:hidden">
       <PitcherOutcomeLegendGate>
         <OutcomeLegend />
       </PitcherOutcomeLegendGate>
@@ -763,6 +872,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           </div>
         }
       />
+      </div>
 
       {/* Card column. Absolute wrapper that holds the pitcher card AND
           the mobile-only summary banner stacked below it. Flex-col so
@@ -773,7 +883,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           the card section — otherwise the summary banner overlaps the
           stat cards on mobile in stats mode. */}
       <HidablePanel
-        positionClass="absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
+        positionClass="lg:hidden absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
         panelName="pitcher panel"
         dataAttribute="data-pitcher-card-column"
       >

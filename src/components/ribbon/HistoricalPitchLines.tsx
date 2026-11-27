@@ -25,6 +25,8 @@ interface HistoricalEntry {
    *  `path` they pass to the regular Ribbon. */
   path: Array<[number, number, number]>;
   pitchType: string;
+  /** Overrides the pitch-type color (e.g. "color by outcome"). */
+  color?: string;
 }
 
 interface HistoricalPitchLinesProps {
@@ -72,11 +74,11 @@ function buildGeometry(entries: HistoricalEntry[]): BufferGeometry {
   // Cache parsed Color per pitch type so we're not building one
   // every loop iteration — that adds up at 2000+ pitches.
   const colorCache = new Map<string, Color>();
-  const colorFor = (pitchType: string): Color => {
-    let c = colorCache.get(pitchType);
+  const colorFor = (hex: string): Color => {
+    let c = colorCache.get(hex);
     if (!c) {
-      c = new Color(getPitchColor(pitchType));
-      colorCache.set(pitchType, c);
+      c = new Color(hex);
+      colorCache.set(hex, c);
     }
     return c;
   };
@@ -84,7 +86,7 @@ function buildGeometry(entries: HistoricalEntry[]): BufferGeometry {
   let cursor = 0;
   for (const e of entries) {
     if (e.path.length < 2) continue;
-    const c = colorFor(e.pitchType);
+    const c = colorFor(e.color ?? getPitchColor(e.pitchType));
     for (let i = 0; i < e.path.length - 1; i++) {
       const a = statcastToThree(e.path[i]);
       const b = statcastToThree(e.path[i + 1]);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Html, Sphere } from "@react-three/drei";
 import { Pitch, type StatcastRow } from "@/lib/pitch/Pitch";
 import { Scene } from "@/components/scene/Scene";
+import { useColorBy } from "./rail/colorBy";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { HistoricalPitchLines } from "@/components/ribbon/HistoricalPitchLines";
 import { RECENT_RIBBON_CAP } from "@/lib/viz/scene-tuning";
@@ -50,6 +51,16 @@ function subscribeIsMobile(callback: () => void): () => void {
 }
 function getIsMobileSnapshot(): boolean {
   return window.matchMedia(MOBILE_MQL).matches;
+}
+// lg (≥1024px): docked-rail desktop layout.
+const DESKTOP_MQL = "(min-width: 1024px)";
+function subscribeIsDesktop(callback: () => void): () => void {
+  const mql = window.matchMedia(DESKTOP_MQL);
+  mql.addEventListener("change", callback);
+  return () => mql.removeEventListener("change", callback);
+}
+function getIsDesktopSnapshot(): boolean {
+  return window.matchMedia(DESKTOP_MQL).matches;
 }
 function getIsMobileServerSnapshot(): boolean {
   return false;
@@ -239,6 +250,17 @@ export function PitcherArsenalScene({
     };
   }, [entries]);
 
+  const [overlayHelp, setOverlayHelp] = useState<"tunnel" | "heat" | null>(null);
+
+  // "Color by: Outcome" (rail legend) recolors every path by its
+  // pitch result instead of its type.
+  const [colorBy] = useColorBy();
+  const byOutcome = colorBy === "outcome";
+  const historicalForLines = useMemo(
+    () => (byOutcome ? historicalEntries.map((e) => ({ ...e, color: e.outcomeColor })) : historicalEntries),
+    [byOutcome, historicalEntries],
+  );
+
   const selectedEntry = useMemo(
     () => entries.find((e) => e.id === selectedId) ?? null,
     [entries, selectedId],
@@ -317,15 +339,24 @@ export function PitcherArsenalScene({
     getIsMobileServerSnapshot,
   );
 
+  const isDesktop = useSyncExternalStore(
+    subscribeIsDesktop,
+    getIsDesktopSnapshot,
+    getIsMobileServerSnapshot,
+  );
+
   const presetOverride: CameraPosition | null = useMemo(() => {
     if (inAtBatMode) {
       return frontPresetForStand(preset, batterStand);
     }
-    if (preset === "front" && isMobile) {
+    // Centered front framing on phones and on the desktop layout, where
+    // the rail is docked beside the scene instead of floating over its
+    // left side. (Tablets still have the floating panel → biased view.)
+    if (preset === "front" && (isMobile || isDesktop)) {
       return MOBILE_FRONT_PRESET;
     }
     return null;
-  }, [inAtBatMode, preset, batterStand, isMobile]);
+  }, [inAtBatMode, preset, batterStand, isMobile, isDesktop]);
 
   // Snap the camera back to the front preset (with the stance shift
   // applied) every time a new at-bat is loaded — the user usually
@@ -370,7 +401,7 @@ export function PitcherArsenalScene({
         ) : null}
         {!inAtBatMode && historicalEntries.length > 0 ? (
           <HistoricalPitchLines
-            entries={historicalEntries}
+            entries={historicalForLines}
             opacity={
               tunnelOn || heatMetric !== null
                 ? 0.05
@@ -397,6 +428,7 @@ export function PitcherArsenalScene({
               <Ribbon
                 path={e.path}
                 pitchType={e.pitchType}
+                color={byOutcome ? e.outcomeColor : undefined}
                 radius={isSelected ? 0.1 : 0.06}
                 opacity={opacity}
                 onClick={(ev) => {
@@ -453,7 +485,69 @@ export function PitcherArsenalScene({
         current={preset}
         onChange={handlePresetChange}
         leftSlot={<EnvToggleGear />}
+        // Desktop: Tunnel is a camera-group button and Heat sits beside
+        // it (design/Pitcher.dc.html). Below lg the floating toggles stay.
+        extra={
+          inAtBatMode ? null : (
+            <span className="hidden lg:contents">
+              <span aria-hidden="true" className="w-px h-6 mx-1 bg-line-strong" />
+              <button
+                type="button"
+                aria-pressed={tunnelOn}
+                onClick={() => setTunnelOn((v) => !v)}
+                title="Show the pitch-tunnel envelope across the current pitch types."
+                className={`h-9 px-3 rounded-[2px] uppercase transition-colors ${tunnelOn ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
+              >
+                Tunnel
+              </button>
+              <button
+                type="button"
+                aria-pressed={heatMetric !== null}
+                onClick={() => setHeatParam(heatMetric ? null : "whiff")}
+                title="Show a per-zone heat grid across the current pitch selection."
+                className={`h-9 px-3 rounded-[2px] uppercase transition-colors ${heatMetric ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
+              >
+                Heat
+              </button>
+            </span>
+          )
+        }
       />
+      {!inAtBatMode && (tunnelOn || heatMetric) ? (
+        <div className="hidden lg:flex absolute bottom-[72px] right-4 z-40 items-center gap-1.5 p-1 rounded-control bg-overlay border border-line-strong shadow-lg">
+          {heatMetric ? (
+            <div role="radiogroup" aria-label="Heat metric" className="flex gap-0.5">
+              {HEAT_METRIC_OPTIONS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={m === heatMetric}
+                  onClick={() => setHeatParam(m)}
+                  className={`h-8 px-2.5 rounded-[2px] text-xs font-semibold ${
+                    m === heatMetric ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"
+                  }`}
+                >
+                  {HEAT_METRIC_LABELS[m]}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {tunnelOn && !tunnelEnvelope ? (
+            <span className="px-2 text-xs text-highlight">Tunnel needs ≥ 2 pitch types</span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setOverlayHelp(heatMetric ? "heat" : "tunnel")}
+            aria-label={heatMetric ? "What is the heat grid?" : "What is pitch tunneling?"}
+            className="size-8 rounded-full border border-line-strong text-ink-2 hover:text-ink text-sm"
+          >
+            ?
+          </button>
+        </div>
+      ) : null}
+      {overlayHelp === "tunnel" ? <TunnelHelp onClose={() => setOverlayHelp(null)} /> : null}
+      {overlayHelp === "heat" ? <HeatHelp metric={heatMetric} onClose={() => setOverlayHelp(null)} /> : null}
       {inAtBatMode ? (
         <AtBatPlaybackBar
           state={playback.state}
@@ -588,7 +682,7 @@ function TunnelToggle({
   const [helpOpen, setHelpOpen] = useState(false);
   return (
     <>
-      <div className="absolute bottom-20 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
+      <div className="lg:hidden absolute bottom-20 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
         <div className="flex items-center gap-1">
           <OverlayToggleButton
             active={active}
@@ -726,7 +820,7 @@ function HeatToggle({
     : "Heat";
   return (
     <>
-      <div className="absolute bottom-32 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
+      <div className="lg:hidden absolute bottom-32 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
         <div className="flex items-center gap-1">
           <OverlayToggleButton
             active={active}

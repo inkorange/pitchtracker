@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { usePitcherView } from "./StatsModeToggle";
 
 // Composes the pitcher card body from three slots:
@@ -25,11 +25,13 @@ export function PitcherBody({
 }) {
   const [view] = usePitcherView();
   if (view === "stats") return <>{filters}</>;
+  // Keyed: React dev warned about unkeyed children here when the
+  // server-rendered slots came through as a list.
   return (
     <>
-      {arsenal}
-      {filters}
-      {matchups}
+      <Fragment key="arsenal">{arsenal}</Fragment>
+      <Fragment key="filters">{filters}</Fragment>
+      <Fragment key="matchups">{matchups}</Fragment>
     </>
   );
 }
