@@ -7,6 +7,7 @@ import { BottomSheet, type SnapIndex } from "@/components/sheet/BottomSheet";
 import { openAiChat } from "@/lib/ai/open-chat";
 import { usePitcherView } from "../StatsModeToggle";
 import { useFilterChips } from "./SceneChrome";
+import { AtBatMobileHeader, AtBatMobilePanel } from "../atbat/AtBatMobile";
 import { RAIL_TAB_EVENT, usePitcherUrl, type RailTab } from "./usePitcherUrl";
 
 // Mobile / tablet (< lg) pitcher page — design/MobileSheetPeek.dc.html +
@@ -20,6 +21,7 @@ const TABS: { key: Exclude<RailTab, "matchups">; label: string }[] = [
 ];
 
 export function MobilePitcherShell({
+  pitcherName,
   shortName,
   meta,
   pitchCount,
@@ -33,6 +35,7 @@ export function MobilePitcherShell({
   games,
   matchups,
 }: {
+  pitcherName: string;
   shortName: string;
   meta: string;
   pitchCount: number;
@@ -109,8 +112,9 @@ export function MobilePitcherShell({
 
   return (
     <div className="lg:hidden">
+      {inAtBat ? <AtBatMobileHeader pitcherName={pitcherName} season={season} /> : null}
       {/* Header */}
-      <header className="absolute inset-x-0 top-0 h-14 z-30 flex items-center gap-1 pl-1 pr-2 bg-bg-raised border-b border-line">
+      <header hidden={inAtBat} className="absolute inset-x-0 top-0 h-14 z-30 flex items-center gap-1 pl-1 pr-2 bg-bg-raised border-b border-line">
         <button
           type="button"
           aria-label="Back"
@@ -141,7 +145,7 @@ export function MobilePitcherShell({
       </header>
 
       {/* View toggle + filter chips over the top of the scene */}
-      <div className="absolute top-[68px] inset-x-0 z-20 flex gap-2 px-3 overflow-x-auto scrollbar-thin">
+      <div hidden={inAtBat} className="absolute top-[68px] inset-x-0 z-20 flex gap-2 px-3 overflow-x-auto scrollbar-thin">
         <div role="group" aria-label="View" className="shrink-0 flex bg-overlay border border-line-strong rounded-control p-[3px]">
           {(
             [
@@ -192,7 +196,7 @@ export function MobilePitcherShell({
       <BottomSheet
         index={snap}
         onIndexChange={setSnap}
-        dismissed={view === "stats" && snap === 0}
+        dismissed={inAtBat || (view === "stats" && snap === 0)}
         label="Pitcher panel"
         header={
           <>
@@ -249,6 +253,7 @@ export function MobilePitcherShell({
       >
         {body}
       </BottomSheet>
+      {inAtBat ? <AtBatMobilePanel /> : null}
     </div>
   );
 }

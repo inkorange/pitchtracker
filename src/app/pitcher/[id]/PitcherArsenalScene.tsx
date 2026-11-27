@@ -10,7 +10,8 @@ import { useColorBy } from "./rail/colorBy";
 import { Ribbon } from "@/components/ribbon/Ribbon";
 import { HistoricalPitchLines } from "@/components/ribbon/HistoricalPitchLines";
 import { RECENT_RIBBON_CAP } from "@/lib/viz/scene-tuning";
-import { CameraPad } from "@/components/controls/CameraPad";
+import { CameraGroup, CameraPad } from "@/components/controls/CameraPad";
+import { atBatKeyHandler, publishAtBat, registerAtBatCommands } from "./atbat/store";
 import { EnvToggleGear } from "@/components/controls/EnvToggleGear";
 import { TunnelMesh } from "@/components/scene/TunnelMesh";
 import { HeatGridPlane } from "@/components/scene/HeatGridPlane";
@@ -31,7 +32,7 @@ import {
 } from "@/lib/pitch/heatGrid";
 import type { ReplayPitch } from "@/app/at-bat/[gamePk]/[atBatNumber]/AtBatReplayScene";
 import {
-  AtBatPlaybackBar,
+  AtBatTransport,
   AtBatPlaybackLayer,
   useAtBatPlayback,
 } from "./AtBatPlaybackLayer";
@@ -280,6 +281,8 @@ export function PitcherArsenalScene({
         return;
       }
       if (recentEntries.length === 0) return;
+      // At-bat mode has its own (scene-scoped) arrow keys.
+      if (new URLSearchParams(window.location.search).has("abGame")) return;
       ev.preventDefault();
       const dir = ev.key === "ArrowRight" ? 1 : -1;
       setSelectedId((curr) => {
@@ -307,6 +310,31 @@ export function PitcherArsenalScene({
   // render and trigger an infinite reset loop.
   const playback = useAtBatPlayback(atBatPitches ?? null);
   const inAtBatMode = atBatPitches != null && atBatPitches.length > 0;
+
+  // Share playback with the page's at-bat chrome (rail pitch list,
+  // score bug, zone inset, mobile cards) — see atbat/store.ts.
+  const playRaw = useMemo(() => playback.state.prepared.map((p) => p.raw), [playback.state.prepared]);
+  const { currentIdx: abIdx, phase: abPhase, playing: abPlaying, speed: abSpeed } = playback.state;
+  useEffect(() => {
+    publishAtBat(
+      inAtBatMode
+        ? {
+            pitches: playRaw,
+            currentIdx: abIdx,
+            landed: abPhase !== "flying",
+            playing: abPlaying && abPhase !== "done",
+            done: abPhase === "done",
+            speed: abSpeed,
+          }
+        : null,
+    );
+  }, [inAtBatMode, playRaw, abIdx, abPhase, abPlaying, abSpeed]);
+  useEffect(() => () => publishAtBat(null), []);
+  const { jumpTo: abJump, togglePlay: abToggle, setSpeed: abSetSpeed } = playback.handlers;
+  useEffect(
+    () => registerAtBatCommands({ jumpTo: abJump, togglePlay: abToggle, setSpeed: abSetSpeed }),
+    [abJump, abToggle, abSetSpeed],
+  );
 
   // Stance is the same for the whole at-bat; first valid value wins.
   // Drives both the silhouette in the box and the front-preset camera
@@ -359,6 +387,15 @@ export function PitcherArsenalScene({
 
   return (
     <>
+      {/* At-bat keys (←/→ step, Space play) are scoped to the scene:
+          clicking the canvas focuses this box. */}
+      <div
+        className="absolute inset-0 outline-none"
+        tabIndex={inAtBatMode ? 0 : -1}
+        aria-label={inAtBatMode ? "At-bat replay. Left and right arrows step through pitches; Space plays or pauses." : undefined}
+        role={inAtBatMode ? "region" : undefined}
+        onKeyDown={inAtBatMode ? atBatKeyHandler : undefined}
+      >
       <Scene
         preset={preset}
         presetTick={presetTick}
@@ -457,6 +494,7 @@ export function PitcherArsenalScene({
         ) : null}
         {!inAtBatMode && heatGrid ? <HeatGridPlane grid={heatGrid} /> : null}
       </Scene>
+      </div>
       {/* Bottom-of-screen controls swap with the mode. Camera pad +
           tunnel toggle for arsenal browsing; transport bar for
           at-bat playback. */}
@@ -467,7 +505,8 @@ export function PitcherArsenalScene({
         // Below lg the pad sits full-width just above the drawer's peek
         // (the scene box ends 36px under the peek's top edge)
         // (design/MobileSheetPeek); on desktop, bottom-right of the scene.
-        positionClass="left-3 right-3 bottom-12 sm:left-auto sm:right-4 lg:bottom-4"
+        // In at-bat mode the desktop transport bar carries the camera group.
+        positionClass={`left-3 right-3 bottom-12 sm:left-auto sm:right-4 lg:bottom-4 ${inAtBatMode ? "lg:hidden" : ""}`}
         // Tunnel is a camera-group button and Heat sits beside it.
         extra={
           inAtBatMode ? null : (
@@ -531,9 +570,10 @@ export function PitcherArsenalScene({
       {overlayHelp === "tunnel" ? <TunnelHelp onClose={() => setOverlayHelp(null)} /> : null}
       {overlayHelp === "heat" ? <HeatHelp metric={heatMetric} onClose={() => setOverlayHelp(null)} /> : null}
       {inAtBatMode ? (
-        <AtBatPlaybackBar
+        <AtBatTransport
           state={playback.state}
           handlers={playback.handlers}
+          camera={<CameraGroup current={preset} onChange={handlePresetChange} className="shadow-none" />}
         />
       ) : (
         <>

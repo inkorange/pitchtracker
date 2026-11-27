@@ -45,6 +45,10 @@ export function SceneChrome({
 
   const chips = useFilterChips(gameLabels, batterName);
 
+  // At-bat mode has its own overlays (atbat/AtBatOverlays) and exits
+  // from the top bar.
+  if (inAtBat) return null;
+
   return (
     <div className="hidden lg:block absolute top-14 left-[384px] right-0 bottom-0 pointer-events-none z-20">
       <TransitionOverlay isPending={isPending} />

@@ -1,12 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useAtBatNav } from "../atbat/AtBatRail";
+import { shareAtBat, useAtBatInfo } from "../atbat/useAtBatInfo";
 import { openPalette } from "@/components/chrome/CommandPalette";
 import { Wordmark } from "@/components/chrome/SiteHeader";
 import { openAiChat } from "@/lib/ai/open-chat";
 
 /** Desktop pitcher-page top bar (56px) — design/Pitcher.dc.html. */
-export function PitcherTopBar({ name, compareHref }: { name: string; compareHref: string }) {
+export function PitcherTopBar({ name, season, compareHref }: { name: string; season: number; compareHref: string }) {
+  const sp = useSearchParams();
+  const inAtBat = sp.has("abGame") && sp.has("abNum");
+  const info = useAtBatInfo(season);
+  const nav = useAtBatNav();
+  const [copied, setCopied] = useState(false);
+  const abLabel = inAtBat
+    ? `At-bat #${sp.get("abNum")}${info?.batterName ? ` vs ${info.batterName}` : ""}`
+    : null;
   return (
     <header className="hidden lg:flex absolute inset-x-0 top-0 h-14 z-30 items-center gap-5 px-5 bg-bg-raised border-b border-line">
       <Link href="/" aria-label="PitchTracker home" className="hover:opacity-90">
@@ -20,12 +32,56 @@ export function PitcherTopBar({ name, compareHref }: { name: string; compareHref
             </Link>
           </li>
           <li aria-hidden="true">/</li>
-          <li aria-current="page" className="text-ink truncate max-w-[280px]">
-            {name}
-          </li>
+          {abLabel ? (
+            <>
+              <li>
+                <button type="button" onClick={nav.exit} className="text-muted hover:text-accent-hover">
+                  {name}
+                </button>
+              </li>
+              <li aria-hidden="true">/</li>
+              <li aria-current="page" className="text-ink truncate max-w-[360px]">
+                {abLabel}
+              </li>
+            </>
+          ) : (
+            <li aria-current="page" className="text-ink truncate max-w-[280px]">
+              {name}
+            </li>
+          )}
         </ol>
       </nav>
       <span className="grow" />
+      {inAtBat ? (
+        <>
+          <span role="status" className={copied ? "text-sm text-highlight" : "sr-only"}>
+            {copied ? "Link copied" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              if ((await shareAtBat(`${name}${abLabel ? ` · ${abLabel}` : ""}`)) === "copied") {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }
+            }}
+            className="h-9 px-3.5 rounded-control border border-line-strong text-[13px] font-semibold text-ink hover:border-ink-2"
+          >
+            Share at-bat
+          </button>
+          <button
+            type="button"
+            onClick={nav.exit}
+            className="h-9 px-3.5 flex items-center gap-2 rounded-control border border-line-strong text-[13px] font-semibold text-ink hover:border-ink-2"
+          >
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+            Exit at-bat
+          </button>
+        </>
+      ) : (
+        <>
       <button
         type="button"
         onClick={openPalette}
@@ -55,6 +111,8 @@ export function PitcherTopBar({ name, compareHref }: { name: string; compareHref
       >
         Compare
       </Link>
+        </>
+      )}
     </header>
   );
 }

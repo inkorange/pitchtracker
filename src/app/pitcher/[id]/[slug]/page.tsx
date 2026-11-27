@@ -24,7 +24,8 @@ import {
 } from "@/lib/viz/colors";
 import { HelpButton } from "../stats/HelpButton";
 import { MatchupsPanel } from "../MatchupsPanel";
-import { AtBatHeader } from "../AtBatHeader";
+import { AtBatOverlays } from "../atbat/AtBatOverlays";
+import { AtBatRail, RailSwitch } from "../atbat/AtBatRail";
 import { PitcherStatsArea } from "../PitcherStatsArea";
 import type { StatsAtBat } from "../stats/StatsSummary";
 import { groupPlateAppearances } from "@/lib/at-bat/plate-appearances";
@@ -814,11 +815,14 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       {/* ── Desktop (lg+): top bar · docked rail · scene overlays ── */}
-      <PitcherTopBar name={pitcher.full_name} compareHref={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`} />
+      <PitcherTopBar name={pitcher.full_name} season={season} compareHref={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`} />
       <aside
         aria-label="Pitcher controls"
         className="hidden lg:flex flex-col absolute left-0 top-14 bottom-0 w-[384px] z-20 bg-bg-raised border-r border-line"
       >
+        <RailSwitch
+          atBat={<AtBatRail pitcherName={pitcher.full_name} pitcherMeta={[team?.abbreviation, pitcher.throws ? `${pitcher.throws}HP` : null].filter(Boolean).join(" · ")} season={season} />}
+        >
         <div className="px-5 pt-5 pb-4 flex flex-col gap-4 border-b border-line shrink-0">
           <div className="flex items-center gap-3.5">
             <span className="relative size-14 shrink-0 rounded-full bg-avatar overflow-hidden">
@@ -893,12 +897,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
             />
           }
           matchups={
-            <div className="flex flex-col gap-3">
-              <AtBatHeader season={season} />
-              <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
-            </div>
+            <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
           }
         />
+        </RailSwitch>
       </aside>
       <SceneChrome
         pitchTypes={aggregates.map((a) => a.pitch_type)}
@@ -908,8 +910,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         lowerValue={pitcher.full_name}
       />
 
+      <AtBatOverlays />
+
       {/* ── Below lg: header · chips · drawer (design/MobileSheetPeek) ── */}
       <MobilePitcherShell
+        pitcherName={pitcher.full_name}
         shortName={pitcher.first_name && pitcher.last_name ? `${pitcher.first_name[0]}. ${pitcher.last_name}` : pitcher.full_name}
         meta={[pitcher.throws ? `${pitcher.throws}HP` : null, team?.abbreviation ?? null, String(season)].filter(Boolean).join(" · ")}
         pitchCount={renderable.length}
@@ -942,10 +947,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           </div>
         }
         matchups={
-          <div className="flex flex-col gap-3">
-            <AtBatHeader season={season} />
-            <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
-          </div>
+          <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
         }
       />
       <CommandPalette />

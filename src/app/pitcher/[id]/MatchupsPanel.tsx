@@ -140,13 +140,10 @@ export function MatchupsPanel({ season, defaultTeamId, openOnMount = false }: Ma
     setBatterName(null);
   }
 
-  function exitAtBat() {
-    setAtBat({ abGame: null, abNum: null });
-  }
-
-  const inAtBatMode = atBat.abGame != null && atBat.abNum != null;
   const batterScoped = vsBatter != null;
-  const showInline = inAtBatMode && batterScoped;
+  // The at-bat list shows whenever a batter is picked; at-bat playback
+  // itself has its own rail panel (atbat/AtBatRail).
+  const showInline = batterScoped;
 
   return (
     <div className="space-y-2">
@@ -179,13 +176,6 @@ export function MatchupsPanel({ season, defaultTeamId, openOnMount = false }: Ma
               setAtBat({ abGame: ab.game_pk, abNum: ab.at_bat_number })
             }
           />
-          <button
-            type="button"
-            onClick={exitAtBat}
-            className="w-full h-11 px-3 rounded-control border border-line-strong text-sm font-semibold text-ink hover:border-ink-2 transition-colors"
-          >
-            Exit at-bat mode
-          </button>
         </>
       ) : !batterScoped ? (
         <button
