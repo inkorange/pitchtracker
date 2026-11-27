@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getHomeRankings } from "@/lib/home/rankings";
 import { LeaderboardCard } from "./LeaderboardCard";
 import { LeaderboardTabs } from "./LeaderboardTabs";
@@ -24,17 +23,7 @@ export async function Leaderboards() {
             </span>
           </>
         }
-        aside={
-          <>
-            <span className="md:hidden text-[13px] text-muted">{season} season</span>
-            <Link
-              href="/strikeout_leaders"
-              className="hidden md:flex text-sm font-semibold min-h-11 items-center text-ink hover:text-accent-hover"
-            >
-              Full leaderboards →
-            </Link>
-          </>
-        }
+        aside={<span className="md:hidden text-[13px] text-muted">{season} season</span>}
       />
 
       <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-4">
