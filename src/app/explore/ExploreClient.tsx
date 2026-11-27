@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   parseAsArrayOf,
   parseAsInteger,
@@ -8,28 +8,41 @@ import {
   parseAsStringLiteral,
   useQueryStates,
 } from "nuqs";
+import { EyebrowTag } from "@/components/broadcast";
+import { Spinner } from "@/components/feedback/Spinner";
 import {
-  PITCH_TYPES,
-  COUNTS,
-  DESCRIPTIONS,
-  EVENTS,
-  BATTED_BALL_TYPES,
-  GAME_TYPES,
-  ZONES,
-  type EnumOption,
-} from "@/lib/savant/enums";
-import { MultiPitcherPicker } from "@/components/search/MultiPitcherPicker";
-import { AggregatePanel } from "./AggregatePanel";
-import { IndividualTable } from "./IndividualTable";
-import { VisualizationPanel } from "./VisualizationPanel";
+  activeFilterCount,
+  CHASE_ZONES,
+  querySentence,
+  RESULT_GROUPS,
+  type ExploreFilters,
+} from "@/lib/explore/query";
+import { getPitchLabel } from "@/lib/viz/colors";
 import type { SearchQuery } from "@/lib/savant/search";
 import type { SearchAggregates } from "@/lib/savant/aggregates";
 import type { SavantPitchRow } from "@/lib/savant/client";
-import { fallbackDisplaySeason } from "@/lib/season/current-season";
+import {
+  OutcomeBody,
+  outcomeSummary,
+  WhatBody,
+  whatSummary,
+  WhenBody,
+  whenSummary,
+  WhoBody,
+  whoSummary,
+  type Patch,
+  type SectionKey,
+  type SectionProps,
+} from "./FilterSections";
+import { IndividualTable } from "./IndividualTable";
+import { VisualizationPanel } from "./VisualizationPanel";
+import { ZoneHeat } from "./ZoneHeat";
 
-// URL state schema. Short keys keep the share URL readable.
+// /explore — design/Explore.dc.html + ExploreMobile.dc.html.
+// URL keys are unchanged from the previous Explore (short keys keep
+// share links readable, and old links keep working).
+
 const HAND = parseAsStringLiteral(["L", "R"] as const);
-
 const filterParsers = {
   pid: parseAsArrayOf(parseAsInteger).withDefault([]),
   bid: parseAsArrayOf(parseAsInteger).withDefault([]),
@@ -42,101 +55,104 @@ const filterParsers = {
   c: parseAsArrayOf(parseAsString).withDefault([]),
   o: parseAsArrayOf(parseAsInteger).withDefault([]),
   inn: parseAsArrayOf(parseAsInteger).withDefault([]),
-  gt: parseAsArrayOf(parseAsString)
-    .withDefault(["R"] as string[]),
+  gt: parseAsArrayOf(parseAsString).withDefault(["R"] as string[]),
   d: parseAsArrayOf(parseAsString).withDefault([]),
   ev: parseAsArrayOf(parseAsString).withDefault([]),
   bb: parseAsArrayOf(parseAsString).withDefault([]),
   z: parseAsArrayOf(parseAsInteger).withDefault([]),
+  view: parseAsStringLiteral(["scene", "heat", "table"] as const).withDefault("scene"),
 };
-
-// Date heuristic rather than the calendar year: this is a client
-// component so it cannot await the data-season lookup, but it still
-// must not default the filter UI to a season with no data every
-// January. See lib/season/current-season.ts.
-const CURRENT_YEAR = fallbackDisplaySeason();
-const SEASON_OPTIONS = Array.from({ length: 6 }, (_, i) => ({
-  value: CURRENT_YEAR - i,
-  label: String(CURRENT_YEAR - i),
-}));
 
 interface SearchResponse {
   rows: SavantPitchRow[];
   truncated: boolean;
   totalReturned: number;
   aggregates: SearchAggregates;
-  cacheKey: string;
 }
 
-export function ExploreClient() {
-  const [filters, setFilters] = useQueryStates(filterParsers, {
-    history: "replace",
-  });
-  // Track an in-flight request id so a slow first response can't
-  // clobber a faster second one if the user resubmits quickly.
-  const [requestId, setRequestId] = useState(0);
+const SECTIONS: { key: SectionKey; title: string }[] = [
+  { key: "who", title: "Who" },
+  { key: "what", title: "What" },
+  { key: "when", title: "When" },
+  { key: "outcome", title: "Outcome" },
+];
+
+const SAVED_KEY = "pt.explore.saved";
+interface SavedQuery {
+  label: string;
+  qs: string;
+}
+
+function toQuery(f: ExploreFilters): SearchQuery {
+  const arr = <T,>(x: T[]) => (x.length ? x : undefined);
+  return {
+    pitcherIds: arr(f.pid),
+    batterIds: arr(f.bid),
+    pitcherThrows: f.pth ?? undefined,
+    batterStands: f.bst ?? undefined,
+    pitchTypes: arr(f.pt),
+    seasons: arr(f.s),
+    gameDateFrom: f.df ?? undefined,
+    gameDateTo: f.dt ?? undefined,
+    counts: arr(f.c),
+    outs: arr(f.o),
+    innings: arr(f.inn),
+    gameTypes: arr(f.gt),
+    descriptions: arr(f.d),
+    events: arr(f.ev),
+    battedBallTypes: arr(f.bb),
+    zones: arr(f.z),
+  };
+}
+
+const EXAMPLES: { label: string; patch: Patch }[] = [
+  { label: "Two-strike sweepers", patch: { pt: ["ST"], c: ["0-2", "1-2", "2-2", "3-2"] } },
+  { label: "Chase-zone whiffs", patch: { z: CHASE_ZONES, d: RESULT_GROUPS[0].codes } },
+  { label: "Curveball strikeouts", patch: { pt: ["CU", "KC"], ev: ["strikeout"] } },
+  { label: "Home runs off changeups", patch: { pt: ["CH"], ev: ["home_run"] } },
+];
+
+const CLEARED: Patch = {
+  pid: null, bid: null, pth: null, bst: null, pt: null, s: null, df: null, dt: null,
+  c: null, o: null, inn: null, gt: ["R"], d: null, ev: null, bb: null, z: null,
+};
+
+export function ExploreClient({ seasons }: { seasons: number[] }) {
+  const [state, setState] = useQueryStates(filterParsers, { history: "replace" });
+  const { view, ...f } = state;
+  const set = useCallback((patch: Patch) => void setState(patch), [setState]);
+
   const [result, setResult] = useState<SearchResponse | null>(null);
+  const [lastRunKey, setLastRunKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState<Record<SectionKey, boolean>>({ who: true, what: true, when: false, outcome: false });
+  const [sheet, setSheet] = useState<SectionKey | null>(null);
+  const [showAllEvents, setShowAllEvents] = useState(false);
+  const [pitcherNames, setPitcherNames] = useState<Map<number, string>>(new Map());
+  const [batterNames, setBatterNames] = useState<Map<number, string>>(new Map());
+  const [toast, setToast] = useState<string | null>(null);
+  const [saved, setSaved] = useState<SavedQuery[]>([]);
 
-  const buildQuery = useMemo<() => SearchQuery>(() => {
-    return () => ({
-      pitcherIds: filters.pid?.length ? filters.pid : undefined,
-      batterIds: filters.bid?.length ? filters.bid : undefined,
-      pitcherThrows: filters.pth ?? undefined,
-      batterStands: filters.bst ?? undefined,
-      pitchTypes: filters.pt.length ? filters.pt : undefined,
-      seasons: filters.s.length ? filters.s : undefined,
-      gameDateFrom: filters.df ?? undefined,
-      gameDateTo: filters.dt ?? undefined,
-      counts: filters.c.length ? filters.c : undefined,
-      outs: filters.o.length ? filters.o : undefined,
-      innings: filters.inn.length ? filters.inn : undefined,
-      gameTypes: filters.gt.length ? filters.gt : undefined,
-      descriptions: filters.d.length ? filters.d : undefined,
-      events: filters.ev.length ? filters.ev : undefined,
-      battedBallTypes: filters.bb.length ? filters.bb : undefined,
-      zones: filters.z.length ? filters.z : undefined,
-    });
-  }, [filters]);
-
-  const hasAnyFilter = useMemo(() => {
-    const q = buildQuery();
-    return Boolean(
-      q.pitcherIds?.length ||
-        q.batterIds?.length ||
-        q.pitcherThrows ||
-        q.batterStands ||
-        q.pitchTypes?.length ||
-        q.seasons?.length ||
-        q.gameDateFrom ||
-        q.gameDateTo ||
-        q.counts?.length ||
-        q.outs?.length ||
-        q.innings?.length ||
-        q.gameTypes?.length ||
-        q.descriptions?.length ||
-        q.events?.length ||
-        q.battedBallTypes?.length ||
-        q.zones?.length,
-    );
-  }, [buildQuery]);
+  const queryKey = JSON.stringify(toQuery(f));
+  const nActive = activeFilterCount(f);
+  const pName = useCallback((id: number) => pitcherNames.get(id) ?? `#${id}`, [pitcherNames]);
+  const bName = useCallback((id: number) => batterNames.get(id) ?? `#${id}`, [batterNames]);
+  const sentence = querySentence(f, { pitchers: pName, batters: bName, pitchLabel: getPitchLabel });
+  const sentenceText = `Pitches ${sentence.map((p) => `${p.pre} ${p.v}`).join(" ")}`;
 
   async function runSearch() {
+    if (nActive === 0) return;
     setLoading(true);
     setError(null);
-    const id = requestId + 1;
-    setRequestId(id);
-    // Abort if Savant takes longer than 60s (matches the route's
-    // maxDuration). Without this the button can sit in "Searching…"
-    // indefinitely on a hung upstream.
+    const key = queryKey;
     const ctrl = new AbortController();
     const timeoutId = window.setTimeout(() => ctrl.abort(), 60_000);
     try {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(buildQuery()),
+        body: key,
         signal: ctrl.signal,
       });
       const body = await res.json();
@@ -145,613 +161,479 @@ export function ExploreClient() {
         return;
       }
       setResult(body as SearchResponse);
+      setLastRunKey(key);
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        setError("Savant took longer than 60s — try narrowing the filters.");
-      } else {
-        setError(err instanceof Error ? err.message : "Search failed");
-      }
+      setError(
+        err instanceof Error && err.name === "AbortError"
+          ? "Savant took longer than 60s — try narrowing the filters."
+          : err instanceof Error
+            ? err.message
+            : "Search failed",
+      );
     } finally {
       window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }
 
-  // Auto-run if the URL arrives pre-filled. Ensures shared links land
-  // on a populated result instead of waiting for an explicit submit.
-  // Deferred to a microtask so the synchronous setLoading/setError
-  // inside runSearch don't fire during the effect itself (React
-  // Compiler flags that as a cascading-render risk).
+  // Shared links arrive pre-filled: run them once on load.
   useEffect(() => {
-    if (hasAnyFilter && !result && !loading) {
-      void Promise.resolve().then(() => runSearch());
-    }
+    if (nActive > 0) void Promise.resolve().then(() => runSearch());
+    // Saved queries live in localStorage, so they load after hydration.
+    void Promise.resolve().then(() => {
+      try {
+        setSaved(JSON.parse(localStorage.getItem(SAVED_KEY) ?? "[]") as SavedQuery[]);
+      } catch {
+        /* ignore corrupt storage */
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function clearAll() {
-    setFilters({
-      pid: null,
-      bid: null,
-      pth: null,
-      bst: null,
-      pt: null,
-      s: null,
-      df: null,
-      dt: null,
-      c: null,
-      o: null,
-      inn: null,
-      gt: ["R"],
-      d: null,
-      ev: null,
-      bb: null,
-      z: null,
-    });
-    setResult(null);
-    setError(null);
-  }
+  // Mobile sheet: lock page scroll and close on Escape.
+  useEffect(() => {
+    if (!sheet) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSheet(null);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [sheet]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const stale = result != null && lastRunKey !== queryKey;
+  const sectionProps: SectionProps = {
+    f,
+    set,
+    seasons,
+    onPitcherNames: setPitcherNames,
+    onBatterNames: setBatterNames,
+    showAllEvents,
+    setShowAllEvents,
+  };
+  const summaries: Record<SectionKey, string> = {
+    who: whoSummary(f, pName, bName),
+    what: whatSummary(f),
+    when: whenSummary(f),
+    outcome: outcomeSummary(f),
+  };
+  const bodies: Record<SectionKey, ReactNode> = {
+    who: <WhoBody {...sectionProps} />,
+    what: <WhatBody {...sectionProps} />,
+    when: <WhenBody {...sectionProps} />,
+    outcome: <OutcomeBody {...sectionProps} />,
+  };
+
+  const saveQuery = () => {
+    const entry = { label: sentenceText.replace(/^Pitches /, ""), qs: window.location.search };
+    const next = [entry, ...saved.filter((s) => s.qs !== entry.qs)].slice(0, 6);
+    setSaved(next);
+    localStorage.setItem(SAVED_KEY, JSON.stringify(next));
+    setToast("Query saved — find it under “Saved”.");
+  };
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setToast("Link copied.");
+    } catch {
+      setToast("Couldn’t copy — copy the address bar instead.");
+    }
+  };
+
+  const countLine = loading ? (
+    <span className="flex items-center gap-2">
+      <Spinner /> Searching…
+    </span>
+  ) : result && !stale ? (
+    <>
+      <span className="text-ink font-bold num">{result.aggregates.totalPitches.toLocaleString()}</span> pitches
+    </>
+  ) : nActive === 0 ? (
+    "Pick a filter to search"
+  ) : stale ? (
+    "Filters changed — run to update"
+  ) : (
+    "Run to count pitches"
+  );
+
+  const runButton = (cls: string, label = "Run search") => (
+    <button
+      type="button"
+      onClick={() => {
+        setSheet(null);
+        void runSearch();
+      }}
+      disabled={nActive === 0 || loading}
+      className={`rounded-control bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:hover:bg-accent text-white font-display font-bold tracking-[1px] uppercase ${cls}`}
+    >
+      {label}
+    </button>
+  );
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] gap-6 mt-6">
-      {/* Filter rail. flex-col so the Run search button can sit in a
-          non-scrolling footer at the bottom — keeping it in view no
-          matter how far the user scrolls the filter list. */}
-      {/* Aside height has to clear: TopNav (3rem fixed) + main pt-16
-          (4rem) + grid mt-6 (1.5rem) + main pb-12 (3rem buffer) below.
-          h-[calc(100dvh-9rem)] keeps the aside short enough that it
-          can't push the page taller than the viewport. dvh handles
-          mobile browser chrome (URL bar showing/hiding). */}
-      <aside className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex flex-col overflow-hidden h-[calc(100dvh-9rem)] lg:sticky lg:top-20 lg:self-start lg:h-[calc(100dvh-9rem)]">
-        {/* min-h-0 lets flex-1 actually shrink below its content size,
-            so the aside's max-h is the real cap and the inner scroll
-            kicks in instead of the aside growing past the viewport. */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-4 space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[11px] uppercase tracking-[0.16em] text-white/70">
-              Filters
-            </h2>
+    <div className="pb-24 md:pb-16">
+      {/* Everything behind the mobile filter sheet goes inert while it's open. */}
+      <div inert={sheet != null}>
+      {/* Head */}
+      <section className="container-page pt-6 pb-4 md:pt-12 md:pb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+        <div className="flex flex-col gap-2.5">
+          <EyebrowTag className="self-start">Explore</EyebrowTag>
+          <h1 className="m-0 font-display font-extrabold italic uppercase text-[46px] md:text-[64px] leading-[0.92]">
+            Query every pitch.
+          </h1>
+          <p className="m-0 text-[15px] md:text-base text-ink-2 max-w-[620px]">
+            Build a Statcast search by who, what, when and outcome, then see the results in 3D.
+          </p>
+        </div>
+        <div className="flex gap-2 items-center flex-wrap md:justify-end">
+          <span className="text-[13px] text-muted">Try:</span>
+          {EXAMPLES.map((ex) => (
+            <button
+              key={ex.label}
+              type="button"
+              onClick={() => {
+                setState({ ...CLEARED, ...ex.patch });
+                setResult(null);
+              }}
+              className="h-11 md:h-9 px-3 rounded-full border border-line-strong text-[13px] text-ink-2 hover:text-ink hover:border-ink-2"
+            >
+              {ex.label}
+            </button>
+          ))}
+        </div>
+      </section>
+      {saved.length ? (
+        <div className="container-page -mt-1 mb-3 flex gap-2 items-center flex-wrap">
+          <span className="text-[13px] text-muted">Saved:</span>
+          {saved.map((s) => (
+            <a
+              key={s.qs}
+              href={`/explore${s.qs}`}
+              className="h-9 max-w-[320px] px-3 flex items-center rounded-full border border-line-strong text-[13px] text-ink-2 hover:text-ink truncate"
+              title={s.label}
+            >
+              <span className="truncate">{s.label}</span>
+            </a>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Query sentence */}
+      <div className="container-page">
+        <div
+          aria-label="Current query"
+          className="flex items-center gap-x-2 gap-y-1 flex-wrap min-h-14 px-4 md:px-[18px] py-2.5 bg-surface border border-line border-l-4 border-l-accent rounded-control"
+        >
+          <span className="font-display font-bold text-lg tracking-[0.5px] text-muted uppercase">Pitches</span>
+          {sentence.map((w, i) => (
+            <span key={i} className="flex items-center gap-2">
+              <span className="text-muted">{w.pre}</span>
+              <span className="font-display font-bold text-lg md:text-xl tracking-[0.3px] text-ink">{w.v}</span>
+            </span>
+          ))}
+          <span className="grow" />
+          {nActive > 0 ? (
             <button
               type="button"
-              onClick={clearAll}
-              className="text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white"
+              onClick={() => {
+                setState(CLEARED);
+                setResult(null);
+                setError(null);
+              }}
+              className="h-9 px-3 rounded-control text-[13px] font-semibold text-accent-hover hover:text-ink"
             >
               Clear
             </button>
-          </div>
-
-          <FilterGroup label="Who">
-          <MultiPitcherPicker
-            label="Pitchers"
-            value={filters.pid}
-            onChange={(v) => setFilters({ pid: v.length ? v : null })}
-          />
-          <NumericListInput
-            label="Batter IDs"
-            placeholder="e.g. 592450"
-            hint="Batter name search is coming. For now, copy the ID from the URL on mlb.com player pages (the digits after /player/)."
-            value={filters.bid}
-            onChange={(v) => setFilters({ bid: v.length ? v : null })}
-          />
-          <SegmentedSingle
-            label="Pitcher hand"
-            options={[
-              { value: "L", label: "L" },
-              { value: "R", label: "R" },
-            ]}
-            value={filters.pth ?? null}
-            onChange={(v) => setFilters({ pth: (v ?? null) as "L" | "R" | null })}
-          />
-          <SegmentedSingle
-            label="Batter stands"
-            options={[
-              { value: "L", label: "L" },
-              { value: "R", label: "R" },
-            ]}
-            value={filters.bst ?? null}
-            onChange={(v) => setFilters({ bst: (v ?? null) as "L" | "R" | null })}
-          />
-        </FilterGroup>
-
-        <FilterGroup label="What">
-          <ChipMulti
-            label="Pitch types"
-            options={PITCH_TYPES}
-            value={filters.pt}
-            onChange={(v) => setFilters({ pt: v.length ? v : null })}
-          />
-        </FilterGroup>
-
-        <FilterGroup label="When">
-          <ChipMulti
-            label="Seasons"
-            options={SEASON_OPTIONS}
-            value={filters.s}
-            onChange={(v) => setFilters({ s: v.length ? v : null })}
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <DateInput
-              label="From"
-              value={filters.df ?? ""}
-              onChange={(v) => setFilters({ df: v || null })}
-            />
-            <DateInput
-              label="To"
-              value={filters.dt ?? ""}
-              onChange={(v) => setFilters({ dt: v || null })}
-            />
-          </div>
-          <ChipMulti
-            label="Counts"
-            options={COUNTS}
-            value={filters.c}
-            onChange={(v) => setFilters({ c: v.length ? v : null })}
-          />
-          <ChipMulti
-            label="Outs"
-            options={[
-              { value: 0, label: "0" },
-              { value: 1, label: "1" },
-              { value: 2, label: "2" },
-            ]}
-            value={filters.o}
-            onChange={(v) => setFilters({ o: v.length ? v : null })}
-          />
-          <ChipMulti
-            label="Game types"
-            options={GAME_TYPES}
-            value={filters.gt}
-            onChange={(v) => setFilters({ gt: v })}
-          />
-        </FilterGroup>
-
-        <FilterGroup label="Outcome">
-          <ChipMulti
-            label="Pitch result"
-            options={DESCRIPTIONS}
-            value={filters.d}
-            onChange={(v) => setFilters({ d: v.length ? v : null })}
-          />
-          <ChipMulti
-            label="At-bat event"
-            options={EVENTS}
-            value={filters.ev}
-            onChange={(v) => setFilters({ ev: v.length ? v : null })}
-          />
-          <ChipMulti
-            label="Batted ball"
-            options={BATTED_BALL_TYPES}
-            value={filters.bb}
-            onChange={(v) => setFilters({ bb: v.length ? v : null })}
-          />
-          <ChipMulti
-            label="Zone"
-            options={ZONES}
-            value={filters.z}
-            onChange={(v) => setFilters({ z: v.length ? v : null })}
-          />
-        </FilterGroup>
+          ) : null}
         </div>
+      </div>
 
-        {/* Sticky footer — always visible above the scroll area so the
-            user can run / re-run a search from anywhere in the form. */}
-        <div className="border-t border-white/10 bg-[#081a32]/95 backdrop-blur-md p-3">
-          <button
-            type="button"
-            onClick={runSearch}
-            disabled={!hasAnyFilter || loading}
-            className="w-full px-3 py-2 rounded-md bg-white/[0.12] hover:bg-white/[0.2] disabled:opacity-30 disabled:hover:bg-white/[0.12] border border-white/15 text-white text-[12px] uppercase tracking-[0.14em] transition-colors"
-          >
-            {loading ? "Searching…" : "Run search"}
-          </button>
-        </div>
-      </aside>
-
-      {/* Results placeholder — task 4 fills in tabs + visualization */}
-      <section className="space-y-4">
-        {!hasAnyFilter && !result ? (
-          <ExampleQueries
-            onPick={(q) => {
-              setFilters(q);
-            }}
-          />
-        ) : null}
-
-        {error ? (
-          <div className="rounded-lg bg-red-500/15 border border-red-400/40 text-red-100 px-4 py-3 text-sm">
-            {error}
+      <div className="container-page mt-4 flex flex-wrap gap-5 items-start">
+        {/* Filters (desktop) */}
+        <aside
+          aria-label="Filters"
+          className="hidden lg:flex flex-col flex-[0_1_400px] min-w-[320px] bg-bg-raised border border-line rounded-panel overflow-hidden lg:sticky lg:top-20 max-h-[calc(100dvh-6rem)]"
+        >
+          <div className="grow min-h-0 overflow-y-auto scrollbar-thin">
+            {SECTIONS.map((sec) => (
+              <section key={sec.key} className="border-b border-line">
+                <h2 className="m-0">
+                  <button
+                    type="button"
+                    aria-expanded={open[sec.key]}
+                    aria-controls={`sec-${sec.key}`}
+                    onClick={() => setOpen((o) => ({ ...o, [sec.key]: !o[sec.key] }))}
+                    className="w-full flex items-center gap-3 min-h-14 px-[18px] text-left text-ink"
+                  >
+                    <span className="w-[88px] shrink-0 font-display font-extrabold text-xl tracking-[1px] uppercase">{sec.title}</span>
+                    <span className="grow min-w-0 text-[13px] text-muted truncate font-normal">{summaries[sec.key]}</span>
+                    <svg
+                      aria-hidden="true"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      className={`shrink-0 text-ink-2 motion-safe:transition-transform ${open[sec.key] ? "rotate-180" : ""}`}
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                </h2>
+                {open[sec.key] ? (
+                  <div id={`sec-${sec.key}`} className="px-[18px] pb-5 flex flex-col gap-[18px]">
+                    {bodies[sec.key]}
+                  </div>
+                ) : null}
+              </section>
+            ))}
           </div>
-        ) : null}
+          <div className="flex items-center gap-3 px-[18px] py-3.5 border-t border-line bg-bg-raised">
+            <span className="grow text-[13px] text-muted" aria-live="polite">
+              {countLine}
+            </span>
+            {runButton("h-11 px-5 text-lg")}
+          </div>
+        </aside>
 
-        {result ? <ResultPanel result={result} /> : null}
-      </section>
+        {/* Results */}
+        <main className="flex-[999_1_560px] min-w-0 flex flex-col gap-3.5">
+          {error ? (
+            <div role="alert" className="rounded-control border border-accent/60 bg-accent/10 px-4 py-3 text-sm text-ink">
+              {error}
+            </div>
+          ) : null}
+          {loading && !result ? <ResultsSkeleton /> : null}
+          {!result && !loading ? <EmptyState hasFilters={nActive > 0} onRun={runSearch} /> : null}
+          {result ? (
+            <Results
+              result={result}
+              stale={stale}
+              loading={loading}
+              view={view}
+              setView={(v) => setState({ view: v === "scene" ? null : v })}
+              onSave={saveQuery}
+              onCopy={copyLink}
+            />
+          ) : null}
+        </main>
+      </div>
+
+      {/* Mobile: floating filter button */}
+      <button
+        type="button"
+        onClick={() => setSheet("who")}
+        className="lg:hidden fixed z-30 left-1/2 -translate-x-1/2 bottom-5 h-12 px-6 rounded-full bg-accent text-white font-display font-bold text-lg tracking-[1px] uppercase shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+      >
+        Edit filters{nActive ? ` (${nActive})` : ""}
+      </button>
+      </div>
+      {sheet ? (
+        <div role="dialog" aria-modal="true" aria-label="Edit filters" className="lg:hidden fixed inset-0 z-50 flex flex-col bg-bg">
+          <div className="flex items-center justify-between h-14 px-5 border-b border-line">
+            <span className="font-display font-extrabold text-xl uppercase">Filters</span>
+            <button type="button" onClick={() => setSheet(null)} aria-label="Close filters" className="size-11 flex items-center justify-center text-2xl text-ink-2">
+              ×
+            </button>
+          </div>
+          <div role="tablist" aria-label="Filter group" className="flex border-b border-line">
+            {SECTIONS.map((sec) => (
+              <button
+                key={sec.key}
+                role="tab"
+                type="button"
+                aria-selected={sheet === sec.key}
+                onClick={() => setSheet(sec.key)}
+                className={`flex-1 h-12 font-display font-bold text-base tracking-[1px] uppercase border-b-[3px] ${
+                  sheet === sec.key ? "text-ink border-accent" : "text-muted border-transparent"
+                }`}
+              >
+                {sec.title}
+              </button>
+            ))}
+          </div>
+          <div role="tabpanel" className="grow overflow-y-auto px-5 py-5 flex flex-col gap-[18px]">
+            {bodies[sheet]}
+          </div>
+          <div className="flex items-center gap-3 px-5 py-3 border-t border-line bg-bg-raised">
+            <span className="grow text-[13px] text-muted">{countLine}</span>
+            {runButton("h-12 px-5 text-lg", "Show pitches")}
+          </div>
+        </div>
+      ) : null}
+
+      {toast ? (
+        <div role="status" className="fixed z-50 bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-control bg-ink text-bg text-sm font-semibold shadow-xl">
+          {toast}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-// ─── result panel ───────────────────────────────────────────────────
-// Tab strip + per-tab content. URL-state-keyed so the chosen view
-// is part of the shareable link. Aggregate is the default; Individual
-// and Visualization will fill in with their own panels in the next
-// tasks.
-type ResultMode = "aggregate" | "individual" | "viz";
+function EmptyState({ hasFilters, onRun }: { hasFilters: boolean; onRun: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-3 p-6 md:p-8 bg-surface border border-line rounded-panel">
+      <h2 className="m-0 font-display font-extrabold text-[28px] uppercase">
+        {hasFilters ? "Ready when you are." : "Start with a filter."}
+      </h2>
+      <p className="m-0 text-ink-2 max-w-prose">
+        {hasFilters
+          ? "Your filters are set. Run the search to pull the matching pitches from Statcast."
+          : "Pick a pitcher, a pitch type, a count or an outcome — or tap one of the examples above. Results show in 3D, as a zone heat map, and as a table you can export."}
+      </p>
+      {hasFilters ? (
+        <button type="button" onClick={onRun} className="h-11 px-5 rounded-control bg-accent hover:bg-accent-hover text-white font-display font-bold text-lg tracking-[1px] uppercase">
+          Run search
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
-// Columns we re-emit in the CSV. Keep the set narrow + obviously
-// useful — the goal is a portable artifact someone can drop into a
-// notebook, not a 1:1 copy of every Savant column.
-const CSV_COLUMNS: Array<{
-  key: keyof SavantPitchRow;
-  label: string;
-}> = [
-  { key: "game_date", label: "game_date" },
-  { key: "game_pk", label: "game_pk" },
-  { key: "at_bat_number", label: "at_bat_number" },
-  { key: "pitch_number", label: "pitch_number" },
-  { key: "pitcher", label: "pitcher_id" },
-  { key: "batter", label: "batter_id" },
-  { key: "pitch_type", label: "pitch_type" },
-  { key: "description", label: "description" },
-  { key: "events", label: "events" },
-  { key: "balls", label: "balls" },
-  { key: "strikes", label: "strikes" },
-  { key: "release_speed", label: "release_speed" },
-  { key: "release_spin_rate", label: "release_spin_rate" },
-  { key: "spin_axis", label: "spin_axis" },
-  { key: "pfx_x", label: "pfx_x" },
-  { key: "pfx_z", label: "pfx_z" },
-  { key: "plate_x", label: "plate_x" },
-  { key: "plate_z", label: "plate_z" },
-  { key: "release_pos_x", label: "release_pos_x" },
-  { key: "release_pos_y", label: "release_pos_y" },
-  { key: "release_pos_z", label: "release_pos_z" },
+function ResultsSkeleton() {
+  return (
+    <div aria-busy="true" className="flex flex-col gap-3.5">
+      <div className="h-[74px] rounded-control bg-surface border border-line motion-safe:animate-pulse" />
+      <div className="h-[420px] rounded-panel bg-surface border border-line motion-safe:animate-pulse flex items-center justify-center gap-3 text-muted">
+        <Spinner className="size-6" /> Pulling pitches from Statcast…
+      </div>
+    </div>
+  );
+}
+
+const VIEWS = [
+  { key: "scene", label: "3D scene" },
+  { key: "heat", label: "Zone heat" },
+  { key: "table", label: "Table only" },
+] as const;
+
+function Results({
+  result,
+  stale,
+  loading,
+  view,
+  setView,
+  onSave,
+  onCopy,
+}: {
+  result: SearchResponse;
+  stale: boolean;
+  loading: boolean;
+  view: "scene" | "heat" | "table";
+  setView: (v: "scene" | "heat" | "table") => void;
+  onSave: () => void;
+  onCopy: () => void;
+}) {
+  const a = result.aggregates;
+  const batters = useMemo(() => new Set(result.rows.map((r) => r.batter)).size, [result.rows]);
+  const fmt = (n: number | null, d = 1) => (n == null ? "—" : n.toFixed(d));
+  const strip: [string, string][] = [
+    ["Pitches", a.totalPitches.toLocaleString()],
+    ["Avg mph", fmt(a.avgVelocity)],
+    ["Avg spin", a.avgSpinRate == null ? "—" : Math.round(a.avgSpinRate).toLocaleString()],
+    ["Whiff/swing %", a.whiffRate == null ? "—" : (a.whiffRate * 100).toFixed(1)],
+    ["Batters", batters.toLocaleString()],
+  ];
+
+  return (
+    <>
+      <dl
+        className={`m-0 grid grid-cols-3 md:grid-cols-5 bg-surface border border-line border-t-[3px] border-t-accent rounded-control transition-opacity ${
+          stale || loading ? "opacity-60" : ""
+        }`}
+      >
+        {strip.map(([k, v], i) => (
+          <div key={k} className={`px-3.5 py-3 border-r border-line flex flex-col min-w-0 ${i >= 3 ? "max-md:hidden" : ""}`}>
+            <dt className="label-caps truncate">{k}</dt>
+            <dd className="m-0 font-display font-bold text-[26px] md:text-[30px] leading-[1.05] num">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {result.truncated ? (
+        <p className="m-0 text-[13px] text-highlight">
+          Showing the first {result.rows.length.toLocaleString()} of {result.totalReturned.toLocaleString()} — narrow your
+          filters for a complete result.
+        </p>
+      ) : null}
+
+      <div className="flex justify-between items-center gap-2.5 flex-wrap">
+        <div role="tablist" aria-label="Result view" className="flex bg-surface border border-line rounded-control p-[3px]">
+          {VIEWS.map((v) => (
+            <button
+              key={v.key}
+              role="tab"
+              type="button"
+              aria-selected={view === v.key}
+              onClick={() => setView(v.key)}
+              className={`h-11 md:h-[34px] px-3.5 rounded-[3px] text-[13px] ${
+                view === v.key ? "bg-ink text-bg font-bold" : "text-ink-2 font-semibold hover:text-ink"
+              }`}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {(
+            [
+              ["Save query", onSave],
+              ["Copy link", onCopy],
+              ["Export CSV", () => downloadCsv(result.rows)],
+            ] as const
+          ).map(([label, fn]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={fn}
+              className="h-11 md:h-9 px-3.5 rounded-control border border-line-strong text-[13px] font-semibold text-ink hover:border-ink-2"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === "scene" ? <VisualizationPanel rows={result.rows} /> : null}
+      {view === "heat" ? <ZoneHeat rows={result.rows} /> : null}
+      <IndividualTable rows={result.rows} />
+    </>
+  );
+}
+
+// ─── CSV export ───────────────────────────────────────────────────────
+const CSV_COLUMNS: Array<keyof SavantPitchRow> = [
+  "game_date", "game_pk", "at_bat_number", "pitch_number", "pitcher", "batter", "pitch_type",
+  "description", "events", "balls", "strikes", "release_speed", "release_spin_rate", "spin_axis",
+  "pfx_x", "pfx_z", "plate_x", "plate_z", "release_pos_x", "release_pos_y", "release_pos_z",
 ];
+const CSV_LABEL: Partial<Record<keyof SavantPitchRow, string>> = { pitcher: "pitcher_id", batter: "batter_id" };
 
 function escapeCsvCell(v: unknown): string {
   if (v === null || v === undefined) return "";
   const s = String(v);
-  // Quote anything that contains comma / quote / newline; double up
-  // any embedded quotes per RFC 4180.
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function rowsToCsv(rows: SavantPitchRow[]): string {
-  const header = CSV_COLUMNS.map((c) => c.label).join(",");
-  const body = rows
-    .map((r) =>
-      CSV_COLUMNS.map((c) => escapeCsvCell(r[c.key])).join(","),
-    )
-    .join("\n");
-  return `${header}\n${body}\n`;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 function downloadCsv(rows: SavantPitchRow[]) {
-  if (typeof window === "undefined") return;
-  const csv = rowsToCsv(rows);
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const header = CSV_COLUMNS.map((c) => CSV_LABEL[c] ?? c).join(",");
+  const body = rows.map((r) => CSV_COLUMNS.map((c) => escapeCsvCell(r[c])).join(",")).join("\n");
+  const blob = new Blob([`${header}\n${body}\n`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  const ts = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16);
-  a.download = `pitchtracker-explore-${ts}.csv`;
+  a.download = `pitchtracker-explore-${new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-function ResultPanel({ result }: { result: SearchResponse }) {
-  // Local UI state — not URL-driven yet because tab choice doesn't
-  // refire the search. Easy to lift to nuqs once Individual + Viz
-  // settle.
-  const [mode, setMode] = useState<ResultMode>("aggregate");
-
-  return (
-    <div className="space-y-3">
-      <div className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 flex items-baseline justify-between gap-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-[0.14em] text-white/55">
-            Pitches matched
-          </div>
-          <div className="text-2xl font-semibold tabular-nums">
-            {result.aggregates.totalPitches.toLocaleString()}
-          </div>
-        </div>
-        {result.truncated ? (
-          <div className="text-[11px] text-amber-200/85 max-w-[18rem] text-right">
-            Showing the first {result.rows.length.toLocaleString()} of{" "}
-            {result.totalReturned.toLocaleString()} — narrow your filters for
-            a complete result.
-          </div>
-        ) : null}
-      </div>
-
-      {/* Tab strip + CSV export */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="inline-flex p-0.5 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10">
-          {(
-            [
-              { key: "aggregate" as const, label: "Aggregate" },
-              { key: "individual" as const, label: "Individual" },
-              { key: "viz" as const, label: "Visualization" },
-            ] as const
-          ).map((t) => {
-            const active = mode === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setMode(t.key)}
-                aria-pressed={active}
-                className={`px-3 py-1.5 rounded-md text-[11px] uppercase tracking-[0.14em] transition-colors ${
-                  active
-                    ? "bg-white/[0.12] text-white"
-                    : "text-white/55 hover:text-white hover:bg-white/[0.04]"
-                }`}
-              >
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={() => downloadCsv(result.rows)}
-          disabled={result.rows.length === 0}
-          className="ml-auto px-3 py-1.5 rounded-md bg-[#081a32]/80 backdrop-blur-md border border-white/10 text-[11px] uppercase tracking-[0.14em] text-white/85 hover:text-white hover:bg-white/[0.06] disabled:opacity-40 transition-colors"
-          title={`Download ${result.rows.length.toLocaleString()} rows as CSV`}
-        >
-          Export CSV
-        </button>
-      </div>
-
-      {mode === "aggregate" ? (
-        <AggregatePanel aggregates={result.aggregates} />
-      ) : null}
-
-      {mode === "individual" ? <IndividualTable rows={result.rows} /> : null}
-
-      {mode === "viz" ? <VisualizationPanel rows={result.rows} /> : null}
-    </div>
-  );
-}
-
-// ─── example queries ────────────────────────────────────────────────
-type FilterPatch = Partial<{
-  pid: number[] | null;
-  bid: number[] | null;
-  pth: "L" | "R" | null;
-  bst: "L" | "R" | null;
-  pt: string[] | null;
-  s: number[] | null;
-  df: string | null;
-  dt: string | null;
-  c: string[] | null;
-  o: number[] | null;
-  inn: number[] | null;
-  gt: string[] | null;
-  d: string[] | null;
-  ev: string[] | null;
-  bb: string[] | null;
-  z: number[] | null;
-}>;
-
-function ExampleQueries({ onPick }: { onPick: (patch: FilterPatch) => void }) {
-  // Canonical Phase 5 examples. Some PLAN entries name specific
-  // pitchers (Skubal, Cole) — those need pitcher IDs that aren't
-  // user-knowable, so we cover the same shapes with broader filters
-  // until the pitcher-picker lands.
-  const examples: Array<{ label: string; patch: FilterPatch }> = [
-    {
-      label: "All sliders that got whiffs in 2025",
-      patch: {
-        pt: ["SL"],
-        d: ["swinging_strike", "swinging_strike_blocked"],
-        s: [2025],
-      },
-    },
-    {
-      label: "RHP fastballs to LHB on 2-strike counts",
-      patch: {
-        pt: ["FF"],
-        pth: "R",
-        bst: "L",
-        c: ["0-2", "1-2", "2-2", "3-2"],
-      },
-    },
-    {
-      label: "Home runs off changeups, 2024",
-      patch: { pt: ["CH"], ev: ["home_run"], s: [2024] },
-    },
-    {
-      label: "Curveballs that ended ABs in strikeouts",
-      patch: { pt: ["CU", "KC"], ev: ["strikeout"] },
-    },
-  ];
-  return (
-    <div className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 space-y-3">
-      <div className="text-[10px] uppercase tracking-[0.14em] text-white/70">
-        Try one of these
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {examples.map((ex) => (
-          <button
-            key={ex.label}
-            type="button"
-            onClick={() => onPick(ex.patch)}
-            className="text-left text-sm px-3 py-2 rounded-md bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 transition-colors"
-          >
-            {ex.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── primitive form components ──────────────────────────────────────
-function FilterGroup({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <fieldset className="space-y-3 pt-3 border-t border-white/[0.05] first:pt-0 first:border-t-0">
-      <legend className="text-[10px] uppercase tracking-[0.16em] text-white/55">
-        {label}
-      </legend>
-      {children}
-    </fieldset>
-  );
-}
-
-function ChipMulti<T extends string | number>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: ReadonlyArray<EnumOption<T>>;
-  value: ReadonlyArray<T>;
-  onChange: (next: T[]) => void;
-}) {
-  const selected = new Set(value);
-  function toggle(v: T) {
-    const next = new Set(selected);
-    if (next.has(v)) next.delete(v);
-    else next.add(v);
-    onChange(Array.from(next));
-  }
-  return (
-    <div className="space-y-1.5">
-      <div className="text-[11px] text-white/65">{label}</div>
-      <div className="flex flex-wrap gap-1.5">
-        {options.map((opt) => {
-          const on = selected.has(opt.value);
-          return (
-            <button
-              key={String(opt.value)}
-              type="button"
-              onClick={() => toggle(opt.value)}
-              aria-pressed={on}
-              className={`px-2 py-0.5 rounded-full border text-[11px] transition-colors ${
-                on
-                  ? "bg-white/[0.18] border-white/30 text-white"
-                  : "bg-white/[0.04] border-white/10 text-white/65 hover:bg-white/[0.1] hover:text-white"
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function SegmentedSingle<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: ReadonlyArray<EnumOption<T>>;
-  value: T | null;
-  onChange: (next: T | null) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="text-[11px] text-white/65">{label}</div>
-      <div className="flex gap-1.5">
-        {options.map((opt) => {
-          const on = value === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onChange(on ? null : opt.value)}
-              aria-pressed={on}
-              className={`flex-1 px-3 py-1 rounded border text-[11px] transition-colors ${
-                on
-                  ? "bg-white/[0.18] border-white/30 text-white"
-                  : "bg-white/[0.04] border-white/10 text-white/65 hover:bg-white/[0.1] hover:text-white"
-              }`}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function NumericListInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  hint,
-}: {
-  label: string;
-  value: number[];
-  onChange: (next: number[]) => void;
-  placeholder?: string;
-  hint?: string;
-}) {
-  // Uncontrolled with a key reset: the local input state stays
-  // disconnected from prop updates *until* the parent clears or
-  // example-overwrites — the new array becomes a new key, the input
-  // remounts, and the new defaultValue takes effect. Avoids the
-  // useEffect-driven sync that the React Compiler flags.
-  const formatted = value.join(", ");
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-[11px] text-white/65">{label}</span>
-      <input
-        key={formatted}
-        type="text"
-        defaultValue={formatted}
-        onBlur={(e) => {
-          const ids = e.target.value
-            .split(/[,\s]+/)
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .map(Number)
-            .filter((n) => Number.isFinite(n));
-          onChange(ids);
-        }}
-        placeholder={placeholder}
-        className="w-full px-2 py-1 rounded bg-white/[0.04] border border-white/10 focus:border-white/30 focus:outline-none text-[12px] tabular-nums text-white/95 placeholder:text-white/30"
-        inputMode="numeric"
-      />
-      {hint ? <span className="block text-[10px] text-white/45 leading-relaxed">{hint}</span> : null}
-    </label>
-  );
-}
-
-function DateInput({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-[11px] text-white/65">{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-2 py-1 rounded bg-white/[0.04] border border-white/10 focus:border-white/30 focus:outline-none text-[12px] tabular-nums text-white/95"
-      />
-    </label>
-  );
 }

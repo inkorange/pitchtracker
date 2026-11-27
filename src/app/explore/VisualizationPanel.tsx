@@ -193,10 +193,8 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
   return (
     <div className="space-y-3">
       {/* Split-mode toggle */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-3">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-white/55 mr-1">
-          Split
-        </span>
+      <div className="flex flex-wrap items-center gap-2 rounded-panel bg-surface border border-line p-3">
+        <span className="label-caps mr-1">Split</span>
         {(
           [
             { key: "none", label: "Off" },
@@ -211,10 +209,10 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
               type="button"
               onClick={() => setSplitMode(opt.key)}
               aria-pressed={active}
-              className={`px-2.5 py-1 rounded-full text-[11px] uppercase tracking-[0.12em] border transition-colors ${
+              className={`h-11 md:h-9 px-3 rounded-full text-[13px] font-semibold border transition-colors ${
                 active
-                  ? "bg-white/[0.18] border-white/30 text-white"
-                  : "bg-white/[0.04] border-white/10 text-white/65 hover:bg-white/[0.1] hover:text-white"
+                  ? "bg-ink text-bg border-ink"
+                  : "text-ink-2 border-line-strong hover:text-ink"
               }`}
             >
               {opt.label}
@@ -222,15 +220,15 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
           );
         })}
         {subsetCounts ? (
-          <span className="text-[11px] text-white/55 tabular-nums ml-auto">
+          <span className="text-[13px] text-muted num ml-auto">
             <span className="text-rose-300">A {subsetCounts.a}</span>{" "}
-            <span className="text-white/35">/</span>{" "}
+            <span className="text-muted">/</span>{" "}
             <span className="text-cyan-300">B {subsetCounts.b}</span>
           </span>
         ) : null}
       </div>
 
-      <div className="relative h-[60vh] min-h-[400px] rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg overflow-hidden">
+      <div className="relative h-[420px] md:h-[480px] rounded-panel bg-surface border border-line overflow-hidden">
         <Scene preset={preset} presetTick={presetTick}>
           {prepared.map((p) => {
             // In split mode, pitches not in either subset fade to near-zero
@@ -259,7 +257,7 @@ export function VisualizationPanel({ rows }: VisualizationPanelProps) {
           ) : null}
         </Scene>
 
-        <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-[#081a32]/80 backdrop-blur-md border border-white/10 text-[10px] uppercase tracking-[0.14em] text-white/85 pointer-events-none">
+        <div className="absolute top-3 left-3 px-3 py-1.5 bg-overlay border-l-4 border-accent font-display font-bold text-sm tracking-[1px] uppercase text-ink pointer-events-none">
           {prepared.length.toLocaleString()} of{" "}
           {rows.length.toLocaleString()} rendered
           {averageRibbon && splitMode === "none"

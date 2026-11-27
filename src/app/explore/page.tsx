@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { TopNav } from "@/components/chrome/TopNav";
+import { SiteHeader } from "@/components/chrome/SiteHeader";
+import { getCachedDisplaySeason } from "@/lib/pitcher/cached-reads";
 import { absoluteUrl } from "@/lib/url/site";
 import { ExploreClient } from "./ExploreClient";
 
@@ -65,16 +66,21 @@ const datasetJsonLd = {
   url: absoluteUrl("/explore"),
 };
 
-export default function ExplorePage() {
+// Explore — design/Explore.dc.html. Seasons offered: the display season
+// and the five before it (Statcast search covers them all).
+export default async function ExplorePage() {
+  const display = await getCachedDisplaySeason();
+  const seasons = Array.from({ length: 6 }, (_, i) => display - i);
   return (
-    <main className="min-h-screen bg-[#0a0e14] text-white/90 pt-16 pb-12">
+    <main className="min-h-screen bg-bg text-ink">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(datasetJsonLd) }}
       />
-      <TopNav title="Explore" />
-      <Suspense fallback={<div className="px-6 py-8 text-white/55">Loading…</div>}>
-        <ExploreClient />
+      <SiteHeader active="explore" />
+      {/* nuqs reads search params on the client → needs a Suspense boundary. */}
+      <Suspense fallback={<div className="container-page py-12 text-muted">Loading…</div>}>
+        <ExploreClient seasons={seasons} />
       </Suspense>
     </main>
   );

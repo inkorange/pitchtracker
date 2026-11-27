@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { personHeadshotUrl } from "@/lib/viz/headshot";
+import { Spinner } from "@/components/feedback/Spinner";
 
 // Matchup finder form — design/AtBatReplays.dc.html (Matchup tab).
 // Pitcher search hits /api/pitchers/search; once a pitcher is picked,
@@ -23,19 +24,6 @@ interface Option extends Picked {
 
 /** Wait this long after the last keystroke before searching. */
 const SEARCH_DEBOUNCE_MS = 300;
-
-function Spinner({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className={`size-[18px] shrink-0 text-muted motion-safe:animate-spin ${className}`}
-    >
-      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function initials(name: string) {
   return name
