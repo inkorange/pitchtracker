@@ -71,7 +71,10 @@ export function StatsSummary({
   const types = useMemo(() => byPitchType(pitches), [pitches]);
   const mix = useMemo(() => outcomeMix(pitches), [pitches]);
   const sides = useMemo(() => sideSplit(pitches), [pitches]);
-  const strip = useMemo(() => seasonStrip(pitches), [pitches]);
+  // Season line: regular season only, matching the rail and homepage
+  // leaderboards. Everything else (tables, splits, at-bats) keeps
+  // postseason pitches in scope.
+  const strip = useMemo(() => seasonStrip(pitches.filter((p) => (p.game_type ?? "R") === "R")), [pitches]);
 
   const line: [string, string][] = game
     ? [
@@ -119,7 +122,7 @@ export function StatsSummary({
           ...(game?.teamAbbr ? [{ tone: "team" as const, content: game.teamAbbr }] : []),
           game
             ? { tone: "name" as const, content: game.opponent ? `vs ${game.opponent}` : "Game" }
-            : { tone: "name" as const, content: `${season} season` },
+            : { tone: "name" as const, content: `${season} regular season` },
           ...(game ? [{ tone: "tag" as const, content: shortDate(game.date) }] : []),
           ...(game ? [{ tone: "plain" as const, content: game.line.decision }] : []),
         ]}

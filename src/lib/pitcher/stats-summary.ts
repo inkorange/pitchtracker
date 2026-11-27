@@ -14,6 +14,8 @@ export interface SummaryPitch {
   stand?: string | null;
   game_pk?: number | null;
   at_bat_number?: number | null;
+  /** Absent = regular season. */
+  game_type?: string | null;
 }
 
 const HITS = new Set(["single", "double", "triple", "home_run"]);

@@ -32,6 +32,7 @@ export interface StatPitch {
   stand?: string | null;
   game_pk?: number | null;
   at_bat_number?: number | null;
+  game_type?: string | null;
 }
 
 /**

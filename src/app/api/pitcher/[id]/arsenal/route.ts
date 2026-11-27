@@ -175,6 +175,9 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     .map(({ pitch_games, ...rest }) => ({
       ...rest,
       game_date: pitch_games?.game_date ?? null,
+      // Only non-regular-season pitches carry game_type (keeps the
+      // payload small); the Stats season line excludes them.
+      ...(pitch_games?.game_type && pitch_games.game_type !== "R" ? { game_type: pitch_games.game_type } : {}),
     }));
 
   // Opt-in: sequencing matrix computed from the PRE-FILTER `cached`
