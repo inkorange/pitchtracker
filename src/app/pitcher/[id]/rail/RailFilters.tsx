@@ -13,7 +13,7 @@ const OFF = "text-ink-2 border-line-strong hover:text-ink hover:border-ink-2";
 
 /** Filters tab — batter side, pitch outcome, at-bat result. Same URL
  *  keys and rules as the previous PitcherFilters. */
-export function RailFilters() {
+export function RailFilters({ showReset = true }: { showReset?: boolean }) {
   const { params, update, list, isPending } = usePitcherUrl();
   const hand = params.get("hand") ?? "";
   const outcomes = list("outcome");
@@ -106,7 +106,7 @@ export function RailFilters() {
         </div>
       </fieldset>
 
-      {any ? (
+      {showReset && any ? (
         <button
           type="button"
           onClick={() => update({ hand: null, outcome: null, event: null, veloMin: null, veloMax: null, pitch: null })}

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { slugifyPitcherName } from "@/lib/url/pitcher-slug";
 import { absoluteUrl } from "@/lib/url/site";
@@ -17,32 +16,16 @@ import {
   loadSavantSeason,
   type SavantSeasonPitchRow,
 } from "@/lib/cache/savant-season";
-import { pitcherHeadshotUrl, teamLogoUrl } from "@/lib/viz/headshot";
-import { TeamLogo } from "@/components/team/TeamLogo";
+import { pitcherHeadshotUrl } from "@/lib/viz/headshot";
 import {
   categorizeDescription,
   getPitchLabel,
-  getPitchColor,
   type OutcomeCategory,
 } from "@/lib/viz/colors";
-import { PitcherSearchPopover } from "@/components/chrome/PitcherSearchPopover";
-import { SeasonPicker } from "@/components/filters/SeasonPicker";
 import { HelpButton } from "../stats/HelpButton";
-import { OutcomeLegend } from "@/app/compare/OutcomeLegend";
-import { TOPNAV_BUTTON_CLS, TopNav } from "@/components/chrome/TopNav";
-import { FiltersGate } from "../FiltersGate";
 import { MatchupsPanel } from "../MatchupsPanel";
-import { PitcherCardCollapse } from "../PitcherCardCollapse";
-import {
-  HidablePanel,
-  HiddenWhenCollapsed,
-} from "@/components/chrome/HidablePanel";
 import { AtBatHeader } from "../AtBatHeader";
-import { PitcherBody } from "../PitcherBody";
-import { StatsModeToggle } from "../StatsModeToggle";
-import { PitcherFilters } from "@/components/filters/PitcherFilters";
 import { PitcherStatsArea } from "../PitcherStatsArea";
-import { PitcherOutcomeLegendGate } from "../PitcherOutcomeLegendGate";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
 import { buildPitcherBio, buildPitcherKeywords } from "@/lib/pitcher/bio";
@@ -61,6 +44,9 @@ import { RailFilters } from "../rail/RailFilters";
 import { RailGames } from "../rail/RailGames";
 import { SeasonSegment } from "../rail/SeasonSegment";
 import { SceneChrome } from "../rail/SceneChrome";
+import { MobilePitcherShell } from "../rail/MobilePitcherShell";
+import { ArsenalCards } from "../rail/ArsenalCards";
+import { CommandPalette } from "@/components/chrome/CommandPalette";
 
 interface PageProps {
   params: Promise<{ id: string; slug: string }>;
@@ -851,236 +837,46 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         lowerValue={pitcher.full_name}
       />
 
-      {/* ── Below lg: the previous floating chrome (until the Phase 8 drawer) ── */}
-      <div className="lg:hidden">
-      <PitcherOutcomeLegendGate>
-        <OutcomeLegend />
-      </PitcherOutcomeLegendGate>
-
-      <TopNav
-        title="Pitcher"
-        summary={filterSummary}
-        rightSlot={
-          <div className="flex items-center gap-1">
-            <Link
-              href={`/compare?a=${pitcher.mlb_id}&aSeason=${season}`}
-              className={TOPNAV_BUTTON_CLS}
-            >
-              Compare
-            </Link>
-            <PitcherSearchPopover />
+      {/* ── Below lg: header · chips · drawer (design/MobileSheetPeek) ── */}
+      <MobilePitcherShell
+        shortName={pitcher.first_name && pitcher.last_name ? `${pitcher.first_name[0]}. ${pitcher.last_name}` : pitcher.full_name}
+        meta={[pitcher.throws ? `${pitcher.throws}HP` : null, team?.abbreviation ?? null, String(season)].filter(Boolean).join(" · ")}
+        pitchCount={renderable.length}
+        totalPitches={season_data.pitches.length}
+        season={season}
+        gameLabels={Object.fromEntries(games.map((g) => [String(g.game_pk), `${g.away} @ ${g.home} · ${g.game_date}`]))}
+        batterName={batterName}
+        arsenalCards={<ArsenalCards rows={aggregates} />}
+        arsenalList={<ArsenalToggles rows={aggregates} season={season} />}
+        filters={<RailFilters showReset={false} />}
+        games={
+          <div className="flex flex-col gap-4">
+            <SeasonSegment season={season} available={availableSeasons.length ? availableSeasons : [season]} />
+            <RailGames
+              games={games}
+              season={season}
+              totalPitches={season_data.pitches.length}
+              gameLine={
+                gameLine ? (
+                  <PitcherGameStats
+                    line={gameLine}
+                    xbh={xbhInGame}
+                    gameDate={activeGameInfo?.game_date ?? null}
+                    opponentName={activeGameInfo?.opponentName ?? null}
+                  />
+                ) : null
+              }
+            />
+          </div>
+        }
+        matchups={
+          <div className="flex flex-col gap-3">
+            <AtBatHeader season={season} />
+            <MatchupsPanel season={season} defaultTeamId={defaultMatchupTeamId} openOnMount />
           </div>
         }
       />
-      </div>
-
-      {/* Card column. Absolute wrapper that holds the pitcher card AND
-          the mobile-only summary banner stacked below it. Flex-col so
-          the summary sits right beneath the card regardless of whether
-          the card is collapsed (short) or expanded (tall + scrolling).
-          `data-pitcher-card-column` marks the wrapper so PitcherStatsArea
-          can anchor below the WHOLE column (card + summary), not just
-          the card section — otherwise the summary banner overlaps the
-          stat cards on mobile in stats mode. */}
-      <HidablePanel
-        positionClass="lg:hidden absolute top-16 left-3 right-3 sm:left-6 sm:right-auto z-20 sm:w-[340px] flex flex-col gap-2 max-h-[calc(100vh-5rem)]"
-        panelName="pitcher panel"
-        dataAttribute="data-pitcher-card-column"
-      >
-      <section
-        data-pitcher-card
-        className="rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg p-4 overflow-y-auto min-h-0"
-      >
-        <PitcherCardCollapse
-          header={
-            <>
-              <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                  <Image
-                    src={pitcherHeadshotUrl(pitcher.mlb_id, 120)}
-                    alt=""
-                    fill
-                    sizes="56px"
-                    className="object-cover"
-                    unoptimized
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  {/* H1 is the pitcher's name; the SEO-friendly
-                      keyword extension ("MLB Statcast data") sits in
-                      a visually-hidden span so the card still reads
-                      as a name + stats line, but Google sees the
-                      full target phrase as the page's heading. */}
-                  <h1 className="text-base font-medium text-white truncate">
-                    {pitcher.full_name}
-                    <span className="sr-only"> MLB Statcast data</span>
-                  </h1>
-                  <div className="text-[11px] text-white/55 tabular-nums flex items-center gap-1.5">
-                    <span>
-                      {pitcher.throws ? `${pitcher.throws}HP` : "—"}
-                      {team ? ` · ${team.abbreviation}` : ""}
-                      {pitcher.debut_year
-                        ? ` · debut ${pitcher.debut_year}`
-                        : ""}
-                    </span>
-                    {bioParagraphs.length > 0 ? (
-                      <HelpButton title="About">
-                        {bioParagraphs.map((p, i) => (
-                          <p key={i}>{p}</p>
-                        ))}
-                      </HelpButton>
-                    ) : null}
-                  </div>
-                </div>
-                {team ? (
-                  <TeamLogo
-                    teamId={team.mlb_id}
-                    size={56}
-                    alt={team.name}
-                    className="hidden sm:block"
-                  />
-                ) : null}
-              </div>
-
-              <SeasonPicker
-                pitcherId={pitcher.mlb_id}
-                season={season}
-                available={availableSeasons.length ? availableSeasons : [season]}
-              />
-
-              {/* Arsenal / Stats mode toggle. Rendered OUTSIDE
-                  FiltersGate — the view toggle is not a per-side
-                  filter and must stay reachable in at-bat playback so
-                  the user can flip over to the batter-scoped stats
-                  view without losing the AB context. Wrapped in
-                  HiddenWhenCollapsed so the panel's compact summary
-                  view (pitcher row + season picker only) doesn't
-                  carry the mode toggle. */}
-              <HiddenWhenCollapsed>
-                <StatsModeToggle />
-              </HiddenWhenCollapsed>
-            </>
-          }
-          body={
-            <HiddenWhenCollapsed>
-            <PitcherBody
-              arsenal={
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-white/45 mb-2">Arsenal</div>
-                  {(aggregates ?? []).length === 0 ? (
-                    <div className="text-xs text-white/55 leading-relaxed">
-                      No arsenal data for {season}.
-                    </div>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {aggregates!.map((a) => (
-                        <li key={a.pitch_type} className="space-y-0.5">
-                          <div className="flex items-center gap-2 text-xs tabular-nums">
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ background: getPitchColor(a.pitch_type) }}
-                            />
-                            <span className="text-white/85 flex-1 truncate">
-                              {getPitchLabel(a.pitch_type)}
-                            </span>
-                            <span className="text-white/55">
-                              {a.avg_velocity != null ? `${Number(a.avg_velocity).toFixed(1)} mph` : "—"}
-                            </span>
-                            <span className="text-white/45 w-16 text-right">
-                              {a.usage_pct != null
-                                ? `${Number(a.usage_pct).toFixed(0)}% (${a.pitch_count ?? 0})`
-                                : "—"}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              }
-              filters={
-                /* Per-side filters live inside the FiltersGate so they
-                   collapse out of the way when at-bat mode is active. */
-                <FiltersGate>
-                  <div className="border-t border-white/[0.08] pt-3">
-                    <PitcherFilters
-                      arsenal={(aggregates ?? []).map((a) => ({
-                        pitch_type: a.pitch_type,
-                        pitch_count: a.pitch_count,
-                      }))}
-                      games={games}
-                      season={season}
-                      gameStatsSlot={
-                        gameLine ? (
-                          <PitcherGameStats
-                            line={gameLine}
-                            xbh={xbhInGame}
-                            gameDate={activeGameInfo?.game_date ?? null}
-                            opponentName={activeGameInfo?.opponentName ?? null}
-                          />
-                        ) : null
-                      }
-                    />
-                  </div>
-
-                  {renderable.length > 0 && (
-                    <div className="text-[11px] text-white/45 tabular-nums pt-2 border-t border-white/[0.05] space-y-0.5">
-                      <div>
-                        Rendering {renderable.length} pitch
-                        {renderable.length === 1 ? "" : "es"}
-                      </div>
-                      {renderable.length > RECENT_RIBBON_CAP && (
-                        <div className="text-white/40 text-[10px]">
-                          {RECENT_RIBBON_CAP.toLocaleString()} recent ·{" "}
-                          {(renderable.length - RECENT_RIBBON_CAP).toLocaleString()}{" "}
-                          historical as paths
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {(cachedPitches ?? []).length === 0 && (
-                    <div className="text-[11px] text-white/40 leading-relaxed pt-2 border-t border-white/5">
-                      No pitch trajectory data available for this filter.
-                    </div>
-                  )}
-                </FiltersGate>
-              }
-              matchups={
-                /* Pitcher-vs-batter matchups: typeahead → at-bat list → playback. */
-                <div className="border-t border-white/[0.08] pt-3 space-y-2">
-                  <MatchupsPanel
-                    season={season}
-                    defaultTeamId={defaultMatchupTeamId}
-                  />
-                </div>
-              }
-            />
-            </HiddenWhenCollapsed>
-          }
-        />
-
-        {/* At-bat info card: lives outside the collapsing body so it
-            stays on screen on mobile after the auto-collapse. Shows
-            the active matchup's batter, outcome, and game context.
-            Renders nothing when not in at-bat mode. Also collapses
-            with the summary view. */}
-        <HiddenWhenCollapsed>
-          <AtBatHeader season={season} />
-        </HiddenWhenCollapsed>
-      </section>
-
-      {/* Mobile-only filter-summary banner. Lives in the top nav on
-          desktop. Anchored just below the card via the flex-col
-          wrapper so it tracks the card's bottom edge whether the body
-          is collapsed or expanded. */}
-      <HiddenWhenCollapsed>
-        {filterSummary ? (
-          <div className="sm:hidden flex-shrink-0 text-[12px] leading-snug text-white/85 italic bg-[#081a32]/70 backdrop-blur-md border border-white/10 rounded-md px-3 py-1.5 shadow-lg">
-            {filterSummary}
-          </div>
-        ) : null}
-      </HiddenWhenCollapsed>
-      </HidablePanel>
+      <CommandPalette />
 
       {/* Stats analytics view — sibling of the pitcher card, NOT
           inside it. Renders nothing in arsenal mode. The

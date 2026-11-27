@@ -495,7 +495,7 @@ export function AtBatPlaybackBar({ state, handlers }: AtBatPlaybackBarProps) {
   return (
     // Mobile: pin above the CameraPad (bottom-6 right-3) so the two
     // don't overlap. Desktop: classic bottom-center transport.
-    <div className="absolute bottom-20 sm:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-auto">
+    <div className="absolute bottom-[104px] sm:bottom-20 lg:bottom-6 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-auto">
       <div className="px-3 py-2 rounded-lg bg-[#081a32]/80 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center gap-2 sm:gap-3 text-white/90 flex-wrap max-w-full">
         <button
           type="button"

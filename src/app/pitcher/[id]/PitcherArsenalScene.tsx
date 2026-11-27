@@ -36,35 +36,28 @@ import {
   useAtBatPlayback,
 } from "./AtBatPlaybackLayer";
 
-// Tailwind's `sm` breakpoint. useSyncExternalStore subscribes to the
-// MQL so the camera reframes on rotate / resize without a setState in
-// an effect (compiler-friendly) and stays SSR-safe.
-const MOBILE_MQL = "(max-width: 639px)";
+// Centered behind-the-plate framing for the front camera. (The shared
+// `front` preset is biased right for pages whose panel floats over the
+// scene's left side; nothing does here any more.)
 const MOBILE_FRONT_PRESET: CameraPosition = {
   position: [0, 4.3, 13],
   target: [0, 2.5, -55],
 };
-function subscribeIsMobile(callback: () => void): () => void {
-  const mql = window.matchMedia(MOBILE_MQL);
-  mql.addEventListener("change", callback);
-  return () => mql.removeEventListener("change", callback);
+// Below lg the scene is a tall, narrow box over the drawer: tilt down
+// a little so the plate and zone sit higher, clear of the camera row,
+// with less empty sky.
+const NARROW_FRONT_PRESET: CameraPosition = {
+  position: [0, 4.6, 13],
+  target: [0, 0.6, -55],
+};
+const NARROW_MQL = "(max-width: 1023px)";
+function subscribeNarrow(cb: () => void): () => void {
+  const mql = window.matchMedia(NARROW_MQL);
+  mql.addEventListener("change", cb);
+  return () => mql.removeEventListener("change", cb);
 }
-function getIsMobileSnapshot(): boolean {
-  return window.matchMedia(MOBILE_MQL).matches;
-}
-// lg (≥1024px): docked-rail desktop layout.
-const DESKTOP_MQL = "(min-width: 1024px)";
-function subscribeIsDesktop(callback: () => void): () => void {
-  const mql = window.matchMedia(DESKTOP_MQL);
-  mql.addEventListener("change", callback);
-  return () => mql.removeEventListener("change", callback);
-}
-function getIsDesktopSnapshot(): boolean {
-  return window.matchMedia(DESKTOP_MQL).matches;
-}
-function getIsMobileServerSnapshot(): boolean {
-  return false;
-}
+const getNarrow = () => window.matchMedia(NARROW_MQL).matches;
+const getNarrowServer = () => false;
 
 interface CachedPitch {
   game_pk: number;
@@ -327,36 +320,22 @@ export function PitcherArsenalScene({
     return null;
   }, [atBatPitches]);
 
-  // Mobile reframes the front preset. The desktop default biases the
-  // camera to the 3B side and points slightly toward 1B so action sits
-  // in the right half of the frame, clear of the left-anchored pitcher
-  // panel. On a portrait phone there's no side panel — the panel is
-  // pinned to the top — and that bias just shoves the strike zone off
-  // the right edge. Override to a centered framing.
-  const isMobile = useSyncExternalStore(
-    subscribeIsMobile,
-    getIsMobileSnapshot,
-    getIsMobileServerSnapshot,
-  );
 
-  const isDesktop = useSyncExternalStore(
-    subscribeIsDesktop,
-    getIsDesktopSnapshot,
-    getIsMobileServerSnapshot,
-  );
+
+  const isNarrow = useSyncExternalStore(subscribeNarrow, getNarrow, getNarrowServer);
 
   const presetOverride: CameraPosition | null = useMemo(() => {
     if (inAtBatMode) {
       return frontPresetForStand(preset, batterStand);
     }
-    // Centered front framing on phones and on the desktop layout, where
-    // the rail is docked beside the scene instead of floating over its
-    // left side. (Tablets still have the floating panel → biased view.)
-    if (preset === "front" && (isMobile || isDesktop)) {
-      return MOBILE_FRONT_PRESET;
+    // Centered front framing at every size: nothing floats over the
+    // scene any more (desktop docks the rail beside it; below lg the
+    // drawer sits under it), so the old right-hand bias isn't needed.
+    if (preset === "front") {
+      return isNarrow ? NARROW_FRONT_PRESET : MOBILE_FRONT_PRESET;
     }
     return null;
-  }, [inAtBatMode, preset, batterStand, isMobile, isDesktop]);
+  }, [inAtBatMode, preset, batterStand, isNarrow]);
 
   // Snap the camera back to the front preset (with the stance shift
   // applied) every time a new at-bat is loaded — the user usually
@@ -485,18 +464,21 @@ export function PitcherArsenalScene({
         current={preset}
         onChange={handlePresetChange}
         leftSlot={<EnvToggleGear />}
-        // Desktop: Tunnel is a camera-group button and Heat sits beside
-        // it (design/Pitcher.dc.html). Below lg the floating toggles stay.
+        // Below lg the pad sits full-width just above the drawer's peek
+        // (the scene box ends 36px under the peek's top edge)
+        // (design/MobileSheetPeek); on desktop, bottom-right of the scene.
+        positionClass="left-3 right-3 bottom-12 sm:left-auto sm:right-4 lg:bottom-4"
+        // Tunnel is a camera-group button and Heat sits beside it.
         extra={
           inAtBatMode ? null : (
-            <span className="hidden lg:contents">
+            <span className="contents">
               <span aria-hidden="true" className="w-px h-6 mx-1 bg-line-strong" />
               <button
                 type="button"
                 aria-pressed={tunnelOn}
                 onClick={() => setTunnelOn((v) => !v)}
                 title="Show the pitch-tunnel envelope across the current pitch types."
-                className={`h-9 px-3 rounded-[2px] uppercase transition-colors ${tunnelOn ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
+                className={`flex-[1.3] sm:flex-none h-10 lg:h-9 px-1.5 sm:px-3 rounded-[2px] uppercase transition-colors ${tunnelOn ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
               >
                 Tunnel
               </button>
@@ -505,7 +487,7 @@ export function PitcherArsenalScene({
                 aria-pressed={heatMetric !== null}
                 onClick={() => setHeatParam(heatMetric ? null : "whiff")}
                 title="Show a per-zone heat grid across the current pitch selection."
-                className={`h-9 px-3 rounded-[2px] uppercase transition-colors ${heatMetric ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
+                className={`flex-1 sm:flex-none h-10 lg:h-9 px-1.5 sm:px-3 rounded-[2px] uppercase transition-colors ${heatMetric ? "bg-ink text-bg" : "text-ink-2 hover:text-ink"}`}
               >
                 Heat
               </button>
@@ -514,7 +496,7 @@ export function PitcherArsenalScene({
         }
       />
       {!inAtBatMode && (tunnelOn || heatMetric) ? (
-        <div className="hidden lg:flex absolute bottom-[72px] right-4 z-40 items-center gap-1.5 p-1 rounded-control bg-overlay border border-line-strong shadow-lg">
+        <div className="flex absolute left-3 right-3 bottom-[104px] sm:left-auto sm:right-4 lg:bottom-[72px] z-40 items-center gap-1.5 p-1 rounded-control bg-overlay border border-line-strong shadow-lg overflow-x-auto">
           {heatMetric ? (
             <div role="radiogroup" aria-label="Heat metric" className="flex gap-0.5">
               {HEAT_METRIC_OPTIONS.map((m) => (
@@ -555,20 +537,11 @@ export function PitcherArsenalScene({
         />
       ) : (
         <>
-          <TunnelToggle
-            active={tunnelOn}
-            unavailable={tunnelOn && !tunnelEnvelope}
-            onToggle={() => setTunnelOn((v) => !v)}
-          />
-          <HeatToggle
-            metric={heatMetric}
-            onSelect={(m) => setHeatParam(m)}
-          />
           {hasSelection && (
             <button
               type="button"
               onClick={() => setSelectedId(null)}
-              className="absolute bottom-24 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-md bg-white/[0.08] hover:bg-white/[0.14] backdrop-blur-md border border-white/15 text-[11px] uppercase tracking-[0.14em] text-white/85 pointer-events-auto"
+              className="absolute bottom-[104px] lg:bottom-20 left-1/2 -translate-x-1/2 h-9 px-3.5 rounded-full bg-overlay border border-line-strong text-[13px] font-semibold text-ink pointer-events-auto"
             >
               Clear selection
             </button>
@@ -667,136 +640,9 @@ function formatBreak(inches: number): string {
   return `${sign}${inches.toFixed(1)}"`;
 }
 
-// Toggle button + help icon for the tunnel overlay. Sits above the
-// camera pad, right-aligned so it shares the bottom-right "scene
-// chrome" zone.
-function TunnelToggle({
-  active,
-  unavailable,
-  onToggle,
-}: {
-  active: boolean;
-  unavailable: boolean;
-  onToggle: () => void;
-}) {
-  const [helpOpen, setHelpOpen] = useState(false);
-  return (
-    <>
-      <div className="lg:hidden absolute bottom-20 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
-        <div className="flex items-center gap-1">
-          <OverlayToggleButton
-            active={active}
-            onClick={onToggle}
-            title="Show the pitch-tunnel envelope across the current pitch types."
-            label="Tunnel"
-          />
-          <OverlayHelpButton
-            ariaLabel="What is pitch tunneling?"
-            title="How tunneling is calculated"
-            onClick={() => setHelpOpen(true)}
-          />
-        </div>
-        {unavailable ? (
-          <span className="text-[10px] text-amber-300/85 px-2 py-0.5 rounded bg-black/40 backdrop-blur-sm">
-            Need ≥ 2 pitch types
-          </span>
-        ) : null}
-      </div>
-      {helpOpen ? <TunnelHelp onClose={() => setHelpOpen(false)} /> : null}
-    </>
-  );
-}
 
-// Shared button shape for the scene-chrome overlay toggles (Tunnel,
-// Heat, future siblings). State is read at a glance from the
-// checkbox glyph on the right; the body color shifts from muted dark
-// (off, "inactive") to cyan-glow (on, "active").
-function OverlayToggleButton({
-  active,
-  onClick,
-  label,
-  title,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-md text-[11px] uppercase tracking-[0.14em] backdrop-blur-md border transition-colors ${
-        active
-          ? "bg-[#5fc7d8]/25 border-[#5fc7d8]/55 text-white"
-          : "bg-[#081a32]/45 border-white/10 text-white/45 hover:text-white/85 hover:bg-[#0e2a4d]/70 hover:border-white/20"
-      }`}
-      title={title}
-    >
-      <span>{label}</span>
-      <CheckboxGlyph checked={active} />
-    </button>
-  );
-}
 
-function OverlayHelpButton({
-  ariaLabel,
-  title,
-  onClick,
-}: {
-  ariaLabel: string;
-  title: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      title={title}
-      className="w-7 h-7 rounded-full text-[12px] font-semibold backdrop-blur-md border bg-[#081a32]/45 border-white/10 text-white/55 hover:text-white hover:bg-[#0e2a4d]/70 hover:border-white/20 transition-colors flex items-center justify-center"
-    >
-      ?
-    </button>
-  );
-}
 
-// Inline checkbox icon — empty square for off, square + checkmark
-// for on. `currentColor` picks up the button's text color so it
-// shifts with the rest of the button state.
-function CheckboxGlyph({ checked }: { checked: boolean }) {
-  return (
-    <svg
-      width="13"
-      height="13"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden
-      className="flex-shrink-0"
-    >
-      <rect
-        x="1.75"
-        y="1.75"
-        width="12.5"
-        height="12.5"
-        rx="2.25"
-        stroke="currentColor"
-        strokeOpacity={checked ? 0.95 : 0.55}
-        strokeWidth="1.5"
-      />
-      {checked ? (
-        <path
-          d="M4.25 8.5 L7 11.25 L11.75 5.5"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ) : null}
-    </svg>
-  );
-}
 
 // Toggle button + help icon for the plate heat-grid overlay. Sits
 // directly below the Tunnel toggle so both controls share the same
@@ -806,67 +652,6 @@ function CheckboxGlyph({ checked }: { checked: boolean }) {
 // view of pitcher dominance.
 const HEAT_METRIC_OPTIONS: HeatMetric[] = ["whiff", "chase", "called", "csw"];
 
-function HeatToggle({
-  metric,
-  onSelect,
-}: {
-  metric: HeatMetric | null;
-  onSelect: (next: HeatMetric | null) => void;
-}) {
-  const [helpOpen, setHelpOpen] = useState(false);
-  const active = metric !== null;
-  const label = active
-    ? `Heat: ${HEAT_METRIC_LABELS[metric].replace(" %", "")}`
-    : "Heat";
-  return (
-    <>
-      <div className="lg:hidden absolute bottom-32 right-3 sm:right-6 z-20 flex flex-col items-end gap-1 pointer-events-auto">
-        <div className="flex items-center gap-1">
-          <OverlayToggleButton
-            active={active}
-            onClick={() => onSelect(active ? null : "whiff")}
-            label={label}
-            title="Show a per-zone heat grid across the current pitch selection."
-          />
-          <OverlayHelpButton
-            ariaLabel="What is the heat grid?"
-            title="How the heat grid works"
-            onClick={() => setHelpOpen(true)}
-          />
-        </div>
-        {active ? (
-          <div className="flex items-center gap-1 mt-0.5" role="radiogroup" aria-label="Heat metric">
-            {HEAT_METRIC_OPTIONS.map((m) => {
-              const isActive = m === metric;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={isActive}
-                  onClick={() => onSelect(m)}
-                  className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-[0.12em] backdrop-blur-md border transition-colors ${
-                    isActive
-                      ? "bg-[#5fc7d8]/30 border-[#5fc7d8]/55 text-white"
-                      : "bg-[#081a32]/45 border-white/10 text-white/55 hover:text-white hover:bg-[#0e2a4d]/70 hover:border-white/20"
-                  }`}
-                  title={HEAT_METRIC_LABELS[m]}
-                >
-                  {/* Short chip label — drop the trailing "%" to keep
-                      the picker compact. */}
-                  {HEAT_METRIC_LABELS[m].replace(" %", "")}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-      {helpOpen ? (
-        <HeatHelp metric={metric} onClose={() => setHelpOpen(false)} />
-      ) : null}
-    </>
-  );
-}
 
 // Heat-grid modal explainer. Same shape as the tunnel one — black
 // backdrop, click-outside or ESC to dismiss.

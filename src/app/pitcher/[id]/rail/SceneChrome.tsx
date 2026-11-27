@@ -17,11 +17,6 @@ import { openRailTab, usePitcherUrl } from "./usePitcherUrl";
 
 const LEGEND_OUTCOMES: OutcomeCategory[] = ["whiff", "called", "ball", "foul", "inplay"];
 
-interface Chip {
-  k: string;
-  v: string;
-  clear: Record<string, string | null>;
-}
 
 /**
  * Desktop scene overlays (design/Pitcher.dc.html): view toggle +
@@ -43,35 +38,12 @@ export function SceneChrome({
   lowerLabel: string;
   lowerValue: string;
 }) {
-  const { params, update, list, isPending } = usePitcherUrl();
+  const { params, update, isPending } = usePitcherUrl();
   const [view, setView] = usePitcherView();
   const [colorBy, setColorBy] = useColorBy();
   const inAtBat = params.has("abGame") && params.has("abNum");
 
-  const chips: Chip[] = [];
-  const pitches = list("pitch");
-  for (const t of pitches) {
-    chips.push({ k: "Pitch", v: getPitchLabel(t), clear: { pitch: pitches.filter((x) => x !== t).join(",") || null } });
-  }
-  const hand = params.get("hand");
-  if (hand) chips.push({ k: "Batter", v: `vs ${hand}HB`, clear: { hand: null } });
-  const outcomes = list("outcome");
-  for (const o of outcomes) {
-    chips.push({
-      k: "Outcome",
-      v: OUTCOME_LABELS[o as OutcomeCategory] ?? o,
-      clear: { outcome: outcomes.filter((x) => x !== o).join(",") || null },
-    });
-  }
-  for (const e of list("event")) {
-    chips.push({ k: "Result", v: AT_BAT_EVENT_CHIPS.find((c) => c.key === e)?.label ?? e.replace(/_/g, " "), clear: { event: null } });
-  }
-  const game = params.get("game");
-  if (game) chips.push({ k: "Game", v: gameLabels[game] ?? `#${game}`, clear: { game: null } });
-  const vMin = params.get("veloMin");
-  const vMax = params.get("veloMax");
-  if (vMin || vMax) chips.push({ k: "Velo", v: `${vMin ?? "…"}–${vMax ?? "…"} mph`, clear: { veloMin: null, veloMax: null } });
-  if (params.get("vsBatter")) chips.push({ k: "Vs", v: batterName ?? "batter", clear: { vsBatter: null } });
+  const chips = useFilterChips(gameLabels, batterName);
 
   return (
     <div className="hidden lg:block absolute top-14 left-[384px] right-0 bottom-0 pointer-events-none z-20">
@@ -170,4 +142,41 @@ export function SceneChrome({
       ) : null}
     </div>
   );
+}
+
+export interface FilterChip {
+  k: string;
+  v: string;
+  clear: Record<string, string | null>;
+}
+
+/** Removable chips for every active URL filter (desktop + mobile scene). */
+export function useFilterChips(gameLabels: Record<string, string>, batterName: string | null): FilterChip[] {
+  const { params, list } = usePitcherUrl();
+  const chips: FilterChip[] = [];
+  const pitches = list("pitch");
+  for (const t of pitches) {
+    chips.push({ k: "Pitch", v: getPitchLabel(t), clear: { pitch: pitches.filter((x) => x !== t).join(",") || null } });
+  }
+  const hand = params.get("hand");
+  if (hand) chips.push({ k: "Batter", v: `vs ${hand}HB`, clear: { hand: null } });
+  const outcomes = list("outcome");
+  for (const o of outcomes) {
+    chips.push({
+      k: "Outcome",
+      v: OUTCOME_LABELS[o as OutcomeCategory] ?? o,
+      clear: { outcome: outcomes.filter((x) => x !== o).join(",") || null },
+    });
+  }
+  for (const e of list("event")) {
+    chips.push({ k: "Result", v: AT_BAT_EVENT_CHIPS.find((c) => c.key === e)?.label ?? e.replace(/_/g, " "), clear: { event: null } });
+  }
+  const game = params.get("game");
+  if (game) chips.push({ k: "Game", v: gameLabels[game] ?? `#${game}`, clear: { game: null } });
+  const vMin = params.get("veloMin");
+  const vMax = params.get("veloMax");
+  if (vMin || vMax) chips.push({ k: "Velo", v: `${vMin ?? "…"}–${vMax ?? "…"} mph`, clear: { veloMin: null, veloMax: null } });
+  if (params.get("vsBatter")) chips.push({ k: "Vs", v: batterName ?? "batter", clear: { vsBatter: null } });
+
+  return chips;
 }

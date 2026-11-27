@@ -245,8 +245,9 @@ export function AiChat() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        // Desktop pitcher pages put "Ask" in their top bar instead.
-        className={`${pathname.startsWith("/pitcher/") ? "lg:hidden " : ""}fixed bottom-4 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/30 transition hover:scale-105 active:scale-95`}
+        // Pitcher pages put "Ask" in their header (top bar / mobile
+        // header) instead; the floating button would sit on the drawer.
+        className={`${pathname.startsWith("/pitcher/") ? "hidden " : ""}fixed bottom-4 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-500 to-cyan-400 text-white shadow-lg shadow-violet-500/30 transition hover:scale-105 active:scale-95`}
         aria-label={open ? "Close AI chat" : "Open AI chat"}
       >
         <SparkleIcon />

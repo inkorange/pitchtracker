@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CommandPalette, openPalette } from "@/components/chrome/CommandPalette";
+import { openPalette } from "@/components/chrome/CommandPalette";
 import { Wordmark } from "@/components/chrome/SiteHeader";
 import { openAiChat } from "@/lib/ai/open-chat";
 
@@ -55,7 +55,6 @@ export function PitcherTopBar({ name, compareHref }: { name: string; compareHref
       >
         Compare
       </Link>
-      <CommandPalette />
     </header>
   );
 }
