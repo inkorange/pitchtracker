@@ -36,6 +36,7 @@ export function PitcherStatsView({
   game,
   atBats,
   season,
+  hasPostseason,
 }: {
   /** Pre-rendered scope text from the page server. Mirrors the
    *  TopNav title so the banner reflects every active URL filter
@@ -45,6 +46,7 @@ export function PitcherStatsView({
   game: StatsGame | null;
   atBats: StatsAtBat[] | null;
   season: number;
+  hasPostseason: boolean;
 }) {
   const params = useParams<{ id?: string }>();
   const searchParams = useSearchParams();
@@ -98,6 +100,11 @@ export function PitcherStatsView({
       sp.delete("game");
       sp.delete("hand");
     }
+    // Season type (Stats toggle): default regular season; a single
+    // game is already one type, so drop it there.
+    const st = sp.get("seasonType");
+    if (sp.get("game") || !hasPostseason || st === "all") sp.delete("seasonType");
+    else sp.set("seasonType", st === "post" ? "post" : "reg");
     sp.set("includeSequence", "1");
     sp.set("includeRadar", "1");
     // Per-game drift series — server skips it under vsBatter, but
@@ -200,7 +207,7 @@ export function PitcherStatsView({
         batterScoped={vsBatter != null}
         onClearBatter={clearBatterScope}
       />
-      <StatsSummary pitches={pitches} game={game} atBats={atBats} season={season} />
+      <StatsSummary pitches={pitches} game={game} atBats={atBats} season={season} hasPostseason={hasPostseason} />
       <h2 className="m-0 pt-5 pb-1 font-display font-bold text-[26px] uppercase leading-none">Deeper analysis</h2>
       {/* The two headline cards — Arsenal (per-pitch stats + league
           radar combined) and Sequencing — span full width because

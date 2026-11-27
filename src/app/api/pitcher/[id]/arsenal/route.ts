@@ -100,9 +100,15 @@ export async function GET(request: Request, { params }: ArsenalParams) {
   // batter-agnostic scene and the batter-scoped stats view.
   type PitchRow = SavantSeasonPitchRow;
   const season_data = await loadSavantSeason(pitcherId, season);
+  // ?seasonType=reg|post (Stats view toggle); absent = every game.
+  const seasonType = sp.get("seasonType");
   const pitchesRaw: PitchRow[] = filterSeasonPitches(season_data.pitches, {
     hand,
     gamePk: game ? Number(game) : null,
+  }).filter((p) => {
+    if (seasonType !== "reg" && seasonType !== "post") return true;
+    const isReg = (p.pitch_games?.game_type ?? "R") === "R";
+    return seasonType === "reg" ? isReg : !isReg;
   });
 
   const { data: pitcher } = await pitcherPromise;
@@ -175,9 +181,6 @@ export async function GET(request: Request, { params }: ArsenalParams) {
     .map(({ pitch_games, ...rest }) => ({
       ...rest,
       game_date: pitch_games?.game_date ?? null,
-      // Only non-regular-season pitches carry game_type (keeps the
-      // payload small); the Stats season line excludes them.
-      ...(pitch_games?.game_type && pitch_games.game_type !== "R" ? { game_type: pitch_games.game_type } : {}),
     }));
 
   // Opt-in: sequencing matrix computed from the PRE-FILTER `cached`

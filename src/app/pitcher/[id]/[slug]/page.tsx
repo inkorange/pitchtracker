@@ -706,6 +706,9 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         game_date: p.pitch_games?.game_date ?? null,
       })),
     ).reverse(); // chronological within the scope
+    const postGames = new Set(
+      scoped.filter((p) => (p.pitch_games?.game_type ?? "R") !== "R").map((p) => p.game_pk),
+    );
     const people = await fetchPersonsCached([...new Set(pas.map((x) => x.batterId))]).catch(
       () => new Map<number, { fullName: string }>(),
     );
@@ -720,8 +723,10 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       sequence: x.sequence,
       count: x.count,
       event: x.event,
+      post: postGames.has(x.gamePk),
     }));
   }
+  const hasPostseason = season_data.pitches.some((p) => (p.pitch_games?.game_type ?? "R") !== "R");
   const statsGame =
     gameLine && activeGameInfo
       ? {
@@ -937,7 +942,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           scope banner mirrors the TopNav title and reflects every
           active URL filter (game / pitch type / outcome / event /
           hand / velo / batter / at-bat). */}
-      <PitcherStatsArea filterSummary={filterSummary} game={statsGame} atBats={statsAtBats} season={season} />
+      <PitcherStatsArea filterSummary={filterSummary} game={statsGame} atBats={statsAtBats} season={season} hasPostseason={hasPostseason} />
     </>
   );
 }

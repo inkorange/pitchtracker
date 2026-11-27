@@ -11,6 +11,7 @@ export function PitcherStatsArea({
   game,
   atBats,
   season,
+  hasPostseason,
 }: {
   /** Server-rendered scope text passed through to the stats banner
    *  so it mirrors the TopNav title. */
@@ -18,6 +19,7 @@ export function PitcherStatsArea({
   game: StatsGame | null;
   atBats: StatsAtBat[] | null;
   season: number;
+  hasPostseason: boolean;
 }) {
   const [view] = usePitcherView();
   if (view !== "stats") return null;
@@ -30,7 +32,7 @@ export function PitcherStatsArea({
       className="absolute left-3 right-3 top-[116px] bottom-0 lg:top-[124px] lg:left-[calc(384px+24px)] lg:right-6 lg:bottom-6 z-10 overflow-y-auto pointer-events-auto pt-1 pb-4"
       aria-label="Pitcher stats"
     >
-      <PitcherStatsView filterSummary={filterSummary} game={game} atBats={atBats} season={season} />
+      <PitcherStatsView filterSummary={filterSummary} game={game} atBats={atBats} season={season} hasPostseason={hasPostseason} />
     </section>
   );
 }

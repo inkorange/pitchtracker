@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 import { ScoreBug } from "@/components/broadcast/ScoreBug";
 import { eventLabel, eventTone } from "@/lib/at-bat/plate-appearances";
@@ -25,6 +25,8 @@ export interface StatsAtBat {
   sequence: string[];
   count: string;
   event: string | null;
+  /** Postseason game. */
+  post: boolean;
 }
 
 export interface StatsGame {
@@ -41,6 +43,15 @@ const shortDate = (iso: string | null) => {
   const [, m, d] = iso.split("-").map(Number);
   return m && d ? `${MONTHS[m - 1]} ${d}` : iso;
 };
+type SeasonType = "reg" | "post" | "all";
+const SEASON_TYPES: [SeasonType, string][] = [
+  ["reg", "Regular season"],
+  ["post", "Postseason"],
+  ["all", "All"],
+];
+const parseSeasonType = (v: string | null): SeasonType => (v === "post" || v === "all" ? v : "reg");
+const SEASON_LABEL: Record<SeasonType, string> = { reg: "regular season", post: "postseason", all: "season" };
+
 const f1 = (n: number | null) => (n == null ? "—" : n.toFixed(1));
 
 function Card({ title, aside, children, className = "" }: { title: string; aside?: string; children: React.ReactNode; className?: string }) {
@@ -60,21 +71,32 @@ export function StatsSummary({
   game,
   atBats,
   season,
+  hasPostseason,
 }: {
   pitches: SummaryPitch[];
   game: StatsGame | null;
   atBats: StatsAtBat[] | null;
   season: number;
+  hasPostseason: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const sp = useSearchParams();
   const types = useMemo(() => byPitchType(pitches), [pitches]);
   const mix = useMemo(() => outcomeMix(pitches), [pitches]);
   const sides = useMemo(() => sideSplit(pitches), [pitches]);
-  // Season line: regular season only, matching the rail and homepage
-  // leaderboards. Everything else (tables, splits, at-bats) keeps
-  // postseason pitches in scope.
-  const strip = useMemo(() => seasonStrip(pitches.filter((p) => (p.game_type ?? "R") === "R")), [pitches]);
+  // Pitches arrive already narrowed to the season type (the arsenal
+  // API's ?seasonType); at-bats are server-built, so narrow them here.
+  const strip = useMemo(() => seasonStrip(pitches), [pitches]);
+  const seasonType: SeasonType = !hasPostseason || game ? "all" : parseSeasonType(sp.get("seasonType"));
+  const shownAtBats =
+    atBats && seasonType !== "all" ? atBats.filter((ab) => ab.post === (seasonType === "post")) : atBats;
+  const setSeasonType = (t: SeasonType) => {
+    const q = new URLSearchParams(sp.toString());
+    if (t === "reg") q.delete("seasonType");
+    else q.set("seasonType", t);
+    router.replace(`${pathname}?${q}`, { scroll: false });
+  };
 
   const line: [string, string][] = game
     ? [
@@ -115,18 +137,35 @@ export function StatsSummary({
 
   return (
     <div className="flex flex-col gap-4 lg:gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
       <ScoreBug
         size="md"
-        className="self-start flex-wrap"
+        className="flex-wrap"
         segments={[
           ...(game?.teamAbbr ? [{ tone: "team" as const, content: game.teamAbbr }] : []),
           game
             ? { tone: "name" as const, content: game.opponent ? `vs ${game.opponent}` : "Game" }
-            : { tone: "name" as const, content: `${season} regular season` },
+            : { tone: "name" as const, content: `${season} ${hasPostseason ? SEASON_LABEL[seasonType] : "season"}` },
           ...(game ? [{ tone: "tag" as const, content: shortDate(game.date) }] : []),
           ...(game ? [{ tone: "plain" as const, content: game.line.decision }] : []),
         ]}
       />
+      {hasPostseason && !game ? (
+        <div role="group" aria-label="Season type" className="flex bg-surface border border-line-strong rounded-control p-[3px]">
+          {SEASON_TYPES.map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              aria-pressed={seasonType === k}
+              onClick={() => setSeasonType(k)}
+              className={`h-[34px] px-3 rounded-[2px] text-[13px] ${seasonType === k ? "bg-ink text-bg font-bold" : "text-ink-2 font-semibold hover:text-ink"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      </div>
 
       <section
         aria-label={game ? "Game line" : "Season line"}
@@ -256,10 +295,10 @@ export function StatsSummary({
           </Card>
         </div>
 
-      {atBats && atBats.length > 0 ? (
-        <Card title="At-bats" aside={`${atBats.length} plate appearances`}>
+      {shownAtBats && shownAtBats.length > 0 ? (
+        <Card title="At-bats" aside={`${shownAtBats.length} plate appearances`}>
           <ol className="list-none m-0 p-0">
-            {atBats.map((ab) => {
+            {shownAtBats.map((ab) => {
               const tone = eventTone(ab.event);
               return (
                 <li key={`${ab.gamePk}-${ab.atBat}`} className="border-t border-line first:border-t-0">
