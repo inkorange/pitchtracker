@@ -192,6 +192,7 @@ export function MobilePitcherShell({
       <BottomSheet
         index={snap}
         onIndexChange={setSnap}
+        dismissed={view === "stats" && snap === 0}
         label="Pitcher panel"
         header={
           <>

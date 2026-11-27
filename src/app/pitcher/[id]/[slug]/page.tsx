@@ -26,6 +26,8 @@ import { HelpButton } from "../stats/HelpButton";
 import { MatchupsPanel } from "../MatchupsPanel";
 import { AtBatHeader } from "../AtBatHeader";
 import { PitcherStatsArea } from "../PitcherStatsArea";
+import type { StatsAtBat } from "../stats/StatsSummary";
+import { groupPlateAppearances } from "@/lib/at-bat/plate-appearances";
 import { expandAtBatEvents } from "@/lib/at-bat-events";
 import { buildFilterSummary } from "@/lib/filter-summary";
 import { buildPitcherBio, buildPitcherKeywords } from "@/lib/pitcher/bio";
@@ -680,6 +682,57 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     ).length;
   }
 
+  // Stats view: at-bat list for a single game (?game) or a batter
+  // (?vsBatter) — season-wide would be hundreds of rows. Names resolved
+  // here so the client list doesn't need a lookup per batter.
+  let statsAtBats: StatsAtBat[] | null = null;
+  if (sp.game || vsBatterId != null) {
+    const scoped = season_data.pitches.filter(
+      (p) =>
+        (!sp.game || p.game_pk === Number(sp.game)) &&
+        (vsBatterId == null || p.batter_id === vsBatterId),
+    );
+    const pas = groupPlateAppearances(
+      scoped.map((p) => ({
+        game_pk: p.game_pk,
+        at_bat_number: p.at_bat_number,
+        pitch_number: p.pitch_number,
+        pitch_type: p.pitch_type,
+        batter_id: p.batter_id,
+        description: p.description,
+        events: p.events,
+        inning: p.inning,
+        inning_topbot: p.inning_topbot,
+        game_date: p.pitch_games?.game_date ?? null,
+      })),
+    ).reverse(); // chronological within the scope
+    const people = await fetchPersonsCached([...new Set(pas.map((x) => x.batterId))]).catch(
+      () => new Map<number, { fullName: string }>(),
+    );
+    statsAtBats = pas.map((x) => ({
+      gamePk: x.gamePk,
+      atBat: x.atBat,
+      date: x.date,
+      inning: x.inning,
+      half: x.half,
+      batterId: x.batterId,
+      batterName: people.get(x.batterId)?.fullName ?? `#${x.batterId}`,
+      sequence: x.sequence,
+      count: x.count,
+      event: x.event,
+    }));
+  }
+  const statsGame =
+    gameLine && activeGameInfo
+      ? {
+          line: gameLine,
+          xbh: xbhInGame,
+          date: activeGameInfo.game_date,
+          opponent: activeGameInfo.opponentName,
+          teamAbbr: team?.abbreviation ?? null,
+        }
+      : null;
+
   // Rail stat strip — homepage leaderboard definitions, regular season.
   const line = seasonLine(
     season_data.pitches.map((p) => ({ ...p, game_type: p.pitch_games?.game_type ?? null })),
@@ -884,7 +937,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           scope banner mirrors the TopNav title and reflects every
           active URL filter (game / pitch type / outcome / event /
           hand / velo / batter / at-bat). */}
-      <PitcherStatsArea filterSummary={filterSummary} />
+      <PitcherStatsArea filterSummary={filterSummary} game={statsGame} atBats={statsAtBats} season={season} />
     </>
   );
 }

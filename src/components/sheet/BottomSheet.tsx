@@ -41,6 +41,7 @@ export function BottomSheet({
   children,
   label,
   className = "",
+  dismissed = false,
 }: {
   index: SnapIndex;
   onIndexChange: (i: SnapIndex) => void;
@@ -49,6 +50,9 @@ export function BottomSheet({
   children: ReactNode;
   label: string;
   className?: string;
+  /** Slide fully off-screen (e.g. the mobile Stats view, where the
+   *  page scrolls on its own and the sheet only opens for filters). */
+  dismissed?: boolean;
 }) {
   const [snaps, setSnaps] = useState<number[]>([PEEK_PX, 460, 690]);
   const [drag, setDrag] = useState<number | null>(null); // visible px while dragging
@@ -120,7 +124,9 @@ export function BottomSheet({
       className={`fixed inset-x-0 bottom-0 z-[45] flex flex-col bg-bg-raised border-t border-line-strong rounded-t-drawer shadow-[0_-12px_32px_rgba(0,0,0,0.45)] ${
         drag == null ? "motion-safe:transition-transform motion-safe:duration-300 motion-safe:ease-[cubic-bezier(.2,.7,.2,1)]" : ""
       } ${className}`}
-      style={{ height: max, transform: `translateY(${max - visible}px)`, touchAction: "none" }}
+      style={{ height: max, transform: `translateY(${dismissed ? max + 24 : max - visible}px)`, touchAction: "none" }}
+      inert={dismissed}
+      aria-hidden={dismissed || undefined}
     >
       <div
         onPointerDown={onPointerDown}

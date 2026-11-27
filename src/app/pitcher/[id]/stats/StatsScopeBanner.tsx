@@ -28,9 +28,9 @@ export function StatsScopeBanner({
   onClearBatter,
 }: StatsScopeBannerProps) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.04] border border-white/10 px-3 py-2">
-      <div className="flex items-center gap-2 min-w-0 text-sm text-white/90">
-        <span className="text-[10px] uppercase tracking-[0.14em] text-white/45 flex-shrink-0">
+    <div className="flex items-center justify-between gap-3 rounded-control bg-surface border border-line px-3 py-2">
+      <div className="flex items-center gap-2 min-w-0 text-sm text-ink">
+        <span className="label-caps flex-shrink-0">
           Scope
         </span>
         <span className="font-medium truncate">
@@ -43,7 +43,7 @@ export function StatsScopeBanner({
         <button
           type="button"
           onClick={onClearBatter}
-          className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white px-2 py-1 rounded hover:bg-white/[0.06] transition-colors flex-shrink-0"
+          className="inline-flex items-center gap-1 label-caps hover:text-ink px-2 py-1 rounded-control hover:bg-surface-2 transition-colors flex-shrink-0"
           aria-label="Clear batter scope"
         >
           <svg
