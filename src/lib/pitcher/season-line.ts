@@ -4,6 +4,8 @@
 // Whiff% = swinging_strike / pitches; CSW% = (swinging_strike +
 // called_strike) / pitches; K = strikeout events.
 
+import { matchesSeasonType, type SeasonType } from "./season-type";
+
 export interface LinePitch {
   description: string | null;
   events: string | null;
@@ -23,8 +25,9 @@ export interface SeasonLine {
 const FB_ORDER = ["FF", "SI", "FC"];
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
-export function seasonLine(all: LinePitch[]): SeasonLine {
-  const ps = all.filter((p) => (p.game_type ?? "R") === "R");
+/** `st` picks the games counted — regular season by default. */
+export function seasonLine(all: LinePitch[], st: SeasonType = "reg"): SeasonLine {
+  const ps = all.filter((p) => matchesSeasonType(p.game_type, st));
   const n = ps.length;
   const sw = ps.filter((p) => p.description === "swinging_strike").length;
   const cs = ps.filter((p) => p.description === "called_strike").length;

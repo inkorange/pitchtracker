@@ -39,12 +39,14 @@ import {
 } from "@/lib/statsapi/client";
 import { PitcherGameStats } from "../PitcherGameStats";
 import { seasonLine } from "@/lib/pitcher/season-line";
+import { effectiveSeasonType, isPostseasonGameType, matchesSeasonType } from "@/lib/pitcher/season-type";
 import { PitcherTopBar } from "../rail/PitcherTopBar";
 import { RailTabs } from "../rail/RailTabs";
 import { ArsenalToggles } from "../rail/ArsenalToggles";
 import { RailFilters } from "../rail/RailFilters";
 import { RailGames } from "../rail/RailGames";
 import { SeasonSegment } from "../rail/SeasonSegment";
+import { SeasonTypeToggle } from "../rail/SeasonTypeToggle";
 import { SceneChrome } from "../rail/SceneChrome";
 import { MobilePitcherShell } from "../rail/MobilePitcherShell";
 import { ArsenalCards } from "../rail/ArsenalCards";
@@ -73,6 +75,8 @@ interface PageProps {
     // also consumed client-side by AtBatHeader / MatchupsPanel /
     // PitcherStatsView for narrowing and playback.
     vsBatter?: string;
+    // reg (default) | post | all — see lib/pitcher/season-type.ts.
+    seasonType?: string;
     abGame?: string;
     abNum?: string;
   }>;
@@ -420,13 +424,22 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // too: it existed only to populate rows this page no longer reads,
   // and its write-through was a large share of the database's WAL.
   const season_data = await loadSavantSeason(pitcherId, season);
+  // Season type (?seasonType) narrows every pitch-derived surface on the
+  // page; a selected game overrides it. Seasons without postseason games
+  // don't offer the toggle, so "post" there would only empty the page.
+  const postGamePks = new Set(
+    season_data.pitches.filter((p) => isPostseasonGameType(p.pitch_games?.game_type)).map((p) => p.game_pk),
+  );
+  const hasPostseason = postGamePks.size > 0;
+  const seasonType = hasPostseason ? effectiveSeasonType(sp.seasonType, sp.game) : "all";
+  const seasonPitches = season_data.pitches.filter((p) => matchesSeasonType(p.pitch_games?.game_type, seasonType));
 
   // Row-level filters are applied in memory now that the whole season
   // is in hand. filterSeasonPitches is the single definition of what
   // ?hand=, ?game= and ?vsBatter= mean.
   type PitchPageRow = SavantSeasonPitchRow;
   const cachedPitchesAcc: PitchPageRow[] = filterSeasonPitches(
-    season_data.pitches,
+    seasonPitches,
     {
       hand: sp.hand ?? null,
       gamePk: sp.game ? Number(sp.game) : null,
@@ -687,7 +700,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
   // here so the client list doesn't need a lookup per batter.
   let statsAtBats: StatsAtBat[] | null = null;
   if (sp.game || vsBatterId != null) {
-    const scoped = season_data.pitches.filter(
+    const scoped = seasonPitches.filter(
       (p) =>
         (!sp.game || p.game_pk === Number(sp.game)) &&
         (vsBatterId == null || p.batter_id === vsBatterId),
@@ -706,9 +719,6 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         game_date: p.pitch_games?.game_date ?? null,
       })),
     ).reverse(); // chronological within the scope
-    const postGames = new Set(
-      scoped.filter((p) => (p.pitch_games?.game_type ?? "R") !== "R").map((p) => p.game_pk),
-    );
     const people = await fetchPersonsCached([...new Set(pas.map((x) => x.batterId))]).catch(
       () => new Map<number, { fullName: string }>(),
     );
@@ -723,10 +733,8 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       sequence: x.sequence,
       count: x.count,
       event: x.event,
-      post: postGames.has(x.gamePk),
     }));
   }
-  const hasPostseason = season_data.pitches.some((p) => (p.pitch_games?.game_type ?? "R") !== "R");
   const statsGame =
     gameLine && activeGameInfo
       ? {
@@ -739,8 +747,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
       : null;
 
   // Rail stat strip — homepage leaderboard definitions, regular season.
+  // Without a game it follows the season type; with one, the rail keeps
+  // the season's regular-season line (the game line shows separately).
   const line = seasonLine(
     season_data.pitches.map((p) => ({ ...p, game_type: p.pitch_games?.game_type ?? null })),
+    sp.game ? "reg" : seasonType,
   );
 
   const filterSummary = buildFilterSummary({
@@ -752,6 +763,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
     game: activeGameInfo,
     veloMin,
     veloMax,
+    seasonType: hasPostseason ? seasonType : null,
     batterName,
     atBat: atBatInfo,
   });
@@ -835,6 +847,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
             <SeasonSegment season={season} available={availableSeasons.length ? availableSeasons : [season]} />
             <span className="text-xs text-muted">MLB Statcast</span>
           </div>
+          {hasPostseason && !sp.game ? <SeasonTypeToggle /> : null}
           <dl className="m-0 grid grid-cols-4 border border-line rounded-control overflow-hidden">
             {(
               [
@@ -864,9 +877,9 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
           filters={<RailFilters />}
           games={
             <RailGames
-              games={games}
+              games={games.map((g) => ({ ...g, post: postGamePks.has(g.game_pk) }))}
               season={season}
-              totalPitches={season_data.pitches.length}
+              totalPitches={seasonPitches.length}
               gameLine={
                 gameLine ? (
                   <PitcherGameStats
@@ -900,7 +913,7 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         shortName={pitcher.first_name && pitcher.last_name ? `${pitcher.first_name[0]}. ${pitcher.last_name}` : pitcher.full_name}
         meta={[pitcher.throws ? `${pitcher.throws}HP` : null, team?.abbreviation ?? null, String(season)].filter(Boolean).join(" · ")}
         pitchCount={renderable.length}
-        totalPitches={season_data.pitches.length}
+        totalPitches={seasonPitches.length}
         season={season}
         gameLabels={Object.fromEntries(games.map((g) => [String(g.game_pk), `${g.away} @ ${g.home} · ${g.game_date}`]))}
         batterName={batterName}
@@ -910,10 +923,11 @@ export default async function PitcherPage({ params, searchParams }: PageProps) {
         games={
           <div className="flex flex-col gap-4">
             <SeasonSegment season={season} available={availableSeasons.length ? availableSeasons : [season]} />
+            {hasPostseason && !sp.game ? <SeasonTypeToggle /> : null}
             <RailGames
-              games={games}
+              games={games.map((g) => ({ ...g, post: postGamePks.has(g.game_pk) }))}
               season={season}
-              totalPitches={season_data.pitches.length}
+              totalPitches={seasonPitches.length}
               gameLine={
                 gameLine ? (
                   <PitcherGameStats

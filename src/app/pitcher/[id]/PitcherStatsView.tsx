@@ -100,11 +100,6 @@ export function PitcherStatsView({
       sp.delete("game");
       sp.delete("hand");
     }
-    // Season type (Stats toggle): default regular season; a single
-    // game is already one type, so drop it there.
-    const st = sp.get("seasonType");
-    if (sp.get("game") || !hasPostseason || st === "all") sp.delete("seasonType");
-    else sp.set("seasonType", st === "post" ? "post" : "reg");
     sp.set("includeSequence", "1");
     sp.set("includeRadar", "1");
     // Per-game drift series — server skips it under vsBatter, but

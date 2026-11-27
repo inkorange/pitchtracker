@@ -73,7 +73,6 @@ export function ArsenalSceneShell() {
     sp.delete("abGame");
     sp.delete("abNum");
     sp.delete("batterQ");
-    sp.delete("seasonType"); // Stats-view only
     return sp.toString();
   })();
 

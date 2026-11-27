@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { parseSeasonType, SEASON_TYPE_LABEL } from "@/lib/pitcher/season-type";
+import { SeasonTypeToggle } from "../rail/SeasonTypeToggle";
 import { useMemo } from "react";
 import { ScoreBug } from "@/components/broadcast/ScoreBug";
 import { eventLabel, eventTone } from "@/lib/at-bat/plate-appearances";
@@ -25,8 +27,6 @@ export interface StatsAtBat {
   sequence: string[];
   count: string;
   event: string | null;
-  /** Postseason game. */
-  post: boolean;
 }
 
 export interface StatsGame {
@@ -43,15 +43,6 @@ const shortDate = (iso: string | null) => {
   const [, m, d] = iso.split("-").map(Number);
   return m && d ? `${MONTHS[m - 1]} ${d}` : iso;
 };
-type SeasonType = "reg" | "post" | "all";
-const SEASON_TYPES: [SeasonType, string][] = [
-  ["reg", "Regular season"],
-  ["post", "Postseason"],
-  ["all", "All"],
-];
-const parseSeasonType = (v: string | null): SeasonType => (v === "post" || v === "all" ? v : "reg");
-const SEASON_LABEL: Record<SeasonType, string> = { reg: "regular season", post: "postseason", all: "season" };
-
 const f1 = (n: number | null) => (n == null ? "—" : n.toFixed(1));
 
 function Card({ title, aside, children, className = "" }: { title: string; aside?: string; children: React.ReactNode; className?: string }) {
@@ -80,23 +71,14 @@ export function StatsSummary({
   hasPostseason: boolean;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const sp = useSearchParams();
   const types = useMemo(() => byPitchType(pitches), [pitches]);
   const mix = useMemo(() => outcomeMix(pitches), [pitches]);
   const sides = useMemo(() => sideSplit(pitches), [pitches]);
-  // Pitches arrive already narrowed to the season type (the arsenal
-  // API's ?seasonType); at-bats are server-built, so narrow them here.
+  // Pitches and at-bats arrive already narrowed to the season type.
   const strip = useMemo(() => seasonStrip(pitches), [pitches]);
-  const seasonType: SeasonType = !hasPostseason || game ? "all" : parseSeasonType(sp.get("seasonType"));
-  const shownAtBats =
-    atBats && seasonType !== "all" ? atBats.filter((ab) => ab.post === (seasonType === "post")) : atBats;
-  const setSeasonType = (t: SeasonType) => {
-    const q = new URLSearchParams(sp.toString());
-    if (t === "reg") q.delete("seasonType");
-    else q.set("seasonType", t);
-    router.replace(`${pathname}?${q}`, { scroll: false });
-  };
+  const seasonType = parseSeasonType(sp.get("seasonType"));
+  const shownAtBats = atBats;
 
   const line: [string, string][] = game
     ? [
@@ -145,26 +127,13 @@ export function StatsSummary({
           ...(game?.teamAbbr ? [{ tone: "team" as const, content: game.teamAbbr }] : []),
           game
             ? { tone: "name" as const, content: game.opponent ? `vs ${game.opponent}` : "Game" }
-            : { tone: "name" as const, content: `${season} ${hasPostseason ? SEASON_LABEL[seasonType] : "season"}` },
+            : { tone: "name" as const, content: `${season} ${hasPostseason ? SEASON_TYPE_LABEL[seasonType] : "season"}` },
           ...(game ? [{ tone: "tag" as const, content: shortDate(game.date) }] : []),
           ...(game ? [{ tone: "plain" as const, content: game.line.decision }] : []),
         ]}
       />
-      {hasPostseason && !game ? (
-        <div role="group" aria-label="Season type" className="flex bg-surface border border-line-strong rounded-control p-[3px]">
-          {SEASON_TYPES.map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              aria-pressed={seasonType === k}
-              onClick={() => setSeasonType(k)}
-              className={`h-[34px] px-3 rounded-[2px] text-[13px] ${seasonType === k ? "bg-ink text-bg font-bold" : "text-ink-2 font-semibold hover:text-ink"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      {/* Desktop has it in the rail; the mobile Stats page has no drawer open. */}
+      {hasPostseason && !game ? <SeasonTypeToggle className="lg:hidden" /> : null}
       </div>
 
       <section

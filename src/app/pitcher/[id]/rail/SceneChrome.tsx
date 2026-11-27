@@ -176,6 +176,9 @@ export function useFilterChips(gameLabels: Record<string, string>, batterName: s
   const vMin = params.get("veloMin");
   const vMax = params.get("veloMax");
   if (vMin || vMax) chips.push({ k: "Velo", v: `${vMin ?? "…"}–${vMax ?? "…"} mph`, clear: { veloMin: null, veloMax: null } });
+  const st = params.get("seasonType");
+  if (!game && (st === "post" || st === "all"))
+    chips.push({ k: "Season", v: st === "post" ? "Postseason" : "Regular + postseason", clear: { seasonType: null } });
   if (params.get("vsBatter")) chips.push({ k: "Vs", v: batterName ?? "batter", clear: { vsBatter: null } });
 
   return chips;
