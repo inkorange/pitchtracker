@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Spinner } from "@/components/feedback/Spinner";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { parseAsInteger, useQueryState, useQueryStates } from "nuqs";
@@ -22,16 +23,18 @@ interface BatterResult {
 // Tailwind class set per result label. Keeps the row visually quiet
 // while still hinting at K (red) vs hit (green) vs walk (yellow) etc.
 const RESULT_PILL_STYLE: Record<string, string> = {
-  K: "bg-red-500/20 border-red-400/40 text-red-100",
-  BB: "bg-amber-500/20 border-amber-400/40 text-amber-100",
-  HBP: "bg-amber-500/20 border-amber-400/40 text-amber-100",
-  "1B": "bg-emerald-500/20 border-emerald-400/40 text-emerald-100",
-  "2B": "bg-emerald-500/25 border-emerald-400/50 text-emerald-100",
-  "3B": "bg-emerald-500/30 border-emerald-400/55 text-emerald-100",
-  HR: "bg-fuchsia-500/25 border-fuchsia-400/50 text-fuchsia-100",
-  Out: "bg-white/[0.06] border-white/15 text-white/65",
-  E: "bg-sky-500/20 border-sky-400/40 text-sky-100",
-  CI: "bg-sky-500/20 border-sky-400/40 text-sky-100",
+  // Redesign palette: strikeouts in the brand accent, free passes and
+  // hits in the highlight yellow, outs neutral.
+  K: "bg-accent/20 border-accent/60 text-ink",
+  BB: "bg-highlight/15 border-highlight/50 text-ink",
+  HBP: "bg-highlight/15 border-highlight/50 text-ink",
+  "1B": "bg-highlight/15 border-highlight/50 text-ink",
+  "2B": "bg-highlight/20 border-highlight/60 text-ink",
+  "3B": "bg-highlight/25 border-highlight/70 text-ink",
+  HR: "bg-highlight/30 border-highlight text-ink",
+  Out: "bg-surface-2 border-line-strong text-ink-2",
+  E: "bg-surface-2 border-line-strong text-ink-2",
+  CI: "bg-surface-2 border-line-strong text-ink-2",
 };
 
 interface AtBatSummary {
@@ -179,7 +182,7 @@ export function MatchupsPanel({ season, defaultTeamId, openOnMount = false }: Ma
           <button
             type="button"
             onClick={exitAtBat}
-            className="w-full px-2.5 py-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.1] text-[10px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
+            className="w-full h-11 px-3 rounded-control border border-line-strong text-sm font-semibold text-ink hover:border-ink-2 transition-colors"
           >
             Exit at-bat mode
           </button>
@@ -188,7 +191,7 @@ export function MatchupsPanel({ season, defaultTeamId, openOnMount = false }: Ma
         <button
           type="button"
           onClick={() => setDialogOpen(true)}
-          className="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[11px] uppercase tracking-[0.14em] text-white/75 hover:text-white transition-colors"
+          className="w-full h-11 px-3 rounded-control bg-accent hover:bg-accent-hover text-sm font-bold text-white transition-colors"
         >
           Find at-bats
         </button>
@@ -237,8 +240,8 @@ function VsBatterChip({
   onClear: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg bg-white/[0.04] border border-white/10 pl-1.5 pr-1 py-1">
-      <div className="relative w-9 h-9 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
+    <div className="flex items-center gap-2 rounded-lg bg-bg border border-line-strong pl-1.5 pr-1 py-1">
+      <div className="relative w-9 h-9 rounded-full bg-avatar overflow-hidden flex-shrink-0">
         <Image
           src={personHeadshotUrl(batterId, 72)}
           alt=""
@@ -249,17 +252,17 @@ function VsBatterChip({
         />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[9px] uppercase tracking-[0.14em] text-white/45 leading-none">
+        <div className="label-caps leading-none">
           vs Batter
         </div>
-        <div className="text-[13px] text-white/95 truncate leading-tight mt-0.5">
+        <div className="text-[13px] text-ink truncate leading-tight mt-0.5">
           {batterName ?? "Selected batter"}
         </div>
       </div>
       <button
         type="button"
         onClick={onChange}
-        className="text-[9px] uppercase tracking-[0.14em] text-white/55 hover:text-white px-1.5 py-1 rounded hover:bg-white/[0.06] transition-colors flex-shrink-0"
+        className="label-caps hover:text-ink px-1.5 py-1 rounded hover:bg-surface-2 transition-colors flex-shrink-0"
         aria-label="Change batter"
       >
         Change
@@ -267,7 +270,7 @@ function VsBatterChip({
       <button
         type="button"
         onClick={onClear}
-        className="inline-flex items-center justify-center w-7 h-7 rounded-md text-white/55 hover:text-white hover:bg-white/[0.08] transition-colors flex-shrink-0"
+        className="inline-flex items-center justify-center w-7 h-7 rounded-control text-muted hover:text-ink hover:bg-surface-2 transition-colors flex-shrink-0"
         aria-label="Exit vsBatter mode"
         title="Exit vsBatter mode"
       >
@@ -348,12 +351,12 @@ function MatchupsDialog({
       role="dialog"
       aria-modal="true"
       aria-label="Find at-bats"
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-bg/75 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md max-h-[60vh] sm:max-h-[85vh] rounded-lg bg-[#081a32]/95 backdrop-blur-md border border-white/10 shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md max-h-[60vh] sm:max-h-[85vh] rounded-panel bg-surface border border-line-strong shadow-2xl overflow-hidden">
         <DialogHeader
           batterName={showSearch ? null : batterName}
           onChangeBatter={() => setForceSearch(true)}
@@ -395,12 +398,12 @@ function DialogHeader({
   onClose: () => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-white/[0.08]">
+    <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-line">
       <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-white/55">
+        <div className="label-caps">
           {batterName ? "Matchups vs" : "Find at-bats"}
         </div>
-        <div className="text-sm font-medium text-white truncate">
+        <div className="font-display font-bold text-xl uppercase tracking-[0.3px] text-ink truncate">
           {batterName ?? "Search a batter to begin"}
         </div>
       </div>
@@ -409,7 +412,7 @@ function DialogHeader({
           <button
             type="button"
             onClick={onChangeBatter}
-            className="px-2 py-1 rounded text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white hover:bg-white/[0.06]"
+            className="px-2 py-1 rounded label-caps hover:text-ink hover:bg-surface-2"
           >
             Change
           </button>
@@ -418,7 +421,7 @@ function DialogHeader({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded text-2xl sm:text-[14px] leading-none text-white/55 hover:text-white hover:bg-white/[0.06]"
+          className="w-10 h-10 sm:w-7 sm:h-7 flex items-center justify-center rounded text-2xl sm:text-[14px] leading-none text-muted hover:text-ink hover:bg-surface-2"
         >
           ×
         </button>
@@ -543,7 +546,7 @@ function BatterSearchBody({
       } finally {
         setLoading(false);
       }
-    }, 150);
+    }, 300); // same debounce as the other name searches
     return () => {
       clearTimeout(handle);
       ctrl.abort();
@@ -563,7 +566,7 @@ function BatterSearchBody({
   const showEmpty = mode === "results" && !loading && results.length === 0;
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="relative p-4 space-y-3">
       <input
         ref={inputRef}
         type="text"
@@ -576,8 +579,12 @@ function BatterSearchBody({
         }}
         placeholder="Type a batter name…"
         aria-label="Search a batter"
-        className="w-full px-3 py-2 rounded bg-white/[0.04] border border-white/10 focus:border-white/30 focus:outline-none text-sm text-white/95 placeholder:text-white/35"
+        className="w-full h-11 pl-3.5 pr-10 rounded-control bg-bg border border-line-strong focus:border-ink-2 focus:outline-none text-[15px] text-ink placeholder:text-muted"
       />
+      {loading ? <Spinner className="absolute right-7 top-[27px]" /> : null}
+      <span className="sr-only" role="status" aria-live="polite">
+        {loading ? "Searching" : ""}
+      </span>
 
       {mode === "suggestions" ? (
         <SuggestionsTwoColumn
@@ -598,13 +605,13 @@ function BatterSearchBody({
       ) : null}
 
       {mode === "hint" ? (
-        <div className="text-[11px] text-white/45">
+        <div className="text-[11px] text-muted">
           Type at least 2 letters to search batters this pitcher faced in {season}.
         </div>
       ) : null}
 
       {showEmpty ? (
-        <div className="text-[11px] text-white/55">
+        <div className="text-[11px] text-muted">
           No batters match. Try a different name or check the season filter.
         </div>
       ) : null}
@@ -633,18 +640,18 @@ function SuggestionsTwoColumn({
   return (
     <div className="flex gap-3">
       <div className="flex-1 min-w-0 space-y-2">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+        <div className="label-caps">
           Most faced
         </div>
         {batters.length > 0 ? (
           <BatterPickList batters={batters} onPick={onPickBatter} />
         ) : (
-          <div className="text-[11px] text-white/45">No data yet.</div>
+          <div className="text-[11px] text-muted">No data yet.</div>
         )}
       </div>
       {teams.length > 0 ? (
         <div className="w-32 flex-shrink-0 space-y-2">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+          <div className="label-caps">
             Teams faced
           </div>
           <TeamPickList teams={teams} onPick={onPickTeam} />
@@ -668,7 +675,7 @@ function TeamPickList({
           <button
             type="button"
             onClick={() => onPick(t)}
-            className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded hover:bg-white/[0.06] transition-colors"
+            className="w-full flex items-center gap-2 text-left min-h-11 px-2.5 py-2 rounded-control hover:bg-surface-2 transition-colors"
           >
             <div className="relative w-6 h-6 flex-shrink-0 rounded-full bg-white border border-white/30 flex items-center justify-center overflow-hidden">
               <Image
@@ -681,10 +688,10 @@ function TeamPickList({
               />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[12px] text-white/95 truncate font-medium">
+              <div className="text-[12px] text-ink truncate font-medium">
                 {t.abbr}
               </div>
-              <div className="text-[10px] text-white/45 tabular-nums truncate">
+              <div className="text-[10px] text-muted tabular-nums truncate">
                 {t.lastDate}
                 {t.gameCount > 1 ? ` · ${t.gameCount}g` : ""}
               </div>
@@ -709,7 +716,7 @@ function TeamFilterBody({
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/[0.06] border border-white/10">
+      <div className="flex items-center gap-2 px-2 py-1.5 rounded-control bg-surface-2 border border-line-strong">
         <div className="relative w-6 h-6 flex-shrink-0 rounded-full bg-white border border-white/30 flex items-center justify-center overflow-hidden">
           <Image
             src={teamLogoUrl(team.id)}
@@ -721,8 +728,8 @@ function TeamFilterBody({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[12px] text-white/95 truncate">{team.name}</div>
-          <div className="text-[10px] text-white/45 tabular-nums truncate">
+          <div className="text-[12px] text-ink truncate">{team.name}</div>
+          <div className="text-[10px] text-muted tabular-nums truncate">
             {team.lastDate}
             {team.gameCount > 1 ? ` · ${team.gameCount}g` : ""}
           </div>
@@ -731,7 +738,7 @@ function TeamFilterBody({
           type="button"
           onClick={onClear}
           aria-label="Clear team filter"
-          className="px-2 py-1 rounded text-[10px] uppercase tracking-[0.14em] text-white/55 hover:text-white hover:bg-white/[0.06] flex-shrink-0"
+          className="px-2 py-1 rounded label-caps hover:text-ink hover:bg-surface-2 flex-shrink-0"
         >
           Clear
         </button>
@@ -739,7 +746,7 @@ function TeamFilterBody({
       {batters.length > 0 ? (
         <BatterPickList batters={batters} onPick={onPick} />
       ) : (
-        <div className="text-[11px] text-white/45">
+        <div className="text-[11px] text-muted">
           No batters faced from this team yet.
         </div>
       )}
@@ -761,10 +768,10 @@ function BatterPickList({
           <button
             type="button"
             onClick={() => onPick(b)}
-            className="w-full flex items-start gap-2.5 text-left px-2 py-1.5 rounded hover:bg-white/[0.06] transition-colors text-sm text-white/95"
+            className="w-full flex items-start gap-2.5 text-left min-h-11 px-2.5 py-2 rounded-control hover:bg-surface-2 transition-colors text-sm text-ink"
           >
             <div className="relative w-8 h-8 flex-shrink-0">
-              <div className="relative w-8 h-8 rounded-full bg-white/5 overflow-hidden">
+              <div className="relative w-8 h-8 rounded-full bg-avatar overflow-hidden">
                 <Image
                   src={personHeadshotUrl(b.id, 64)}
                   alt=""
@@ -799,7 +806,7 @@ function BatterPickList({
                   {b.results.map((r, i) => (
                     <span
                       key={i}
-                      className={`inline-flex items-center px-1.5 py-0.5 rounded border text-[10px] font-semibold tracking-[0.04em] ${RESULT_PILL_STYLE[r] ?? "bg-white/[0.06] border-white/15 text-white/65"}`}
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded-[3px] border text-[11px] font-bold font-display tracking-[0.5px] ${RESULT_PILL_STYLE[r] ?? "bg-surface-2 border-line-strong text-ink-2"}`}
                     >
                       {r}
                     </span>
@@ -896,13 +903,13 @@ function MatchupsListContent({
   return (
     <>
       {error ? (
-        <div className="text-[11px] text-rose-300/80 px-1">{error}</div>
+        <div className="text-[11px] text-accent-hover px-1">{error}</div>
       ) : null}
       {loading && matchups.length === 0 ? (
-        <div className="text-[11px] text-white/55 px-1">Loading at-bats…</div>
+        <div className="text-[11px] text-muted px-1">Loading at-bats…</div>
       ) : null}
       {!loading && matchups.length === 0 && !error ? (
-        <div className="text-[12px] text-white/55 italic px-1">
+        <div className="text-[12px] text-muted italic px-1">
           No matchups found for this season.
         </div>
       ) : null}
@@ -945,17 +952,17 @@ function MatchupRow({
       aria-current={current ? "true" : undefined}
       onClick={() => onPick(ab)}
       className={
-        "w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-md border transition-colors " +
+        "w-full text-left flex items-center gap-2.5 px-2.5 py-2 min-h-14 rounded-control border transition-colors " +
         (current
-          ? "bg-white/[0.14] border-white/30 text-white"
-          : "bg-white/[0.04] hover:bg-white/[0.1] border-white/10 text-white/85")
+          ? "bg-surface-2 border-accent text-ink"
+          : "bg-bg hover:bg-surface-2 border-line-strong text-ink-2")
       }
     >
       {/* Batter headshot with the team-logo badge at the time of the
           AB tucked into the bottom-right corner. */}
       <div className="relative w-10 h-10 flex-shrink-0">
         {batterId != null ? (
-          <div className="relative w-10 h-10 rounded-full bg-white/5 overflow-hidden">
+          <div className="relative w-10 h-10 rounded-full bg-avatar overflow-hidden">
             <Image
               src={personHeadshotUrl(batterId, 80)}
               alt=""
@@ -966,7 +973,7 @@ function MatchupRow({
             />
           </div>
         ) : (
-          <div className="w-10 h-10 rounded-full bg-white/5" />
+          <div className="w-10 h-10 rounded-full bg-avatar" />
         )}
         {ab.batter_team_id != null ? (
           <div className="absolute -bottom-0.5 -right-1 w-5 h-5 rounded-full bg-white border border-white/30 shadow flex items-center justify-center overflow-hidden">
@@ -983,13 +990,13 @@ function MatchupRow({
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] tabular-nums truncate text-white/95">
+        <div className="text-[13px] font-semibold num truncate text-ink">
           {ab.pitch_count} pitch{ab.pitch_count === 1 ? "" : "es"}
         </div>
         <div
           className={
             "text-[10.5px] tabular-nums truncate mt-0.5 " +
-            (current ? "text-white/70" : "text-white/45")
+            "text-muted"
           }
         >
           {ab.game_date}

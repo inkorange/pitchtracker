@@ -94,12 +94,12 @@ export function AtBatHeader({ season }: { season: number }) {
   }
 
   return (
-    <div className="sm:hidden border-t border-white/[0.08] mt-3 pt-3">
+    <div className="sm:hidden border-t border-line mt-3 pt-3">
       <div className="flex items-start gap-2.5">
         {/* Batter headshot with the team-logo badge for the team
             they were on during this at-bat. */}
         <div className="relative w-10 h-10 flex-shrink-0">
-          <div className="relative w-10 h-10 rounded-full bg-white/5 overflow-hidden">
+          <div className="relative w-10 h-10 rounded-full bg-avatar overflow-hidden">
             <Image
               src={personHeadshotUrl(vsBatter, 80)}
               alt=""
@@ -125,7 +125,7 @@ export function AtBatHeader({ season }: { season: number }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <div className="text-sm text-white/95 font-medium truncate flex-1">
+            <div className="text-sm text-ink font-medium truncate flex-1">
               {batterName ?? "—"}
             </div>
             <span
@@ -137,7 +137,7 @@ export function AtBatHeader({ season }: { season: number }) {
               {humanizeOutcome(atBat.outcome)}
             </span>
           </div>
-          <div className="text-[10.5px] tabular-nums truncate text-white/55 mt-0.5">
+          <div className="text-[10.5px] tabular-nums truncate text-muted mt-0.5">
             {atBat.game_date}
             {atBat.inning != null ? (
               <>
@@ -160,7 +160,7 @@ export function AtBatHeader({ season }: { season: number }) {
           type="button"
           onClick={() => setUrl({ abGame: null, abNum: null })}
           aria-label="Exit at-bat playback"
-          className="flex-shrink-0 w-10 h-10 -mr-1 flex items-center justify-center rounded text-2xl leading-none text-white/55 hover:text-white hover:bg-white/[0.06]"
+          className="flex-shrink-0 w-10 h-10 -mr-1 flex items-center justify-center rounded text-2xl leading-none text-muted hover:text-ink hover:bg-surface-2"
           title="Exit at-bat playback"
         >
           ×
