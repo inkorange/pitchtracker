@@ -133,7 +133,7 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
   const { view, ...f } = state;
   const set = useCallback((patch: Patch) => void setState(patch), [setState]);
 
-  const [result, setResult] = useState<SearchResponse | null>(null);
+  const [searchResult, setResult] = useState<SearchResponse | null>(null);
   const [lastRunKey, setLastRunKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,6 +147,10 @@ export function ExploreClient({ seasons }: { seasons: number[] }) {
 
   const queryKey = JSON.stringify(toQuery(f));
   const nActive = activeFilterCount(f, defaultSeasons);
+  // With nothing filtered there is no query, so there are no results:
+  // clearing the last filter (e.g. removing every pitcher) blanks the
+  // results and count immediately instead of leaving stale data up.
+  const result = nActive > 0 ? searchResult : null;
   const pName = useCallback((id: number) => pitcherInfo.get(id)?.name ?? `#${id}`, [pitcherInfo]);
   const bName = useCallback((id: number) => batterInfo.get(id)?.name ?? `#${id}`, [batterInfo]);
 
